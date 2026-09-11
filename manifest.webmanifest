@@ -1,0 +1,13 @@
+{
+  "name": "Diário de Obra - SAGIS",
+  "short_name": "Diário de Obra",
+  "description": "Diário de obra digital - Solar dos Pequis e Solar dos Buritis",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f5f3ee",
+  "theme_color": "#16233d",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
