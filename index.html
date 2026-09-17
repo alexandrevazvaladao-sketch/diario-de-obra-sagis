@@ -1387,12 +1387,19 @@
       const girowrap = document.getElementById('dob-mapa-girowrap');
       const inner = document.getElementById('dob-mapa-rot-inner');
       if(!girowrap || !inner) return;
+      const imgsPendentes = Array.from(inner.querySelectorAll('img')).filter(img => !img.complete);
+      if(imgsPendentes.length){
+        let restantes = imgsPendentes.length;
+        const seguir = () => { restantes--; if(restantes <= 0) aplicarGiro(rotKey); };
+        imgsPendentes.forEach(img => { img.addEventListener('load', seguir, { once: true }); img.addEventListener('error', seguir, { once: true }); });
+        return;
+      }
       const deg = rotKey ? grauAtual(rotKey) : 0;
       inner.style.transform = 'none';
       inner.style.position = 'static';
       inner.style.width = '';
       const w = inner.offsetWidth, h = inner.offsetHeight;
-      if(deg === 0){
+      if(deg === 0 || w < 10){
         girowrap.style.width = '';
         girowrap.style.height = '';
         return;
@@ -2200,7 +2207,7 @@
       <div class="dob-campo" style="margin-bottom:10px; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--paper2, #f3ede1);" id="dob-f-painel-mapa">
         <label>Mapa de Acompanhamento</label>
         <div id="dob-f-painel-mapa-conteudo">
-          ${marcacoesNoDia.length ? `<div style="font-size:13px; margin:4px 0;">${marcacoesNoDia.map(l => `<div>📍 ${l}</div>`).join('')}</div>` : '<div class="dob-dica" style="margin:4px 0;">Nada marcado no mapa pra esse dia ainda.</div>'}
+          ${marcacoesNoDia.length ? `<div style="font-size:13px; margin:4px 0;">${linhasMapaParaHtml(marcacoesNoDia)}</div>` : '<div class="dob-dica" style="margin:4px 0;">Nada marcado no mapa pra esse dia ainda.</div>'}
         </div>
         <button type="button" class="dob-btn secundario pequeno" id="dob-f-marcar-mapa">📍 Marcar no mapa</button>
       </div>`;
@@ -2221,13 +2228,6 @@
           </div>
         </div>
         ${painelMapaHtml}
-        <div class="dob-campo" style="margin-bottom:10px;">
-          <label>Atividades executadas</label>
-          <div style="position:relative;">
-            <textarea class="dob-textarea" id="dob-f-atividades" style="min-height:130px; padding-right:44px;" placeholder="Ex.: Radiers estaqueados, terraplenagem em andamento...">${draft.atividades||''}</textarea>
-            <button type="button" id="dob-f-mic" title="Ditar por voz" style="position:absolute; right:8px; top:8px; width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px;">🎤</button>
-          </div>
-        </div>
         <div class="dob-campo" style="margin-bottom:10px;">
           <label>Equipamentos presentes</label>
           <div id="dob-f-equip-lista" class="dob-chamada-lista"></div>
@@ -2283,7 +2283,10 @@
         </div>
         <div class="dob-campo" style="margin-bottom:10px;">
           <label>Observações / Ocorrências</label>
-          <textarea class="dob-textarea" id="dob-f-texto" placeholder="Qualquer coisa fora das categorias acima...">${draft.texto}</textarea>
+          <div style="position:relative;">
+            <textarea class="dob-textarea" id="dob-f-texto" style="padding-right:44px;" placeholder="Qualquer coisa que quiser registrar sobre o dia...">${draft.texto}</textarea>
+            <button type="button" id="dob-f-mic" title="Ditar por voz" style="position:absolute; right:8px; top:8px; width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:14px;">🎤</button>
+          </div>
           <label class="dob-ocorrencia-label">
             <input type="checkbox" id="dob-f-ocorrencia" ${draft.ocorrencia ? 'checked' : ''} />
             <span>⚠️ Marcar esse registro como ocorrência (destaca no histórico)</span>
@@ -2397,7 +2400,7 @@
       const dataAtual = document.getElementById('dob-f-data').value || todayStr();
       const linhas = marcacoesMapaDoDia(dataAtual);
       document.getElementById('dob-f-painel-mapa-conteudo').innerHTML = linhas.length
-        ? `<div style="font-size:13px; margin:4px 0;">${linhas.map(l => `<div>📍 ${l}</div>`).join('')}</div>`
+        ? `<div style="font-size:13px; margin:4px 0;">${linhasMapaParaHtml(linhas)}</div>`
         : '<div class="dob-dica" style="margin:4px 0;">Nada marcado no mapa pra esse dia ainda.</div>';
     }
     document.getElementById('dob-f-data').addEventListener('change', atualizarPainelMapa);
@@ -2615,7 +2618,7 @@
     });
 
     document.getElementById('dob-f-cancelar').addEventListener('click', () => {
-      const temConteudo = document.getElementById('dob-f-atividades').value.trim() || document.getElementById('dob-f-texto').value.trim() || draft.itensVinculados.length || draft.fotos.length;
+      const temConteudo = document.getElementById('dob-f-texto').value.trim() || draft.itensVinculados.length || draft.fotos.length;
       if(temConteudo && !confirm('Sair sem salvar? O que você preencheu vai ser perdido.')) return;
       formularioSujo = false;
       formContainer.innerHTML='';
@@ -2641,7 +2644,7 @@
         rec.onerror = () => { gravando = false; btnMic.style.background = '#fff'; btnMic.style.color = ''; };
         rec.onresult = (e) => {
           const texto = e.results[0][0].transcript;
-          const ta = document.getElementById('dob-f-atividades');
+          const ta = document.getElementById('dob-f-texto');
           ta.value = ta.value ? (ta.value + ' ' + texto) : texto;
         };
         rec.start();
@@ -2653,8 +2656,7 @@
       draft.clima = document.getElementById('dob-f-clima').value;
       draft.ocorrencia = document.getElementById('dob-f-ocorrencia').checked;
       draft.texto = document.getElementById('dob-f-texto').value.trim();
-      draft.atividades = document.getElementById('dob-f-atividades').value.trim();
-      const temConteudo = draft.texto || draft.atividades || draft.equipamentos || draft.maodeobra || draft.fotos.length > 0;
+      const temConteudo = draft.texto || draft.equipamentos || draft.maodeobra || draft.fotos.length > 0;
       if(!temConteudo){ alert('Preencha ao menos um campo ou adicione uma foto antes de salvar.'); return; }
       try{
         saveEntry(draft);
@@ -2772,42 +2774,70 @@
   }
   function normalizeFoto(foto){ return typeof foto === 'string' ? { type:'local', data: foto } : foto; }
 
+  function humanizarNomeBloco(id, tipo){
+    if(tipo === 'bloco') return 'Bloco ' + id;
+    if(tipo === 'vaga') return 'Vaga ' + id;
+    let s = String(id).replace(/^(pequis_completo_|buritis_completo_|lazer_pequis_|lazer_buritis_|pequis_|buritis_)/i, '');
+    s = s.replace(/_/g, ' ').trim();
+    s = s.replace(/\s+\d+$/, ''); // tira número solto no final (índice)
+    s = s.split(' ').filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+    return s || String(id);
+  }
+
   function marcacoesMapaDoDia(data){
-    const grupos = {};
-    const chave = (s, o) => s + '|' + o;
-    const pegaGrupo = (s, o) => {
-      const k = chave(s, o);
-      if(!grupos[k]) grupos[k] = { servico: s, obra: o, iniciados: [], concluidos: [], trechosAmarelo: 0, trechosVerde: 0 };
-      return grupos[k];
+    const porObra = {};
+    const registrar = (obra, texto) => {
+      if(!porObra[obra]) porObra[obra] = [];
+      porObra[obra].push(texto);
     };
+
+    const gruposEstado = {};
     mapaState.estados.forEach(e => {
-      if(e.dataInicio === data || e.dataConclusao === data){
-        const g = pegaGrupo(e.servico, e.obra);
-        if(e.dataInicio === data) g.iniciados.push(e.bloco);
-        if(e.dataConclusao === data) g.concluidos.push(e.bloco);
-      }
+      let status = null;
+      if(e.dataConclusao === data) status = 'concluído';
+      else if(e.dataInicio === data) status = 'em andamento';
+      if(!status) return;
+      const chave = e.servico + '|' + e.obra + '|' + status;
+      if(!gruposEstado[chave]) gruposEstado[chave] = { servico: e.servico, obra: e.obra, status, nomes: [] };
+      const tipo = mapaState.tipoPorServico[e.servico];
+      gruposEstado[chave].nomes.push(humanizarNomeBloco(e.bloco, tipo));
     });
+    Object.values(gruposEstado).forEach(g => {
+      registrar(g.obra, `${g.servico}: ${g.nomes.join(', ')} — ${g.status}`);
+    });
+
+    const gruposDesenho = {};
     mapaState.desenhos.forEach(d => {
-      if(d.data === data){
-        const g = pegaGrupo(d.servico, d.obra);
-        if(d.cor === 'verde') g.trechosVerde++; else g.trechosAmarelo++;
-      }
+      if(d.data !== data) return;
+      const status = d.cor === 'verde' ? 'concluído' : 'em andamento';
+      const chave = d.servico + '|' + d.obra + '|' + status;
+      if(!gruposDesenho[chave]) gruposDesenho[chave] = { servico: d.servico, obra: d.obra, status, qtd: 0 };
+      gruposDesenho[chave].qtd++;
     });
-    return Object.values(grupos).map(g => {
-      const obraLabel = g.obra === 'Pequis' ? 'Solar dos Pequis' : g.obra === 'Buritis' ? 'Solar dos Buritis' : g.obra;
-      const partes = [];
-      if(g.iniciados.length) partes.push(`bloco(s) ${g.iniciados.join(', ')} iniciado(s)`);
-      if(g.concluidos.length) partes.push(`bloco(s) ${g.concluidos.join(', ')} concluído(s)`);
-      if(g.trechosAmarelo) partes.push(`${g.trechosAmarelo} trecho(s) em execução`);
-      if(g.trechosVerde) partes.push(`${g.trechosVerde} trecho(s) concluído(s)`);
-      return `<strong>${g.servico}</strong> (${obraLabel}): ${partes.join(', ')}`;
+    Object.values(gruposDesenho).forEach(g => {
+      registrar(g.obra, `${g.servico}: ${g.qtd} trecho(s) — ${g.status}`);
     });
+
+    const linhas = [];
+    Object.keys(porObra).sort().forEach(obra => {
+      const obraLabel = obra === 'Pequis' ? 'Solar dos Pequis' : obra === 'Buritis' ? 'Solar dos Buritis' : obra;
+      linhas.push({ tipo: 'obra', texto: obraLabel });
+      porObra[obra].forEach(texto => linhas.push({ tipo: 'item', texto }));
+    });
+    return linhas;
+  }
+
+  function linhasMapaParaHtml(linhas){
+    return linhas.map(l => l.tipo === 'obra'
+      ? `<div style="font-weight:600; margin-top:6px;">Obra: ${l.texto}</div>`
+      : `<div style="margin-left:8px;">${l.texto}</div>`
+    ).join('');
   }
 
   function marcacoesMapaHtml(data){
     const linhas = marcacoesMapaDoDia(data);
     if(!linhas.length) return '';
-    return `<div class="dob-entry-secao"><div class="dob-entry-secao-label">📍 Marcações do mapa nesse dia</div><div class="dob-entry-secao-texto">${linhas.map(l => `<div>${l}</div>`).join('')}</div></div>`;
+    return `<div class="dob-entry-secao"><div class="dob-entry-secao-label">📍 Marcações do mapa nesse dia</div><div class="dob-entry-secao-texto">${linhasMapaParaHtml(linhas)}</div></div>`;
   }
 
   function datasComMarcacaoSemRegistro(){
