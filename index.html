@@ -1221,6 +1221,10 @@
     mapaState.desenhos = mapaState.desenhos.filter(d => !(d.servico === servico && d.obra === obra && d.planta === planta));
     saveMapaState();
   }
+  function limparTodosDesenhos(){
+    mapaState.desenhos = [];
+    saveMapaState();
+  }
   function grauAtual(rotKey){
     return (mapaState.rotacoes && mapaState.rotacoes[rotKey]) || 0;
   }
@@ -1485,6 +1489,7 @@
         const ferramentasHtml = !isDesenhavel ? '' : `
           <div style="display:flex; flex-direction:column; gap:6px; padding:10px; background:var(--paper2, #f3ede1); border-radius:8px; border:1px solid var(--line);">
             <button type="button" class="dob-btn ${modoDesenho ? '' : 'secundario'} pequeno" id="dob-mapa-toggle-desenho">${modoDesenho ? '✅ Desenho ativo' : '✏️ Desenhar no mapa'}</button>
+            <button type="button" class="dob-btn perigo pequeno" id="dob-mapa-limpar-tudo-geral">🗑️ Apagar TODOS os traços (todas as redes)</button>
             ${modoDesenho ? `
               <span style="font-size:12px; color:var(--muted);">Cor do lápis:</span>
               <button type="button" class="dob-btn pequeno" id="dob-mapa-cor-amarelo" style="background:${desenhoFerramenta==='lapis' && desenhoCorAtual==='amarelo' ? '#c99a3d' : 'transparent'}; color:${desenhoFerramenta==='lapis' && desenhoCorAtual==='amarelo' ? '#fff' : 'inherit'}; border:1px solid #a97f2a;">Em execução</button>
@@ -1530,6 +1535,10 @@
           if(desfazerBtn) desfazerBtn.addEventListener('click', () => { desfazerUltimoDesenho(servico, obra, chaveAtualRede); renderGrid(); });
           if(limparBtn) limparBtn.addEventListener('click', async () => {
             if(await confirmarCustom('Apagar todos os traços desenhados nesse mapa?')){ limparDesenhos(servico, obra, chaveAtualRede); renderGrid(); }
+          });
+          const limparTudoGeralBtn = document.getElementById('dob-mapa-limpar-tudo-geral');
+          if(limparTudoGeralBtn) limparTudoGeralBtn.addEventListener('click', async () => {
+            if(await confirmarCustom('Apagar TODOS os traços de TODAS as redes (Pequis e Buritis)? Essa ação não pode ser desfeita.')){ limparTodosDesenhos(); renderGrid(); }
           });
 
           const canvas = document.getElementById('dob-mapa-canvas');
