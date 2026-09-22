@@ -1202,6 +1202,37 @@
   function desenhosPara(servico, obra, planta){
     return mapaState.desenhos.filter(d => d.servico === servico && d.obra === obra && d.planta === planta);
   }
+  function baixarImagemMapa(servico, obra, planta){
+    const imgEl = document.getElementById('dob-mapa-rede-img');
+    if(!imgEl){ alert('Não achei a imagem do mapa pra baixar.'); return; }
+    const gerar = () => {
+      const w = imgEl.naturalWidth || 1000;
+      const h = imgEl.naturalHeight || Math.round(w * 1.414);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(imgEl, 0, 0, w, h);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      const CORES = { amarelo: '#c99a3d', verde: '#3f7d5c' };
+      desenhosPara(servico, obra, planta).forEach(d => {
+        if(!d.pontos || d.pontos.length < 2) return;
+        ctx.strokeStyle = CORES[d.cor] || CORES.amarelo;
+        ctx.lineWidth = Math.max(4, w * 0.006);
+        ctx.beginPath();
+        d.pontos.forEach((p, i) => {
+          const px = (p.x / 100) * w, py = (p.y / 100) * h;
+          if(i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        });
+        ctx.stroke();
+      });
+      const link = document.createElement('a');
+      link.download = `${planta}_${todayStr().replace(/-/g, '')}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    };
+    if(imgEl.complete) gerar(); else imgEl.addEventListener('load', gerar, { once: true });
+  }
   function addDesenho(servico, obra, planta, pontos, cor, data){
     const id = 'd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     mapaState.desenhos.push({ id, servico, obra, planta, pontos, cor, data: data || todayStr() });
@@ -1510,6 +1541,7 @@
         const ferramentasHtml = !isDesenhavel ? '' : `
           <div style="display:flex; flex-direction:column; gap:6px; padding:10px; background:var(--paper2, #f3ede1); border-radius:8px; border:1px solid var(--line);">
             <button type="button" class="dob-btn ${modoDesenho ? '' : 'secundario'} pequeno" id="dob-mapa-toggle-desenho">${modoDesenho ? '✅ Desenho ativo' : '✏️ Desenhar no mapa'}</button>
+            <button type="button" class="dob-btn secundario pequeno" id="dob-mapa-baixar-imagem">📥 Baixar imagem com marcações</button>
             <button type="button" class="dob-btn perigo pequeno" id="dob-mapa-limpar-tudo-geral">🗑️ Apagar TODOS os traços (todas as redes)</button>
             ${modoDesenho ? `
               <span style="font-size:12px; color:var(--muted);">Cor do lápis:</span>
@@ -1561,6 +1593,9 @@
           if(limparTudoGeralBtn) limparTudoGeralBtn.addEventListener('click', async () => {
             if(await confirmarCustom('Apagar TODOS os traços de TODAS as redes (Pequis e Buritis)? Essa ação não pode ser desfeita.')){ limparTodosDesenhos(); renderGrid(); }
           });
+
+          const baixarImagemBtn = document.getElementById('dob-mapa-baixar-imagem');
+          if(baixarImagemBtn) baixarImagemBtn.addEventListener('click', () => baixarImagemMapa(servico, obra, chaveAtualRede));
 
           const canvas = document.getElementById('dob-mapa-canvas');
           const imgEl = document.getElementById('dob-mapa-rede-img');
