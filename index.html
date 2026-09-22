@@ -1202,6 +1202,36 @@
   function desenhosPara(servico, obra, planta){
     return mapaState.desenhos.filter(d => d.servico === servico && d.obra === obra && d.planta === planta);
   }
+  function encontrarRedeDoBloco(obra, blocoId){
+    for(const chave in REDES_PLANTAS){
+      const planta = REDES_PLANTAS[chave];
+      if(planta.obra !== obra) continue;
+      if(planta.itens.some(it => it.id === blocoId)) return chave;
+    }
+    return null;
+  }
+  function abrirNoMapa(obra, servico, planta){
+    mapaAberto = true;
+    const btnMapa = document.getElementById('dob-btn-mapa');
+    if(btnMapa) btnMapa.textContent = 'Fechar mapa';
+    renderMapa();
+    const obraSel = document.getElementById('dob-mapa-obra');
+    const servicoSel = document.getElementById('dob-mapa-servico');
+    if(obraSel){ obraSel.value = obra; obraSel.dispatchEvent(new Event('change', {bubbles:true})); }
+    if(servicoSel){ servicoSel.value = servico; servicoSel.dispatchEvent(new Event('change', {bubbles:true})); }
+    if(planta){
+      const redeSel = document.getElementById('dob-rede-seletor');
+      if(redeSel){ redeSel.dataset.obraCarregada = obra; redeSel.value = planta; redeSel.dispatchEvent(new Event('change', {bubbles:true})); }
+    }
+    const container = document.getElementById('dob-mapa-container');
+    if(container) container.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+  document.addEventListener('click', (ev) => {
+    const alvo = ev.target.closest('[data-ir-mapa]');
+    if(!alvo) return;
+    const [obra, servico, planta] = alvo.dataset.irMapa.split('|||');
+    abrirNoMapa(obra, servico, planta || null);
+  });
   function baixarImagemMapa(servico, obra, planta){
     const imgEl = document.getElementById('dob-mapa-rede-img');
     if(!imgEl){ alert('Não achei a imagem do mapa pra baixar.'); return; }
@@ -2878,26 +2908,28 @@
       const chave = e.servico + '|' + e.obra + '|' + status;
       if(!gruposEstado[chave]) gruposEstado[chave] = { servico: e.servico, obra: e.obra, status, itens: [] };
       const tipo = mapaState.tipoPorServico[e.servico];
-      gruposEstado[chave].itens.push({ nome: humanizarNomeBloco(e.bloco, tipo), inicio: e.dataInicio, fim: e.dataConclusao });
+      gruposEstado[chave].itens.push({ nome: humanizarNomeBloco(e.bloco, tipo), inicio: e.dataInicio, fim: e.dataConclusao, bloco: e.bloco });
     });
     Object.values(gruposEstado).forEach(g => {
       const chips = g.itens.map(it => {
         if(g.status === 'andamento') return `${it.nome} · desde ${fmtDate(it.inicio)}`;
         return it.inicio && it.inicio !== it.fim ? `${it.nome} · ${fmtDate(it.inicio)} → ${fmtDate(it.fim)}` : it.nome;
       });
-      registrar(g.obra, { servico: g.servico, status: g.status, chips });
+      const tipoMapa = mapaState.tipoPorServico[g.servico];
+      const planta = tipoMapa === 'rede' ? encontrarRedeDoBloco(g.obra, g.itens[0].bloco) : null;
+      registrar(g.obra, { servico: g.servico, status: g.status, chips, planta });
     });
 
     const gruposDesenho = {};
     mapaState.desenhos.forEach(d => {
       if(d.data !== data) return;
       const status = d.cor === 'verde' ? 'concluido' : 'andamento';
-      const chave = d.servico + '|' + d.obra + '|' + status;
-      if(!gruposDesenho[chave]) gruposDesenho[chave] = { servico: d.servico, obra: d.obra, status, qtd: 0 };
+      const chave = d.servico + '|' + d.obra + '|' + d.planta + '|' + status;
+      if(!gruposDesenho[chave]) gruposDesenho[chave] = { servico: d.servico, obra: d.obra, planta: d.planta, status, qtd: 0 };
       gruposDesenho[chave].qtd++;
     });
     Object.values(gruposDesenho).forEach(g => {
-      registrar(g.obra, { servico: g.servico, status: g.status, chips: [`${g.qtd} trecho${g.qtd > 1 ? 's' : ''} no mapa`] });
+      registrar(g.obra, { servico: g.servico, status: g.status, chips: [`${g.qtd} trecho${g.qtd > 1 ? 's' : ''} no mapa`], planta: g.planta });
     });
 
     const linhas = [];
@@ -2914,17 +2946,21 @@
       concluido:  { cor: '#2f5f45', bg: 'rgba(63,125,92,0.14)',  label: 'Concluído',    chipClasse: 'mapa-concluido' },
       andamento:  { cor: '#a97e2c', bg: 'rgba(201,154,61,0.18)', label: 'Em andamento', chipClasse: 'mapa-andamento' }
     };
+    let obraAtual = '';
     return linhas.map(l => {
       if(l.tipo === 'obra'){
+        obraAtual = l.texto === 'Solar dos Pequis' ? 'Pequis' : l.texto === 'Solar dos Buritis' ? 'Buritis' : l.texto;
         return `<div style="font-weight:700; font-size:13px; margin:10px 0 4px; color:var(--ink,#16233d); display:flex; align-items:center; gap:6px;">🏗️ ${l.texto}</div>`;
       }
       const info = STATUS_INFO[l.status] || STATUS_INFO.andamento;
       const chips = (l.chips || []).map(c => `<span class="dob-chip ${info.chipClasse}">${c}</span>`).join('');
+      const irMapaAttr = `data-ir-mapa="${obraAtual}|||${l.servico}|||${l.planta || ''}"`;
       return `
-        <div class="dob-mapa-servico-linha">
+        <div class="dob-mapa-servico-linha" ${irMapaAttr} style="cursor:pointer;" title="Abrir no mapa para ver/atualizar">
           <span class="dob-mapa-status-dot" style="background:${info.cor};"></span>
-          <span style="font-weight:600; font-size:12.5px; color:var(--ink,#16233d);">${l.servico}</span>
+          <span style="font-weight:600; font-size:12.5px; color:var(--ink,#16233d); text-decoration:underline; text-decoration-style:dotted; text-underline-offset:2px;">${l.servico}</span>
           <span class="dob-mapa-status-label" style="color:${info.cor}; background:${info.bg};">${info.label}</span>
+          <span style="font-size:11px; color:var(--muted,#8a8272);">🗺️ abrir no mapa</span>
         </div>
         <div class="dob-chips" style="margin:0 0 8px 24px;">${chips}</div>
       `;
