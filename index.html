@@ -2832,17 +2832,25 @@
 
     const gruposEstado = {};
     mapaState.estados.forEach(e => {
-      let status = null;
-      if(e.dataConclusao === data) status = 'concluido';
-      else if(e.dataInicio === data) status = 'andamento';
-      if(!status) return;
+      if(!e.dataInicio || e.dataInicio > data) return; // ainda não começou até essa data
+      let status;
+      if(e.dataConclusao && e.dataConclusao <= data){
+        if(e.dataConclusao !== data) return; // já concluído antes — só aparece no dia exato da conclusão
+        status = 'concluido';
+      } else {
+        status = 'andamento'; // segue em execução nesse dia (mesmo que tenha começado antes)
+      }
       const chave = e.servico + '|' + e.obra + '|' + status;
-      if(!gruposEstado[chave]) gruposEstado[chave] = { servico: e.servico, obra: e.obra, status, nomes: [] };
+      if(!gruposEstado[chave]) gruposEstado[chave] = { servico: e.servico, obra: e.obra, status, itens: [] };
       const tipo = mapaState.tipoPorServico[e.servico];
-      gruposEstado[chave].nomes.push(humanizarNomeBloco(e.bloco, tipo));
+      gruposEstado[chave].itens.push({ nome: humanizarNomeBloco(e.bloco, tipo), inicio: e.dataInicio, fim: e.dataConclusao });
     });
     Object.values(gruposEstado).forEach(g => {
-      registrar(g.obra, { servico: g.servico, status: g.status, chips: g.nomes });
+      const chips = g.itens.map(it => {
+        if(g.status === 'andamento') return `${it.nome} · desde ${fmtDate(it.inicio)}`;
+        return it.inicio && it.inicio !== it.fim ? `${it.nome} · ${fmtDate(it.inicio)} → ${fmtDate(it.fim)}` : it.nome;
+      });
+      registrar(g.obra, { servico: g.servico, status: g.status, chips });
     });
 
     const gruposDesenho = {};
