@@ -1300,6 +1300,8 @@
             <label>Serviço acompanhado</label>
             <div class="dob-linha" style="gap:6px;">
               <select class="dob-select" id="dob-mapa-servico" style="flex:1;"></select>
+              <button class="dob-btn secundario pequeno" id="dob-mapa-servico-subir" type="button" title="Mover este serviço pra cima na lista">↑</button>
+              <button class="dob-btn secundario pequeno" id="dob-mapa-servico-descer" type="button" title="Mover este serviço pra baixo na lista">↓</button>
               <button class="dob-btn secundario pequeno" id="dob-mapa-editar-servico" type="button" title="Editar nome do serviço">Editar</button>
               <button class="dob-btn perigo pequeno" id="dob-mapa-excluir-servico" type="button" title="Excluir este serviço">Excluir</button>
             </div>
@@ -1342,11 +1344,25 @@
     function popularServicos(){
       const sel = document.getElementById('dob-mapa-servico');
       const atual = sel.value;
-      const ordenada = ordenarServicos(mapaState.servicos);
-      sel.innerHTML = ordenada.map(s => `<option value="${s}">${s}</option>`).join('');
+      // ordem manual: usa a ordem salva em mapaState.servicos (arrastável pelos botões ↑/↓)
+      sel.innerHTML = mapaState.servicos.map(s => `<option value="${s}">${s}</option>`).join('');
       if(mapaState.servicos.includes(atual)) sel.value = atual;
     }
     popularServicos();
+
+    function moverServico(direcao){
+      const sel = document.getElementById('dob-mapa-servico');
+      const nomeAtual = sel.value;
+      const idx = mapaState.servicos.indexOf(nomeAtual);
+      if(idx < 0) return;
+      const novoIdx = idx + direcao;
+      if(novoIdx < 0 || novoIdx >= mapaState.servicos.length) return;
+      const arr = mapaState.servicos;
+      [arr[idx], arr[novoIdx]] = [arr[novoIdx], arr[idx]];
+      saveMapaState();
+      popularServicos();
+      sel.value = nomeAtual;
+    }
 
     function corClasse(cor){ return cor === 'amarelo' ? 'rgba(201,154,61,0.75)' : cor === 'verde' ? 'rgba(63,125,92,0.75)' : 'transparent'; }
 
@@ -1757,6 +1773,9 @@
       document.getElementById('dob-mapa-servico').value = nome;
       renderGrid();
     });
+
+    document.getElementById('dob-mapa-servico-subir').addEventListener('click', () => moverServico(-1));
+    document.getElementById('dob-mapa-servico-descer').addEventListener('click', () => moverServico(1));
 
     document.getElementById('dob-mapa-editar-servico').addEventListener('click', () => {
       const sel = document.getElementById('dob-mapa-servico');
