@@ -2808,8 +2808,14 @@
   function normalizeFoto(foto){ return typeof foto === 'string' ? { type:'local', data: foto } : foto; }
 
   function humanizarNomeBloco(id, tipo){
-    if(tipo === 'bloco') return 'Bloco ' + id;
-    if(tipo === 'vaga') return 'Vaga ' + id;
+    if(tipo === 'bloco' || tipo === 'vaga'){
+      const rotulo = tipo === 'bloco' ? 'Bloco' : 'Vaga';
+      const tokens = String(id).split('_').filter(Boolean);
+      const numeros = tokens.filter(t => /^\d+$/.test(t));
+      const palavras = tokens.filter(t => !/^\d+$/.test(t)).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      if(numeros.length) return `${rotulo} ${numeros.join('/')}${palavras ? ' ' + palavras : ''}`;
+      return `${rotulo} ${id}`;
+    }
     let s = String(id).replace(/^(pequis_completo_|buritis_completo_|lazer_pequis_|lazer_buritis_|pequis_|buritis_)/i, '');
     s = s.replace(/_/g, ' ').trim();
     s = s.replace(/\s+\d+$/, ''); // tira número solto no final (índice)
