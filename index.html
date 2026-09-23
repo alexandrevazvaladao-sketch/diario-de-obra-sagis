@@ -444,7 +444,7 @@
       <span class="dob-side-brand">🏗️ SAGIS</span>
     </div>
     <div class="dob-side-item active" data-side="home"><span class="ic">📋</span><span class="label">Diário</span></div>
-    <div class="dob-side-item" data-side="novo"><span class="ic">📝</span><span class="label">Novo registro</span></div>
+    <div class="dob-side-item" data-side="novo"><span class="ic">📝</span><span class="label">Novo apontamento</span></div>
     <div class="dob-side-item" data-side="mapa"><span class="ic">🗺️</span><span class="label">Mapa</span></div>
     <div class="dob-side-item" data-side="resumo-macro"><span class="ic">📊</span><span class="label">Resumo macro</span></div>
     <div class="dob-side-item" data-side="resumo-semana"><span class="ic">📅</span><span class="label">Resumo semana</span></div>
@@ -464,7 +464,7 @@
     </div>
     <div style="display:flex; align-items:center; gap:10px;">
       <a class="dob-drive-link" id="dob-link-pasta" href="#" target="_blank" style="display:none;">Abrir pasta no Drive →</a>
-      <div class="dob-stamp">Registro de campo</div>
+      <div class="dob-stamp">Apontamento de campo</div>
     </div>
   </div>
 
@@ -481,7 +481,7 @@
   <div class="dob-datestrip dob-home-only" id="dob-datestrip"></div>
 
   <div class="dob-toolbar dob-home-only">
-    <button class="dob-btn" id="dob-novo">+ Novo registro</button>
+    <button class="dob-btn" id="dob-novo">+ Novo apontamento</button>
     <button class="dob-btn secundario" id="dob-btn-relatorio" style="display:none;">Gerar apresentação</button>
     <button class="dob-btn secundario" id="dob-btn-gamma" style="display:none;">Comando para o Gamma</button>
     <button class="dob-btn secundario" id="dob-btn-resumo-macro" style="display:none;">Resumo por macro-serviço</button>
@@ -509,7 +509,7 @@
   <div id="dob-producao-diaria-container"></div>
   <div id="dob-mapa-container"></div>
   <div id="dob-form-container"></div>
-  <div id="dob-lista" class="dob-lista dob-home-only"><div class="dob-loading">Carregando registros...</div></div>
+  <div id="dob-lista" class="dob-lista dob-home-only"><div class="dob-loading">Carregando apontamentos...</div></div>
 </div>
 </div>
 
@@ -552,7 +552,7 @@
     const registrosSemana = entries.filter(e => new Date(e.date+'T00:00:00') >= seteDiasAtras).length;
     const obras = new Set(entries.map(e => e.obra)).size;
     const stats = [
-      { num: entries.length, label: 'Registros totais' },
+      { num: entries.length, label: 'Apontamentos totais' },
       { num: registrosSemana, label: 'Últimos 7 dias' },
       { num: totalFotos, label: 'Fotos' },
       { num: fotosDrive, label: 'No Drive' },
@@ -768,8 +768,8 @@
     s.background = { color: PAPEL };
     s.addText('Resumo do período', { x:0.5, y:0.35, w:9, h:0.5, fontSize:22, bold:true, color:AZUL, fontFace:'Georgia' });
     const stats = [
-      [String(periodoEntries.length), 'Registros'],
-      [String(diasComRegistro), 'Dias com registro'],
+      [String(periodoEntries.length), 'Apontamentos'],
+      [String(diasComRegistro), 'Dias com apontamento'],
       [String(totalFotos), 'Fotos'],
       [String(equipNoPeriodo.length), 'Equipamentos ativos'],
     ];
@@ -928,11 +928,11 @@
     let txt = `Use o conector do Gamma para gerar uma apresentação executiva para a diretoria, com base nestes dados reais do Diário de Obra (SAGIS). Capa, resumo executivo, atividades do período e equipe/equipamentos envolvidos. Design profissional, cores azul-marinho e laranja.\n\n`;
     txt += `PERÍODO: ${fmtDate(inicio)} a ${fmtDate(fim)}\n`;
     txt += `OBRA: ${nomeObra[obraFiltro] || nomeObra['']}\n\n`;
-    txt += `RESUMO:\n- Registros no período: ${periodoEntries.length}\n- Dias com registro: ${diasComRegistro}\n- Fotos no período: ${totalFotos}\n- Equipamentos com presença: ${equipNoPeriodo.length}\n- Pessoas/empresas com presença: ${pessoasNoPeriodo.length}\n\n`;
+    txt += `RESUMO:\n- Apontamentos no período: ${periodoEntries.length}\n- Dias com apontamento: ${diasComRegistro}\n- Fotos no período: ${totalFotos}\n- Equipamentos com presença: ${equipNoPeriodo.length}\n- Pessoas/empresas com presença: ${pessoasNoPeriodo.length}\n\n`;
 
     txt += `ATIVIDADES POR DIA:\n`;
     if(periodoEntries.length === 0){
-      txt += `(nenhum registro neste período)\n`;
+      txt += `(nenhum apontamento neste período)\n`;
     } else {
       periodoEntries.forEach(e => {
         const obraLabel = e.obra === 'Pequis' ? 'Solar dos Pequis' : e.obra === 'Buritis' ? 'Solar dos Buritis' : 'Geral';
@@ -1042,14 +1042,14 @@
       <div class="dob-card-form">
         <h3>Resumo da semana <span style="font-weight:400; font-size:12px; color:var(--muted);">(${fmtDate(inicioStr)} até ${fmtDate(fimStr)})</span></h3>
         <div class="dob-resumo-semana-cards">
-          <div class="dob-resumo-semana-card"><div class="v">${diasComRegistro}</div><div class="l">Dias com registro</div></div>
+          <div class="dob-resumo-semana-card"><div class="v">${diasComRegistro}</div><div class="l">Dias com apontamento</div></div>
           <div class="dob-resumo-semana-card ${ocorrencias.length ? 'alerta' : ''}"><div class="v">${ocorrencias.length}</div><div class="l">Ocorrências</div></div>
           <div class="dob-resumo-semana-card"><div class="v">${producaoTotal || 0}</div><div class="l">Produção somada</div></div>
           <div class="dob-resumo-semana-card ${equipParadosSet.size ? 'alerta' : ''}"><div class="v">${equipParadosSet.size}</div><div class="l">Equip. parados (dia)</div></div>
         </div>
         ${ocorrencias.length ? `<div style="margin-top:14px;"><div class="dob-entry-secao-label">Ocorrências da semana</div>${ocorrencias.map(e => `<div class="dob-macro-registro"><span class="dob-macro-data">${fmtDate(e.date)}</span><span>${(e.texto||e.atividades||'').slice(0,140)}</span></div>`).join('')}</div>` : ''}
         ${equipParadosSet.size ? `<div style="margin-top:14px;"><div class="dob-entry-secao-label">Equipamentos parados</div><div class="dob-chips">${Array.from(equipParadosSet).map(n => `<span class="dob-chip" style="background:#faece7; color:#993c1d;">${n}</span>`).join('')}</div></div>` : ''}
-        ${daSemana.length === 0 ? '<p class="dob-dica">Nenhum registro nos últimos 7 dias.</p>' : ''}
+        ${daSemana.length === 0 ? '<p class="dob-dica">Nenhum apontamento nos últimos 7 dias.</p>' : ''}
       </div>
     `;
   }
@@ -1130,7 +1130,7 @@
             <option value="30" ${producaoDiariaDias===30?'selected':''}>Últimos 30 dias</option>
           </select>
         </div>
-        <p class="dob-dica">Quantidade lançada em cada registro, por dia. Agrupado por macro-serviço e contrato — vem direto do que você vincula ao criar um registro.</p>
+        <p class="dob-dica">Quantidade lançada em cada apontamento, por dia. Agrupado por macro-serviço e contrato — vem direto do que você vincula ao criar um apontamento.</p>
         <div class="dob-pd-wrap">
           <table class="dob-pd-tabela">
             <thead><tr>
@@ -1509,13 +1509,14 @@
         <h3>Mapa de Acompanhamento</h3>
         ${dataForcadaMapa ? `
           <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#fdf2e6; border:1px solid #e8c48f; border-radius:8px; margin-bottom:10px;">
-            <span style="font-size:13px;">📍 Marcando para o registro de <strong>${fmtDate(dataForcadaMapa)}</strong> — tudo que você marcar aqui fica datado desse dia.</span>
+            <span style="font-size:13px;">📍 Marcando para o apontamento de <strong>${fmtDate(dataForcadaMapa)}</strong> — tudo que você marcar aqui fica datado desse dia.</span>
             <button type="button" class="dob-btn secundario pequeno" id="dob-mapa-soltar-data" style="margin-left:auto;">Marcar livre (hoje)</button>
           </div>
         ` : ''}
         ${!mapaModoEdicao ? `
           <div style="display:flex; align-items:center; gap:8px; padding:7px 12px; background:#eef1f6; border:1px solid #c9d2e0; border-radius:8px; margin-bottom:10px;">
-            <span style="font-size:12.5px; color:var(--ink-soft,#2c3c5c);">👁️ Modo visualização — clique em "🗺️ abrir no mapa" numa atividade do diário, ou crie um novo registro, pra poder atualizar.</span>
+            <span style="font-size:12.5px; color:var(--ink-soft,#2c3c5c);">👁️ Modo visualização — clique em "🗺️ abrir no mapa" num apontamento do diário, crie um novo apontamento, ou clique em "✏️ Editar" pra corrigir algo aqui mesmo.</span>
+            <button type="button" class="dob-btn secundario pequeno" id="dob-mapa-editar-aqui" style="margin-left:auto; flex-shrink:0;">✏️ Editar</button>
           </div>
         ` : ''}
         <div class="dob-linha">
@@ -2049,6 +2050,9 @@
 
     const soltarDataBtn = document.getElementById('dob-mapa-soltar-data');
     if(soltarDataBtn) soltarDataBtn.addEventListener('click', () => { dataForcadaMapa = null; renderMapa(); });
+
+    const editarAquiBtn = document.getElementById('dob-mapa-editar-aqui');
+    if(editarAquiBtn) editarAquiBtn.addEventListener('click', () => { mapaModoEdicao = true; renderMapa(); });
   }
 
   function fmtTimestamp(){
@@ -2476,7 +2480,7 @@
 
     formContainer.innerHTML = `
       <div class="dob-card-form">
-        <h3>${existing ? 'Editar registro' : 'Novo registro de campo'}</h3>
+        <h3>${existing ? 'Editar apontamento' : 'Novo apontamento de campo'}</h3>
         <div class="dob-linha">
           <div class="dob-campo"><label>Data</label><input class="dob-input" type="date" id="dob-f-data" value="${draft.date}" /></div>
           <div class="dob-campo">
@@ -2551,7 +2555,7 @@
           </div>
           <label class="dob-ocorrencia-label">
             <input type="checkbox" id="dob-f-ocorrencia" ${draft.ocorrencia ? 'checked' : ''} />
-            <span>⚠️ Marcar esse registro como ocorrência (destaca no histórico)</span>
+            <span>⚠️ Marcar esse apontamento como ocorrência (destaca no histórico)</span>
           </label>
         </div>
         <div class="dob-campo" style="margin-bottom:10px;">
@@ -2562,7 +2566,7 @@
         </div>
         <div id="dob-f-status"></div>
         <div class="dob-linha">
-          <button class="dob-btn" id="dob-f-salvar">Salvar registro</button>
+          <button class="dob-btn" id="dob-f-salvar">Salvar apontamento</button>
           <button class="dob-btn secundario" id="dob-f-cancelar">Cancelar</button>
         </div>
       </div>
@@ -2927,7 +2931,7 @@
         formContainer.innerHTML = '';
         loadEntries();
       }catch(e){
-        alert('Erro ao salvar o registro (espaço local pode estar cheio).');
+        alert('Erro ao salvar o apontamento (espaço local pode estar cheio).');
       }
     });
 
@@ -3202,9 +3206,9 @@
     const filtroTexto = document.getElementById('dob-filtro-texto').value.trim();
     const datasVirtuais = filtroTexto ? [] : datasComMarcacaoSemRegistro().filter(d => !filtroData || d === filtroData);
 
-    contadorEl.textContent = `${filtered.length} registro(s)${datasVirtuais.length ? ' + ' + datasVirtuais.length + ' dia(s) só com marcações no mapa' : ''}`;
+    contadorEl.textContent = `${filtered.length} apontamento(s)${datasVirtuais.length ? ' + ' + datasVirtuais.length + ' dia(s) só com marcações no mapa' : ''}`;
     if(filtered.length === 0 && datasVirtuais.length === 0){
-      listaEl.innerHTML = '<div class="dob-vazio">Nenhum registro encontrado. Clique em "+ Novo registro" para começar.</div>';
+      listaEl.innerHTML = '<div class="dob-vazio">Nenhum apontamento encontrado. Clique em "+ Novo apontamento" para começar.</div>';
       return;
     }
     const climaEmoji = { sol: '☀️', nublado: '☁️', chuva: '🌧️' };
@@ -3225,7 +3229,7 @@
             </div>
             ${marcacoesMapaHtml(item.date)}
             <div class="dob-entry-acoes">
-              <button class="dob-btn secundario pequeno dob-completar-registro" data-data="${item.date}">+ Completar registro desse dia</button>
+              <button class="dob-btn secundario pequeno dob-completar-registro" data-data="${item.date}">+ Completar apontamento desse dia</button>
             </div>
           </div>`;
       }
@@ -3262,7 +3266,7 @@
     }));
     listaEl.querySelectorAll('.dob-editar').forEach(btn => btn.addEventListener('click', () => { const entry = entries.find(x => x.id === btn.dataset.id); if(entry) openForm(entry); }));
     listaEl.querySelectorAll('.dob-excluir').forEach(btn => btn.addEventListener('click', () => {
-      if(confirm('Excluir este registro permanentemente? (Fotos já enviadas ao Drive continuam lá.)')){ deleteEntryLocal(btn.dataset.id); loadEntries(); }
+      if(confirm('Excluir este apontamento permanentemente? (Fotos já enviadas ao Drive continuam lá.)')){ deleteEntryLocal(btn.dataset.id); loadEntries(); }
     }));
     listaEl.querySelectorAll('.dob-completar-registro').forEach(btn => btn.addEventListener('click', () => { openForm(null, btn.dataset.data); }));
   }
