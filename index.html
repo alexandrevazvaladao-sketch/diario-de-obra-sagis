@@ -38,9 +38,26 @@
     background: var(--paper);
     color: var(--ink-text);
     min-height:100vh;
-    padding: 28px 22px 60px;
+    padding: 0;
     line-height:1.5;
     -webkit-font-smoothing: antialiased;
+  }
+  .dob-app-shell{ display:flex; align-items:flex-start; min-height:100vh; }
+  #dob-sidebar{
+    width:200px; flex-shrink:0; background:var(--ink); min-height:100vh;
+    position:sticky; top:0; align-self:flex-start; padding:18px 0; z-index:10;
+  }
+  .dob-side-brand{ color:#fff; font-family:Georgia, "Iowan Old Style", serif; font-size:16px; font-weight:700; padding:0 18px 16px; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:10px; }
+  .dob-side-item{
+    display:flex; align-items:center; gap:10px; padding:10px 18px; color:rgba(255,255,255,0.75);
+    font-size:13px; font-weight:600; cursor:pointer; border-left:3px solid transparent; user-select:none;
+  }
+  .dob-side-item:hover{ background:rgba(255,255,255,0.06); color:#fff; }
+  .dob-side-item.active{ background:rgba(255,255,255,0.1); color:#fff; border-left-color:var(--clay); }
+  .dob-side-item .ic{ font-size:15px; flex-shrink:0; width:18px; text-align:center; }
+  #dob-root{ flex:1; min-width:0; padding: 28px 22px 60px; }
+  @media (max-width: 720px){
+    #dob-sidebar{ display:none; }
   }
   .mono{ font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace; }
 
@@ -401,6 +418,20 @@
 </style>
 </head>
 <body>
+<div class="dob-app-shell">
+  <div id="dob-sidebar">
+    <div class="dob-side-brand">🏗️ SAGIS</div>
+    <div class="dob-side-item active" data-side="home"><span class="ic">📋</span>Diário</div>
+    <div class="dob-side-item" data-side="novo"><span class="ic">📝</span>Novo registro</div>
+    <div class="dob-side-item" data-side="mapa"><span class="ic">🗺️</span>Mapa</div>
+    <div class="dob-side-item" data-side="resumo-macro"><span class="ic">📊</span>Resumo macro</div>
+    <div class="dob-side-item" data-side="resumo-semana"><span class="ic">📅</span>Resumo semana</div>
+    <div class="dob-side-item" data-side="producao-diaria"><span class="ic">📈</span>Produção diária</div>
+    <div class="dob-side-item" data-side="relatorio"><span class="ic">📑</span>Apresentação</div>
+    <div class="dob-side-item" data-side="gamma"><span class="ic">🤖</span>Comando Gamma</div>
+    <div class="dob-side-item" data-side="drive"><span class="ic">☁️</span>Google Drive</div>
+    <div class="dob-side-item" data-side="config"><span class="ic">⚙️</span>Configurações</div>
+  </div>
 <div id="dob-root">
   <div class="dob-header">
     <div>
@@ -455,6 +486,7 @@
   <div id="dob-mapa-container"></div>
   <div id="dob-form-container"></div>
   <div id="dob-lista" class="dob-lista"><div class="dob-loading">Carregando registros...</div></div>
+</div>
 </div>
 
 <script>
@@ -3248,6 +3280,50 @@
     renderMapa();
     if(mapaAberto) document.getElementById('dob-mapa-container').scrollIntoView({behavior:'smooth', block:'start'});
   });
+
+  (function initSidebar(){
+    const mapaBotoes = {
+      mapa: 'dob-btn-mapa',
+      'resumo-macro': 'dob-btn-resumo-macro',
+      'resumo-semana': 'dob-btn-resumo-semana',
+      'producao-diaria': 'dob-btn-producao-diaria',
+      relatorio: 'dob-btn-relatorio',
+      gamma: 'dob-btn-gamma',
+      drive: 'dob-btn-conectar',
+      config: 'dob-btn-config',
+      novo: 'dob-novo'
+    };
+    function sincronizarSidebar(){
+      Object.entries(mapaBotoes).forEach(([side, btnId]) => {
+        const btn = document.getElementById(btnId);
+        const item = document.querySelector(`.dob-side-item[data-side="${side}"]`);
+        if(!btn || !item) return;
+        item.style.display = (btn.style.display === 'none') ? 'none' : 'flex';
+        item.classList.toggle('active', btn.textContent.trim().startsWith('Fechar'));
+      });
+    }
+    document.querySelectorAll('.dob-side-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const side = item.dataset.side;
+        if(side === 'home'){
+          document.querySelectorAll('.dob-side-item').forEach(i => i.classList.remove('active'));
+          item.classList.add('active');
+          document.getElementById('dob-lista').scrollIntoView({behavior:'smooth', block:'start'});
+          return;
+        }
+        const btn = document.getElementById(mapaBotoes[side]);
+        if(btn) btn.click();
+        else document.getElementById('dob-lista').scrollIntoView({behavior:'smooth', block:'start'});
+        document.querySelectorAll('.dob-side-item').forEach(i => { if(i.dataset.side !== side) i.classList.remove('active'); });
+      });
+    });
+    const alvos = Object.values(mapaBotoes).map(id => document.getElementById(id)).filter(Boolean);
+    const obs = new MutationObserver(sincronizarSidebar);
+    alvos.forEach(el => obs.observe(el, { attributes:true, attributeFilter:['style'] }));
+    const obsTexto = new MutationObserver(sincronizarSidebar);
+    alvos.forEach(el => obsTexto.observe(el, { childList:true, characterData:true, subtree:true }));
+    sincronizarSidebar();
+  })();
 
   renderSetup();
   loadEntries();
