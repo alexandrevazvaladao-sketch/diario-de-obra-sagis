@@ -476,11 +476,11 @@
     <button class="dob-btn secundario pequeno" id="dob-btn-config">Configurações</button>
   </div>
 
-  <div class="dob-stats" id="dob-stats"></div>
+  <div class="dob-stats dob-home-only" id="dob-stats"></div>
 
-  <div class="dob-datestrip" id="dob-datestrip"></div>
+  <div class="dob-datestrip dob-home-only" id="dob-datestrip"></div>
 
-  <div class="dob-toolbar">
+  <div class="dob-toolbar dob-home-only">
     <button class="dob-btn" id="dob-novo">+ Novo registro</button>
     <button class="dob-btn secundario" id="dob-btn-relatorio" style="display:none;">Gerar apresentação</button>
     <button class="dob-btn secundario" id="dob-btn-gamma" style="display:none;">Comando para o Gamma</button>
@@ -509,7 +509,7 @@
   <div id="dob-producao-diaria-container"></div>
   <div id="dob-mapa-container"></div>
   <div id="dob-form-container"></div>
-  <div id="dob-lista" class="dob-lista"><div class="dob-loading">Carregando registros...</div></div>
+  <div id="dob-lista" class="dob-lista dob-home-only"><div class="dob-loading">Carregando registros...</div></div>
 </div>
 </div>
 
@@ -3345,16 +3345,35 @@
       config: 'dob-btn-config',
       novo: 'dob-novo'
     };
+    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-producao-diaria', 'dob-btn-relatorio', 'dob-btn-gamma'];
     function sincronizarSidebar(){
+      let algumAberto = false;
       Object.entries(mapaBotoes).forEach(([side, btnId]) => {
         const btn = document.getElementById(btnId);
         const item = document.querySelector(`.dob-side-item[data-side="${side}"]`);
         if(!btn || !item) return;
         item.style.display = (btn.style.display === 'none') ? 'none' : 'flex';
-        item.classList.toggle('active', btn.textContent.trim().startsWith('Fechar'));
+        const aberto = btn.textContent.trim().startsWith('Fechar');
+        item.classList.toggle('active', aberto);
+        if(PAINEIS_TOGGLE.includes(btnId) && aberto) algumAberto = true;
       });
+      const formContainerEl = document.getElementById('dob-form-container');
+      const formAberto = !!(formContainerEl && formContainerEl.innerHTML.trim());
+      const itemNovo = document.querySelector('.dob-side-item[data-side="novo"]');
+      if(itemNovo) itemNovo.classList.toggle('active', formAberto);
+      if(formAberto) algumAberto = true;
+      const elsHomeOnly = document.querySelectorAll('.dob-home-only');
+      if(elsHomeOnly.length){
+        if(algumAberto){
+          elsHomeOnly.forEach(el => el.style.display = 'none');
+        } else {
+          elsHomeOnly.forEach(el => el.style.display = '');
+          document.querySelectorAll('.dob-side-item').forEach(i => i.classList.remove('active'));
+          const itemHome = document.querySelector('.dob-side-item[data-side="home"]');
+          if(itemHome) itemHome.classList.add('active');
+        }
+      }
     }
-    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-producao-diaria', 'dob-btn-relatorio', 'dob-btn-gamma'];
     function fecharTudoExceto(manterBtnId){
       PAINEIS_TOGGLE.forEach(id => {
         if(id === manterBtnId) return;
@@ -3371,13 +3390,16 @@
         const side = item.dataset.side;
         document.querySelectorAll('.dob-side-item').forEach(i => i.classList.remove('active'));
         item.classList.add('active');
+        const homeEls = document.querySelectorAll('.dob-home-only');
         if(side === 'home'){
           fecharTudoExceto(null);
-          document.getElementById('dob-lista').scrollIntoView({behavior:'smooth', block:'start'});
+          homeEls.forEach(el => el.style.display = '');
+          window.scrollTo({top:0, behavior:'smooth'});
           return;
         }
         if(side === 'novo'){
           fecharTudoExceto('form');
+          homeEls.forEach(el => el.style.display = 'none');
           document.getElementById('dob-novo').click();
           setTimeout(() => document.getElementById('dob-form-container').scrollIntoView({behavior:'smooth', block:'start'}), 50);
           return;
@@ -3389,8 +3411,10 @@
         }
         const btnId = mapaBotoes[side];
         fecharTudoExceto(btnId);
+        homeEls.forEach(el => el.style.display = 'none');
         const btn = document.getElementById(btnId);
         if(btn) btn.click();
+        setTimeout(() => window.scrollTo({top:0, behavior:'smooth'}), 30);
       });
     });
     const alvos = Object.values(mapaBotoes).map(id => document.getElementById(id)).filter(Boolean);
@@ -3398,6 +3422,8 @@
     alvos.forEach(el => obs.observe(el, { attributes:true, attributeFilter:['style'] }));
     const obsTexto = new MutationObserver(sincronizarSidebar);
     alvos.forEach(el => obsTexto.observe(el, { childList:true, characterData:true, subtree:true }));
+    const formContainerEl = document.getElementById('dob-form-container');
+    if(formContainerEl) obsTexto.observe(formContainerEl, { childList:true });
     sincronizarSidebar();
   })();
 
