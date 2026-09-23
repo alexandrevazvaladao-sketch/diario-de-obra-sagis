@@ -4,6 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Diário de Obra — SAGIS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="manifest" href="manifest.webmanifest" />
 <meta name="theme-color" content="#16233d" />
 <link rel="icon" href="icon-192.png" />
@@ -34,7 +37,7 @@
   *{box-sizing:border-box;}
   html,body{margin:0; padding:0;}
   body{
-    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background: var(--paper);
     color: var(--ink-text);
     min-height:100vh;
@@ -46,16 +49,32 @@
   #dob-sidebar{
     width:200px; flex-shrink:0; background:var(--ink); min-height:100vh;
     position:sticky; top:0; align-self:flex-start; padding:18px 0; z-index:10;
+    transition:width 0.15s ease;
   }
-  .dob-side-brand{ color:#fff; font-family:Georgia, "Iowan Old Style", serif; font-size:16px; font-weight:700; padding:0 18px 16px; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:10px; }
+  #dob-sidebar.recolhida{ width:56px; }
+  .dob-side-top{ display:flex; align-items:center; gap:10px; padding:0 18px 16px; border-bottom:1px solid rgba(255,255,255,0.12); margin-bottom:10px; }
+  #dob-sidebar.recolhida .dob-side-top{ padding:0 0 16px; justify-content:center; }
+  .dob-side-hamburguer{ background:none; border:none; color:#fff; font-size:18px; cursor:pointer; padding:4px 6px; line-height:1; flex-shrink:0; }
+  .dob-side-brand{ color:#fff; font-family:Georgia, "Iowan Old Style", serif; font-size:16px; font-weight:700; white-space:nowrap; overflow:hidden; }
+  #dob-sidebar.recolhida .dob-side-brand{ display:none; }
   .dob-side-item{
     display:flex; align-items:center; gap:10px; padding:10px 18px; color:rgba(255,255,255,0.75);
-    font-size:13px; font-weight:600; cursor:pointer; border-left:3px solid transparent; user-select:none;
+    font-size:13px; font-weight:600; cursor:pointer; border-left:3px solid transparent; user-select:none; white-space:nowrap; overflow:hidden;
   }
+  #dob-sidebar.recolhida .dob-side-item{ padding:10px 0; justify-content:center; }
+  #dob-sidebar.recolhida .dob-side-item .label{ display:none; }
   .dob-side-item:hover{ background:rgba(255,255,255,0.06); color:#fff; }
   .dob-side-item.active{ background:rgba(255,255,255,0.1); color:#fff; border-left-color:var(--clay); }
   .dob-side-item .ic{ font-size:15px; flex-shrink:0; width:18px; text-align:center; }
+  .dob-side-recolher{ display:flex; align-items:center; gap:8px; padding:10px 18px; color:rgba(255,255,255,0.55); font-size:12.5px; cursor:pointer; margin-top:10px; border-top:1px solid rgba(255,255,255,0.12); padding-top:14px; white-space:nowrap; overflow:hidden; }
+  #dob-sidebar.recolhida .dob-side-recolher{ padding:14px 0 0; justify-content:center; }
+  #dob-sidebar.recolhida .dob-side-recolher .label{ display:none; }
+  .dob-side-recolher:hover{ color:#fff; }
   #dob-root{ flex:1; min-width:0; padding: 28px 22px 60px; }
+  .dob-saudacao{ margin-bottom:14px; }
+  .dob-saudacao-titulo{ font-family:Georgia, "Iowan Old Style", serif; font-size:24px; font-weight:700; color:var(--ink); margin:0; }
+  .dob-saudacao-titulo .nome{ color:var(--clay-dark); }
+  .dob-saudacao-data{ font-size:13px; color:var(--muted); margin:2px 0 0; }
   @media (max-width: 720px){
     #dob-sidebar{ display:none; }
   }
@@ -260,7 +279,7 @@
   /* ---------- Cards de estatística ---------- */
   .dob-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
   .dob-stat-card{ background:var(--card); border:1px solid var(--line); border-radius:var(--radius-sm); padding:14px 16px; box-shadow:var(--shadow-sm); }
-  .dob-stat-num{ font-family:Georgia,serif; font-size:24px; font-weight:600; color:var(--ink); line-height:1.1; }
+  .dob-stat-num{ font-family:"Inter", -apple-system, sans-serif; font-size:24px; font-weight:700; color:var(--ink); line-height:1.1; }
   .dob-stat-label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.6px; margin-top:4px; }
 
   /* ---------- Tira de datas ---------- */
@@ -420,19 +439,24 @@
 <body>
 <div class="dob-app-shell">
   <div id="dob-sidebar">
-    <div class="dob-side-brand">🏗️ SAGIS</div>
-    <div class="dob-side-item active" data-side="home"><span class="ic">📋</span>Diário</div>
-    <div class="dob-side-item" data-side="novo"><span class="ic">📝</span>Novo registro</div>
-    <div class="dob-side-item" data-side="mapa"><span class="ic">🗺️</span>Mapa</div>
-    <div class="dob-side-item" data-side="resumo-macro"><span class="ic">📊</span>Resumo macro</div>
-    <div class="dob-side-item" data-side="resumo-semana"><span class="ic">📅</span>Resumo semana</div>
-    <div class="dob-side-item" data-side="producao-diaria"><span class="ic">📈</span>Produção diária</div>
-    <div class="dob-side-item" data-side="relatorio"><span class="ic">📑</span>Apresentação</div>
-    <div class="dob-side-item" data-side="gamma"><span class="ic">🤖</span>Comando Gamma</div>
-    <div class="dob-side-item" data-side="drive"><span class="ic">☁️</span>Google Drive</div>
-    <div class="dob-side-item" data-side="config"><span class="ic">⚙️</span>Configurações</div>
+    <div class="dob-side-top">
+      <button class="dob-side-hamburguer" id="dob-side-toggle" title="Recolher/expandir menu">☰</button>
+      <span class="dob-side-brand">🏗️ SAGIS</span>
+    </div>
+    <div class="dob-side-item active" data-side="home"><span class="ic">📋</span><span class="label">Diário</span></div>
+    <div class="dob-side-item" data-side="novo"><span class="ic">📝</span><span class="label">Novo registro</span></div>
+    <div class="dob-side-item" data-side="mapa"><span class="ic">🗺️</span><span class="label">Mapa</span></div>
+    <div class="dob-side-item" data-side="resumo-macro"><span class="ic">📊</span><span class="label">Resumo macro</span></div>
+    <div class="dob-side-item" data-side="resumo-semana"><span class="ic">📅</span><span class="label">Resumo semana</span></div>
+    <div class="dob-side-item" data-side="producao-diaria"><span class="ic">📈</span><span class="label">Produção diária</span></div>
+    <div class="dob-side-item" data-side="relatorio"><span class="ic">📑</span><span class="label">Apresentação</span></div>
+    <div class="dob-side-item" data-side="gamma"><span class="ic">🤖</span><span class="label">Comando Gamma</span></div>
+    <div class="dob-side-item" data-side="drive"><span class="ic">☁️</span><span class="label">Google Drive</span></div>
+    <div class="dob-side-item" data-side="config"><span class="ic">⚙️</span><span class="label">Configurações</span></div>
+    <div class="dob-side-recolher" id="dob-side-recolher-link"><span class="ic">←</span><span class="label">Recolher</span></div>
   </div>
 <div id="dob-root">
+  <div class="dob-saudacao" id="dob-saudacao"></div>
   <div class="dob-header">
     <div>
       <p class="dob-title">Diário de Obra</p>
@@ -3281,7 +3305,35 @@
     if(mapaAberto) document.getElementById('dob-mapa-container').scrollIntoView({behavior:'smooth', block:'start'});
   });
 
+  (function renderSaudacao(){
+    const h = new Date().getHours();
+    const saudacao = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+    const nome = 'Alexandre';
+    const dataFmtRaw = new Intl.DateTimeFormat('pt-BR', { weekday:'long', day:'numeric', month:'long', year:'numeric' }).format(new Date());
+    const dataFmt = dataFmtRaw.charAt(0).toUpperCase() + dataFmtRaw.slice(1);
+    const el = document.getElementById('dob-saudacao');
+    if(el) el.innerHTML = `
+      <p class="dob-saudacao-titulo">${saudacao}, <span class="nome">${nome}</span></p>
+      <p class="dob-saudacao-data">${dataFmt}</p>
+    `;
+  })();
+
   (function initSidebar(){
+    const sidebarEl = document.getElementById('dob-sidebar');
+    const recolherLink = document.getElementById('dob-side-recolher-link');
+    function aplicarEstadoRecolhido(recolhida){
+      sidebarEl.classList.toggle('recolhida', recolhida);
+      const seta = recolherLink.querySelector('.ic');
+      const label = recolherLink.querySelector('.label');
+      seta.textContent = recolhida ? '→' : '←';
+      label.textContent = recolhida ? 'Expandir' : 'Recolher';
+      recolherLink.title = recolhida ? 'Expandir menu' : 'Recolher menu';
+      try{ localStorage.setItem('dob:sidebar_recolhida', recolhida ? '1' : '0'); }catch(e){}
+    }
+    const recolhidaSalva = (function(){ try{ return localStorage.getItem('dob:sidebar_recolhida') === '1'; }catch(e){ return false; } })();
+    aplicarEstadoRecolhido(recolhidaSalva);
+    document.getElementById('dob-side-toggle').addEventListener('click', () => aplicarEstadoRecolhido(!sidebarEl.classList.contains('recolhida')));
+    recolherLink.addEventListener('click', () => aplicarEstadoRecolhido(!sidebarEl.classList.contains('recolhida')));
     const mapaBotoes = {
       mapa: 'dob-btn-mapa',
       'resumo-macro': 'dob-btn-resumo-macro',
@@ -3302,19 +3354,43 @@
         item.classList.toggle('active', btn.textContent.trim().startsWith('Fechar'));
       });
     }
+    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-producao-diaria', 'dob-btn-relatorio', 'dob-btn-gamma'];
+    function fecharTudoExceto(manterBtnId){
+      PAINEIS_TOGGLE.forEach(id => {
+        if(id === manterBtnId) return;
+        const b = document.getElementById(id);
+        if(b && b.textContent.trim().startsWith('Fechar')) b.click();
+      });
+      if(manterBtnId !== 'form'){
+        const cancelar = document.getElementById('dob-f-cancelar');
+        if(cancelar) cancelar.click();
+      }
+    }
     document.querySelectorAll('.dob-side-item').forEach(item => {
       item.addEventListener('click', () => {
         const side = item.dataset.side;
+        document.querySelectorAll('.dob-side-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
         if(side === 'home'){
-          document.querySelectorAll('.dob-side-item').forEach(i => i.classList.remove('active'));
-          item.classList.add('active');
+          fecharTudoExceto(null);
           document.getElementById('dob-lista').scrollIntoView({behavior:'smooth', block:'start'});
           return;
         }
-        const btn = document.getElementById(mapaBotoes[side]);
+        if(side === 'novo'){
+          fecharTudoExceto('form');
+          document.getElementById('dob-novo').click();
+          setTimeout(() => document.getElementById('dob-form-container').scrollIntoView({behavior:'smooth', block:'start'}), 50);
+          return;
+        }
+        if(side === 'drive' || side === 'config'){
+          const btn = document.getElementById(mapaBotoes[side]);
+          if(btn) btn.click();
+          return;
+        }
+        const btnId = mapaBotoes[side];
+        fecharTudoExceto(btnId);
+        const btn = document.getElementById(btnId);
         if(btn) btn.click();
-        else document.getElementById('dob-lista').scrollIntoView({behavior:'smooth', block:'start'});
-        document.querySelectorAll('.dob-side-item').forEach(i => { if(i.dataset.side !== side) i.classList.remove('active'); });
       });
     });
     const alvos = Object.values(mapaBotoes).map(id => document.getElementById(id)).filter(Boolean);
