@@ -1409,6 +1409,28 @@
       overlay.addEventListener('click', (ev) => { if(ev.target === overlay) finalizar(); });
     });
   }
+  function mostrarToastSalvo(msg){
+    const antigo = document.getElementById('dob-toast-salvo');
+    if(antigo) antigo.remove();
+    const semDrive = !accessToken;
+    const toast = document.createElement('div');
+    toast.id = 'dob-toast-salvo';
+    toast.style.cssText = 'position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:99999; background:var(--ink,#16233d); color:#fff; padding:10px 10px 10px 16px; border-radius:999px; box-shadow:0 8px 24px rgba(0,0,0,0.3); font-size:13px; display:flex; align-items:center; gap:10px; max-width:92vw;';
+    toast.innerHTML = `
+      <span>✅ ${msg || 'Salvo'}</span>
+      ${semDrive ? `<button type="button" id="dob-toast-conectar" style="background:var(--clay,#d9662f); color:#fff; border:none; padding:6px 13px; border-radius:999px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">Conectar Drive</button>` : ''}
+    `;
+    document.body.appendChild(toast);
+    if(semDrive){
+      const btnConectar = toast.querySelector('#dob-toast-conectar');
+      if(btnConectar) btnConectar.addEventListener('click', () => {
+        const real = document.getElementById('dob-btn-conectar');
+        if(real) real.click();
+        toast.remove();
+      });
+    }
+    setTimeout(() => { if(toast.parentNode) toast.remove(); }, semDrive ? 6000 : 2500);
+  }
   function corInfoBloco(cor){
     return {
       '':       { grad: 'linear-gradient(155deg, #cfcabc 0%, #a9a48f 100%)', label: '⚪ A fazer' },
@@ -1475,6 +1497,7 @@
     const resultado = await cardBlocoCustom({ servico, obra, blocoId, nomeBonito });
     if(!resultado || !mapaModoEdicao) return false;
     ciclarCorBloco(servico, obra, blocoId, resultado.responsavel);
+    mostrarToastSalvo(`${nomeBonito} atualizado`);
     return true;
   }
   function promptDataCustom(msg, valorAtual){
@@ -2930,6 +2953,7 @@
         formularioSujo = false;
         formContainer.innerHTML = '';
         loadEntries();
+        mostrarToastSalvo('Apontamento salvo');
       }catch(e){
         alert('Erro ao salvar o apontamento (espaço local pode estar cheio).');
       }
