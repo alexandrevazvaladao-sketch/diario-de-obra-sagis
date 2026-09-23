@@ -473,6 +473,7 @@
   <div class="dob-status-bar" id="dob-status-bar" style="display:none;">
     <span><span class="dob-dot off" id="dob-dot"></span><span id="dob-status-texto">Drive não conectado</span></span>
     <button class="dob-btn secundario pequeno" id="dob-btn-conectar">Conectar ao Google Drive</button>
+    <button class="dob-btn secundario pequeno" id="dob-btn-sync-fotos" style="display:none;">📤 Sincronizar fotos locais</button>
     <button class="dob-btn secundario pequeno" id="dob-btn-config">Configurações</button>
   </div>
 
@@ -2087,6 +2088,7 @@
     const keys = db.listKeys('dob:entry:');
     entries = keys.map(k => { try{ return JSON.parse(db.get(k)); }catch(e){ return null; } }).filter(Boolean);
     entries.sort((a,b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt));
+    updateStatus();
     render();
   }
   function saveEntry(entry){
@@ -2356,11 +2358,15 @@
         if(resp && resp.access_token){
           accessToken = resp.access_token;
           updateStatus();
-          syncFromDriveOnConnect();
-          syncEquipFromDriveOnConnect();
-          syncMaoObraFromDriveOnConnect();
-          syncContratosFromDriveOnConnect();
-          syncMapaFromDriveOnConnect();
+          (async () => {
+            await syncFromDriveOnConnect();
+            syncEquipFromDriveOnConnect();
+            syncMaoObraFromDriveOnConnect();
+            syncContratosFromDriveOnConnect();
+            syncMapaFromDriveOnConnect();
+            updateStatus();
+            await sincronizarFotosLocaisPendentes();
+          })();
         }
       }
     });
@@ -2371,6 +2377,38 @@
     updateStatus();
   }
 
+  function contarFotosLocaisPendentes(){
+    let n = 0;
+    entries.forEach(e => (e.fotos || []).forEach(f => { if(normalizeFoto(f).type !== 'drive') n++; }));
+    return n;
+  }
+  async function sincronizarFotosLocaisPendentes(){
+    if(!accessToken) return;
+    const pendentes = [];
+    entries.forEach(e => (e.fotos || []).forEach((f, i) => {
+      if(normalizeFoto(f).type !== 'drive') pendentes.push({ entry: e, index: i });
+    }));
+    if(!pendentes.length) return;
+    const btn = document.getElementById('dob-btn-sync-fotos');
+    if(btn){ btn.disabled = true; btn.textContent = `📤 Sincronizando 0/${pendentes.length}...`; }
+    let ok = 0, falhas = 0;
+    for(const { entry, index } of pendentes){
+      try{
+        const foto = normalizeFoto(entry.fotos[index]);
+        const filename = `${entry.date}_${entry.id}_${index}.jpg`;
+        const fileId = await uploadToDrive(foto.data, filename);
+        entry.fotos[index] = { type: 'drive', fileId };
+        ok++;
+      }catch(e){ falhas++; }
+      if(btn) btn.textContent = `📤 Sincronizando ${ok + falhas}/${pendentes.length}...`;
+    }
+    entries.forEach(e => db.set('dob:entry:' + e.id, JSON.stringify(e)));
+    await syncEntriesToDrive();
+    if(btn){ btn.disabled = false; }
+    updateStatus();
+    render();
+    mostrarToastSalvo(`${ok} foto${ok === 1 ? '' : 's'} sincronizada${ok === 1 ? '' : 's'} no Drive${falhas ? ` — ${falhas} falharam, tenta de novo` : ''}`);
+  }
   function updateStatus(){
     if(accessToken){
       statusDot.className = 'dob-dot on';
@@ -2381,12 +2419,19 @@
       statusTexto.textContent = 'Drive não conectado — fotos serão salvas só localmente';
       document.getElementById('dob-btn-conectar').textContent = 'Conectar ao Google Drive';
     }
+    const btnSync = document.getElementById('dob-btn-sync-fotos');
+    if(btnSync){
+      const pendentes = accessToken ? contarFotosLocaisPendentes() : 0;
+      btnSync.style.display = pendentes > 0 ? 'inline-flex' : 'none';
+      btnSync.textContent = `📤 Sincronizar ${pendentes} foto${pendentes === 1 ? '' : 's'} local${pendentes === 1 ? '' : 'is'}`;
+    }
   }
 
   document.getElementById('dob-btn-conectar').addEventListener('click', () => {
     if(!tokenClient){ alert('Configuração ainda não carregada. Aguarde um instante e tente de novo.'); return; }
     tokenClient.requestAccessToken({ prompt: '' });
   });
+  document.getElementById('dob-btn-sync-fotos').addEventListener('click', () => { sincronizarFotosLocaisPendentes(); });
   document.getElementById('dob-btn-config').addEventListener('click', () => {
     if(confirm('Deseja trocar o Client ID configurado?')){
       localStorage.removeItem('dob:client_id');
