@@ -3403,23 +3403,103 @@
     return entry;
   }
 
+  function listaAtividadesParaVincular(){
+    const nomes = [];
+    mapaState.estados.forEach(e => {
+      if(e.cor !== 'amarelo') return;
+      const tipo = mapaState.tipoPorServico[e.servico];
+      const nome = `${humanizarNomeBloco(e.bloco, tipo)} — ${e.servico}`;
+      if(!nomes.includes(nome)) nomes.push(nome);
+    });
+    return nomes;
+  }
+
+  function escolherAtividadeCustom(itens, valorAtual){
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed; inset:0; background:rgba(20,20,20,0.4); z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px;';
+      const outraJaEhCustom = valorAtual && !itens.includes(valorAtual);
+      const opcoesHtml = itens.length
+        ? itens.map(nome => `<button type="button" class="dob-escolha-item" data-valor="${nome.replace(/"/g,'&quot;')}" style="display:block; width:100%; text-align:left; padding:11px 13px; border:1px solid var(--line); border-radius:8px; background:${nome === valorAtual ? 'var(--paper2,#f3ede1)' : '#fff'}; margin-bottom:6px; font-size:13.5px; cursor:pointer;">${nome === valorAtual ? '✅ ' : ''}${nome}</button>`).join('')
+        : `<p class="dob-dica" style="margin:0 0 10px;">Nada em execução no mapa agora.</p>`;
+      overlay.innerHTML = `
+        <div style="background:#fff; border-radius:10px; padding:20px; max-width:420px; width:100%; max-height:80vh; overflow-y:auto; box-shadow:0 10px 30px rgba(0,0,0,0.3); font-family:inherit;">
+          <p style="margin:0 0 12px; font-size:15px; font-weight:700; color:var(--ink,#16233d);">Vincular foto a qual atividade?</p>
+          <div id="dob-escolha-lista">${opcoesHtml}</div>
+          <input type="text" id="dob-escolha-outra" class="dob-input" placeholder="Ou digite outra atividade..." style="width:100%; margin-top:6px;" value="${outraJaEhCustom ? valorAtual.replace(/"/g,'&quot;') : ''}" />
+          <div style="margin-top:14px; display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+            <button type="button" id="dob-escolha-remover" style="padding:9px 14px; border-radius:6px; border:1px solid var(--line); background:#fff; color:#8a8272; cursor:pointer; font-size:13px;">Remover vínculo</button>
+            <div style="display:flex; gap:8px;">
+              <button type="button" id="dob-escolha-cancelar" style="padding:9px 14px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:13px;">Cancelar</button>
+              <button type="button" id="dob-escolha-ok" style="padding:9px 16px; border-radius:6px; border:none; background:#c0522f; color:#fff; cursor:pointer; font-size:13px; font-weight:700;">Salvar</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      let escolhida = outraJaEhCustom ? null : valorAtual || null;
+      overlay.querySelectorAll('.dob-escolha-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+          escolhida = btn.dataset.valor;
+          document.getElementById('dob-escolha-outra').value = '';
+          overlay.querySelectorAll('.dob-escolha-item').forEach(b => { b.style.background = '#fff'; b.textContent = b.textContent.replace('✅ ', ''); });
+          btn.style.background = 'var(--paper2,#f3ede1)';
+          btn.textContent = '✅ ' + btn.dataset.valor;
+        });
+      });
+      const finalizar = (valor) => { overlay.remove(); resolve(valor); };
+      overlay.querySelector('#dob-escolha-cancelar').addEventListener('click', () => finalizar(undefined));
+      overlay.querySelector('#dob-escolha-remover').addEventListener('click', () => finalizar(null));
+      overlay.querySelector('#dob-escolha-ok').addEventListener('click', () => {
+        const outraTxt = document.getElementById('dob-escolha-outra').value.trim();
+        finalizar(outraTxt || escolhida || null);
+      });
+      overlay.addEventListener('click', (ev) => { if(ev.target === overlay) finalizar(undefined); });
+    });
+  }
+
+  function fotoCampoThumbHtml(f, i){
+    const nf = normalizeFoto(f);
+    const src = nf.thumb || nf.data || '';
+    const legenda = nf.legenda;
+    return `
+      <div class="dob-campo-thumb" data-idx="${i}" style="cursor:pointer; border-radius:8px; overflow:hidden; border:1px solid var(--line); background:#fff;">
+        <img src="data:image/jpeg;base64,${src}" style="width:100%; height:90px; object-fit:cover; display:block; background:#eee;" />
+        <div style="padding:4px 6px; font-size:10px; line-height:1.3; ${legenda ? 'color:var(--clay-dark,#c2551f); font-weight:600;' : 'color:#8a8272;'} white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${legenda ? '🔗 ' + legenda : 'Toque pra vincular'}</div>
+      </div>`;
+  }
+
   function renderModoCampo(){
     const container = document.getElementById('dob-campo-container');
     if(!campoAberto){ container.innerHTML = ''; return; }
     const hoje = todayStr();
     const entryHoje = entries.find(e => e.date === hoje);
-    const totalFotosHoje = entryHoje ? (entryHoje.fotos || []).length : 0;
+    const fotos = entryHoje ? (entryHoje.fotos || []) : [];
     container.innerHTML = `
-      <div class="dob-card-form" style="margin-top:14px; max-width:440px; text-align:center;">
-        <h3 style="margin:0 0 6px; font-size:19px;">📷 Modo Campo</h3>
-        <p class="dob-dica" style="margin:0 0 20px;">Toque no botão e tire a foto — ela já entra direto no apontamento de hoje. Você vincula cada foto à atividade certa depois, no computador.</p>
-        <button type="button" id="dob-campo-tirar-foto" class="dob-btn" style="width:100%; padding:20px; font-size:18px; font-weight:700;">📸 Tirar Foto</button>
-        <div style="margin-top:16px; font-size:14px; color:var(--muted,#8a8272);">${totalFotosHoje} foto${totalFotosHoje === 1 ? '' : 's'} salva${totalFotosHoje === 1 ? '' : 's'} hoje</div>
+      <div class="dob-card-form" style="margin-top:14px; max-width:520px;">
+        <h3 style="margin:0 0 6px; font-size:19px; text-align:center;">📷 Modo Campo</h3>
+        <p class="dob-dica" style="margin:0 0 16px; text-align:center;">Toque no botão pra tirar foto. Toque numa foto aí embaixo pra vincular à atividade.</p>
+        <button type="button" id="dob-campo-tirar-foto" class="dob-btn" style="width:100%; padding:18px; font-size:17px; font-weight:700; margin-bottom:16px;">📸 Tirar Foto</button>
+        <div style="font-size:13px; font-weight:700; color:var(--clay-dark,#c2551f); margin-bottom:10px;">${fotos.length} foto${fotos.length === 1 ? '' : 's'} hoje</div>
+        ${fotos.length === 0 ? '<p class="dob-dica">Nenhuma foto ainda hoje.</p>' : `<div id="dob-campo-galeria" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:8px;">${fotos.map((f, i) => fotoCampoThumbHtml(f, i)).join('')}</div>`}
       </div>
     `;
     const btnTirar = document.getElementById('dob-campo-tirar-foto');
     if(btnTirar) btnTirar.addEventListener('click', () => {
       document.getElementById('dob-campo-file-input').click();
+    });
+    container.querySelectorAll('.dob-campo-thumb').forEach(el => {
+      el.addEventListener('click', async () => {
+        const idx = Number(el.dataset.idx);
+        const fotoAtual = normalizeFoto(entryHoje.fotos[idx]);
+        const atividades = listaAtividadesParaVincular();
+        const escolha = await escolherAtividadeCustom(atividades, fotoAtual.legenda);
+        if(escolha === undefined) return;
+        entryHoje.fotos[idx] = { ...fotoAtual, legenda: escolha || undefined };
+        if(!escolha) delete entryHoje.fotos[idx].legenda;
+        saveEntry(entryHoje);
+        renderModoCampo();
+        mostrarToastSalvo(escolha ? `Foto vinculada a "${escolha}"` : 'Vínculo removido');
+      });
     });
   }
 
