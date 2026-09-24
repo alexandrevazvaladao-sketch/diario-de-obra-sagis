@@ -75,9 +75,6 @@
   .dob-saudacao-titulo{ font-family:Georgia, "Iowan Old Style", serif; font-size:24px; font-weight:700; color:var(--ink); margin:0; }
   .dob-saudacao-titulo .nome{ color:var(--clay-dark); }
   .dob-saudacao-data{ font-size:13px; color:var(--muted); margin:2px 0 0; }
-  @media (max-width: 720px){
-    #dob-sidebar{ display:none; }
-  }
   .mono{ font-family: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace; }
 
   /* ---------- Cabeçalho ---------- */
@@ -3616,7 +3613,13 @@
       recolherLink.title = recolhida ? 'Expandir menu' : 'Recolher menu';
       try{ localStorage.setItem('dob:sidebar_recolhida', recolhida ? '1' : '0'); }catch(e){}
     }
-    const recolhidaSalva = (function(){ try{ return localStorage.getItem('dob:sidebar_recolhida') === '1'; }catch(e){ return false; } })();
+    const recolhidaSalva = (function(){
+      try{
+        const salvo = localStorage.getItem('dob:sidebar_recolhida');
+        if(salvo !== null) return salvo === '1';
+        return window.innerWidth < 720; // sem preferência salva ainda: recolhe por padrão em tela estreita (celular)
+      }catch(e){ return false; }
+    })();
     aplicarEstadoRecolhido(recolhidaSalva);
     document.getElementById('dob-side-toggle').addEventListener('click', () => aplicarEstadoRecolhido(!sidebarEl.classList.contains('recolhida')));
     recolherLink.addEventListener('click', () => aplicarEstadoRecolhido(!sidebarEl.classList.contains('recolhida')));
