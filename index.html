@@ -3393,159 +3393,6 @@
     if(campoAberto) document.getElementById('dob-campo-container').scrollIntoView({behavior:'smooth', block:'start'});
   });
 
-  function loadCampoState(){
-    try{ return JSON.parse(localStorage.getItem('dob:campo_state') || '{}'); }catch(e){ return {}; }
-  }
-  function saveCampoState(st){ localStorage.setItem('dob:campo_state', JSON.stringify(st)); }
-  function obraLabelCampo(o){ return o === 'Pequis' ? 'Solar dos Pequis' : o === 'Buritis' ? 'Solar dos Buritis' : o; }
-
-  function listaModoCampo(){
-    const hoje = todayStr();
-    const st = loadCampoState();
-    const diaSt = st[hoje] || { extras: [], blocosFotografados: [] };
-    const itens = [];
-    mapaState.estados.forEach(e => {
-      if(e.cor !== 'amarelo') return;
-      const chave = e.servico + '|||' + e.obra + '|||' + e.bloco;
-      const tipo = mapaState.tipoPorServico[e.servico];
-      itens.push({
-        tipo: 'bloco', chave, nome: humanizarNomeBloco(e.bloco, tipo),
-        servico: e.servico, obra: e.obra,
-        fotografado: (diaSt.blocosFotografados || []).includes(chave)
-      });
-    });
-    (diaSt.extras || []).forEach(x => {
-      itens.push({ tipo: 'extra', chave: x.id, nome: x.texto, fotografado: !!x.fotografado });
-    });
-    return itens;
-  }
-
-  function marcarFotografadoCampo(item){
-    const hoje = todayStr();
-    const st = loadCampoState();
-    if(!st[hoje]) st[hoje] = { extras: [], blocosFotografados: [] };
-    if(item.tipo === 'bloco'){
-      if(!st[hoje].blocosFotografados) st[hoje].blocosFotografados = [];
-      if(!st[hoje].blocosFotografados.includes(item.chave)) st[hoje].blocosFotografados.push(item.chave);
-    } else {
-      const ex = (st[hoje].extras || []).find(x => x.id === item.chave);
-      if(ex) ex.fotografado = true;
-    }
-    saveCampoState(st);
-  }
-
-  function resolverLocalizacaoCampo(item){
-    if(item.tipo !== 'bloco') return null;
-    const partes = item.chave.split('|||');
-    const blocoId = partes[2];
-    const tipoServico = mapaState.tipoPorServico[item.servico];
-    if(tipoServico === 'vaga'){
-      const v = (typeof VAGAS_ITENS !== 'undefined' ? VAGAS_ITENS : []).find(x => x.id === blocoId);
-      if(!v) return null;
-      return { imagem: MAPA_IMAGEM_B64, x: v.x, y: v.y, w: v.w, h: v.h };
-    }
-    if(tipoServico === 'bloco' || tipoServico === 'area_comum'){
-      const b = BLOCOS_MAPA.find(x => x.id === blocoId);
-      if(!b) return null;
-      return { imagem: MAPA_IMAGEM_B64, x: b.x, y: b.y, w: b.w, h: b.h };
-    }
-    return null;
-  }
-
-  function mostrarPreviewCampo(item){
-    const preview = document.getElementById('dob-campo-preview');
-    if(!preview) return;
-    const loc = resolverLocalizacaoCampo(item);
-    if(!loc){
-      preview.innerHTML = `<div class="dob-dica" style="padding:12px; text-align:center;">Sem planta cadastrada pra esse item — provavelmente é rede/tubulação ou algo que você adicionou na hora.</div>`;
-      return;
-    }
-    preview.innerHTML = `
-      <div style="position:relative; width:100%; max-height:280px; overflow:auto; border-radius:10px; border:1px solid var(--line);">
-        <img src="data:image/jpeg;base64,${loc.imagem}" style="width:100%; display:block;" />
-        <div style="position:absolute; left:${loc.x}%; top:${loc.y}%; width:${Math.max(loc.w,1.5)}%; height:${Math.max(loc.h,1.5)}%; border:3px solid #d9662f; border-radius:4px; box-shadow:0 0 0 3000px rgba(0,0,0,0.4); pointer-events:none;"></div>
-      </div>
-      <div style="text-align:center; font-size:12px; font-weight:600; color:var(--clay-dark,#c2551f); margin-top:6px;">📍 ${item.nome}</div>`;
-  }
-
-  function itemCampoHtml(i){
-    const sub = i.tipo === 'bloco' ? `${i.servico} · ${obraLabelCampo(i.obra)}` : 'Adicionado por você';
-    return `
-      <div class="dob-campo-item-linha" data-chave="${i.chave}" data-tipo="${i.tipo}" style="display:flex; align-items:center; gap:10px; padding:12px; background:${i.fotografado ? 'var(--paper2,#f3ede1)' : '#fff'}; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; box-shadow:0 1px 2px rgba(0,0,0,0.05); cursor:pointer;">
-        <div style="flex:1; min-width:0;">
-          <div style="font-weight:600; font-size:14.5px; ${i.fotografado ? 'text-decoration:line-through; color:#8a8272;' : 'color:var(--ink,#16233d);'}">${i.nome}</div>
-          <div style="font-size:11.5px; color:#8a8272; margin-top:2px;">${sub}</div>
-        </div>
-        ${i.fotografado
-          ? `<span style="font-size:22px; flex-shrink:0;">✅</span>`
-          : `<button type="button" class="dob-btn dob-campo-item-foto" data-chave="${i.chave}" data-tipo="${i.tipo}" style="flex-shrink:0; padding:12px 18px; font-size:14px; white-space:nowrap;">📸 Foto</button>`
-        }
-      </div>`;
-  }
-
-  function renderModoCampo(){
-    const container = document.getElementById('dob-campo-container');
-    if(!campoAberto){ container.innerHTML = ''; return; }
-    const itens = listaModoCampo();
-    const pendentes = itens.filter(i => !i.fotografado);
-    const feitos = itens.filter(i => i.fotografado);
-    container.innerHTML = `
-      <div class="dob-card-form" style="margin-top:14px; max-width:640px;">
-        <h3 style="margin:0 0 4px; font-size:19px;">📷 Modo Campo</h3>
-        <p class="dob-dica" style="margin:0 0 10px;">Toque num item pra ver onde fica no mapa. Fotografe cada um. Se você vir algo que não está aqui, adiciona no campo lá embaixo — o mapa é só um ponto de partida.</p>
-        <div id="dob-campo-preview" style="margin-bottom:14px;">
-          <div class="dob-dica" style="padding:12px; text-align:center; border:1px dashed var(--line); border-radius:10px;">Toque num item da lista pra ver a localização aqui</div>
-        </div>
-        <div style="font-size:13px; font-weight:700; color:var(--clay-dark,#c2551f); margin-bottom:10px;">${feitos.length}/${itens.length || 0} fotografados hoje</div>
-        ${itens.length === 0 ? '<p class="dob-dica">Nada em execução no mapa agora. Adicione algo que você viu no local aí embaixo.</p>' : ''}
-        <div id="dob-campo-pendentes">${pendentes.map(i => itemCampoHtml(i)).join('')}</div>
-        ${feitos.length ? `
-          <div style="margin-top:16px; font-size:11.5px; font-weight:700; color:#8a8272; text-transform:uppercase; letter-spacing:.03em;">Já fotografado</div>
-          <div id="dob-campo-feitos" style="margin-top:8px;">${feitos.map(i => itemCampoHtml(i)).join('')}</div>
-        ` : ''}
-        <div style="margin-top:18px; display:flex; gap:8px; flex-wrap:wrap;">
-          <input class="dob-input" id="dob-campo-novo-item" type="text" placeholder="Ex: Alvenaria nova iniciada no bloco 5" style="flex:1; min-width:200px;" />
-          <button class="dob-btn secundario" id="dob-campo-add-item">+ Adicionar</button>
-        </div>
-      </div>
-    `;
-    container.querySelectorAll('.dob-campo-item-linha').forEach(linha => {
-      linha.addEventListener('click', () => {
-        const chave = linha.dataset.chave;
-        const tipo = linha.dataset.tipo;
-        const item = itens.find(i => i.tipo === tipo && i.chave === chave);
-        if(item) mostrarPreviewCampo(item);
-      });
-    });
-    container.querySelectorAll('.dob-campo-item-foto').forEach(btn => {
-      btn.addEventListener('click', (ev) => {
-        ev.stopPropagation();
-        const chave = btn.dataset.chave;
-        const tipo = btn.dataset.tipo;
-        campoItemAtual = itens.find(i => i.tipo === tipo && i.chave === chave);
-        document.getElementById('dob-campo-file-input').click();
-      });
-    });
-    const addBtn = document.getElementById('dob-campo-add-item');
-    const novoInput = document.getElementById('dob-campo-novo-item');
-    if(addBtn) addBtn.addEventListener('click', adicionarItemCampo);
-    if(novoInput) novoInput.addEventListener('keydown', (ev) => { if(ev.key === 'Enter'){ ev.preventDefault(); adicionarItemCampo(); } });
-  }
-
-  function adicionarItemCampo(){
-    const input = document.getElementById('dob-campo-novo-item');
-    const texto = input.value.trim();
-    if(!texto) return;
-    const hoje = todayStr();
-    const st = loadCampoState();
-    if(!st[hoje]) st[hoje] = { extras: [], blocosFotografados: [] };
-    if(!st[hoje].extras) st[hoje].extras = [];
-    st[hoje].extras.push({ id: 'x' + Date.now() + Math.random().toString(36).slice(2,6), texto, fotografado: false });
-    saveCampoState(st);
-    input.value = '';
-    renderModoCampo();
-  }
-
   function acharOuCriarEntradaHoje(){
     const hoje = todayStr();
     let entry = entries.find(e => e.date === hoje);
@@ -3556,12 +3403,30 @@
     return entry;
   }
 
-  let campoItemAtual = null;
+  function renderModoCampo(){
+    const container = document.getElementById('dob-campo-container');
+    if(!campoAberto){ container.innerHTML = ''; return; }
+    const hoje = todayStr();
+    const entryHoje = entries.find(e => e.date === hoje);
+    const totalFotosHoje = entryHoje ? (entryHoje.fotos || []).length : 0;
+    container.innerHTML = `
+      <div class="dob-card-form" style="margin-top:14px; max-width:440px; text-align:center;">
+        <h3 style="margin:0 0 6px; font-size:19px;">📷 Modo Campo</h3>
+        <p class="dob-dica" style="margin:0 0 20px;">Toque no botão e tire a foto — ela já entra direto no apontamento de hoje. Você vincula cada foto à atividade certa depois, no computador.</p>
+        <button type="button" id="dob-campo-tirar-foto" class="dob-btn" style="width:100%; padding:20px; font-size:18px; font-weight:700;">📸 Tirar Foto</button>
+        <div style="margin-top:16px; font-size:14px; color:var(--muted,#8a8272);">${totalFotosHoje} foto${totalFotosHoje === 1 ? '' : 's'} salva${totalFotosHoje === 1 ? '' : 's'} hoje</div>
+      </div>
+    `;
+    const btnTirar = document.getElementById('dob-campo-tirar-foto');
+    if(btnTirar) btnTirar.addEventListener('click', () => {
+      document.getElementById('dob-campo-file-input').click();
+    });
+  }
+
   document.getElementById('dob-campo-file-input').addEventListener('change', async (ev) => {
     const file = (ev.target.files || [])[0];
     ev.target.value = '';
-    if(!file || !campoItemAtual) return;
-    const item = campoItemAtual;
+    if(!file) return;
     try{
       const entry = acharOuCriarEntradaHoje();
       const [fullRes, thumbRes] = await Promise.all([ compressImage(file, 1600, 0.82), compressImage(file, 180, 0.5) ]);
@@ -3569,21 +3434,19 @@
       if(accessToken){
         try{
           const fileId = await uploadToDrive(fullRes, filename);
-          entry.fotos.push({ type: 'drive', fileId, thumb: thumbRes, legenda: item.nome });
+          entry.fotos.push({ type: 'drive', fileId, thumb: thumbRes });
         }catch(driveErr){
           const localRes = await compressImage(file, 1100, 0.6);
-          entry.fotos.push({ type: 'local', data: localRes, legenda: item.nome });
+          entry.fotos.push({ type: 'local', data: localRes });
         }
       }else{
         const localRes = await compressImage(file, 1100, 0.6);
-        entry.fotos.push({ type: 'local', data: localRes, legenda: item.nome });
+        entry.fotos.push({ type: 'local', data: localRes });
       }
       saveEntry(entry);
-      marcarFotografadoCampo(item);
-      campoItemAtual = null;
       renderModoCampo();
       render();
-      mostrarToastSalvo(`Foto de "${item.nome}" salva`);
+      mostrarToastSalvo('Foto salva no apontamento de hoje');
     }catch(e){
       alert('Falha ao processar a foto. Tenta de novo.');
     }
