@@ -317,7 +317,7 @@
   .dob-card-bloco-linha:last-child{ border-bottom:none; }
   .dob-card-bloco-linha span{ color:#8a8272; }
   .dob-kanban-board{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
-  .dob-kanban-col{ background:var(--paper2,#f3ede1); border-radius:10px; padding:8px; }
+  .dob-kanban-col{ background:var(--paper2,#f3ede1); border-radius:10px; padding:8px; min-width:0; }
   .dob-kanban-card-compacta{ display:flex; align-items:center; gap:7px; background:#fff; border-radius:7px; padding:6px 9px; margin-bottom:4px; box-shadow:0 1px 2px rgba(0,0,0,0.08); cursor:pointer; font-size:11.5px; }
   .dob-kanban-card-compacta:last-child{ margin-bottom:0; }
   .dob-kanban-card-compacta:hover{ background:#faf8f4; }
@@ -422,6 +422,7 @@
     .dob-title{ font-size: 21px; }
     .dob-stamp{ align-self: flex-start; }
     .dob-drive-link{ margin-right: 0; }
+    .dob-header-right{ flex-direction: column; align-items: flex-start; gap: 6px; width: 100%; }
     .dob-status-bar{ flex-direction: column; align-items: stretch; gap: 10px; }
     .dob-status-bar button{ width: 100%; }
     .dob-toolbar{ flex-direction: column; align-items: stretch; }
@@ -464,7 +465,7 @@
       <p class="dob-title">Diário de Obra</p>
       <p class="dob-sub">Solar dos Pequis &amp; Solar dos Buritis — Anápolis/GO</p>
     </div>
-    <div style="display:flex; align-items:center; gap:10px;">
+    <div class="dob-header-right" style="display:flex; align-items:center; gap:10px;">
       <a class="dob-drive-link" id="dob-link-pasta" href="#" target="_blank" style="display:none;">Abrir pasta no Drive →</a>
       <div class="dob-stamp">Apontamento de campo</div>
     </div>
