@@ -321,8 +321,12 @@
   .dob-card-bloco-linha span{ color:#8a8272; }
   .dob-kanban-board{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
   .dob-kanban-col{ background:var(--paper2,#f3ede1); border-radius:10px; padding:8px; }
-  .dob-kanban-card{ background:#fff; border-radius:8px; padding:8px 10px; margin-bottom:6px; box-shadow:0 1px 2px rgba(0,0,0,0.08); cursor:pointer; }
-  .dob-kanban-card:last-child{ margin-bottom:0; }
+  .dob-kanban-card-compacta{ display:flex; align-items:center; gap:7px; background:#fff; border-radius:7px; padding:6px 9px; margin-bottom:4px; box-shadow:0 1px 2px rgba(0,0,0,0.08); cursor:pointer; font-size:11.5px; }
+  .dob-kanban-card-compacta:last-child{ margin-bottom:0; }
+  .dob-kanban-card-compacta:hover{ background:#faf8f4; }
+  .dob-kanban-card-compacta .dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .dob-kanban-card-compacta .nome{ font-weight:600; color:var(--ink,#16233d); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:2px; }
+  .dob-kanban-card-compacta .qtd{ font-size:10.5px; color:#8a8272; white-space:nowrap; flex-shrink:0; }
   @media (max-width: 480px){ .dob-kanban-board{ grid-template-columns:1fr; } }
   .dob-mapa-servico-linha{ margin:5px 0 2px 10px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
   .dob-mapa-status-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
@@ -3149,13 +3153,12 @@
       gruposEstado[chave].itens.push({ nome: humanizarNomeBloco(e.bloco, tipo), inicio: e.dataInicio, fim: e.dataConclusao, bloco: e.bloco });
     });
     Object.values(gruposEstado).forEach(g => {
-      const chips = g.itens.map(it => {
-        if(g.status === 'andamento') return `${it.nome} · desde ${fmtDate(it.inicio)}`;
-        return it.inicio && it.inicio !== it.fim ? `${it.nome} · ${fmtDate(it.inicio)} → ${fmtDate(it.fim)}` : it.nome;
-      });
+      const desde = g.status === 'andamento'
+        ? g.itens.reduce((min, it) => (!min || it.inicio < min) ? it.inicio : min, null)
+        : null;
       const tipoMapa = mapaState.tipoPorServico[g.servico];
       const planta = tipoMapa === 'rede' ? encontrarRedeDoBloco(g.obra, g.itens[0].bloco) : null;
-      registrar(g.obra, { servico: g.servico, status: g.status, chips, planta });
+      registrar(g.obra, { servico: g.servico, status: g.status, qtd: g.itens.length, desde, planta });
     });
 
     const gruposDesenho = {};
@@ -3167,7 +3170,7 @@
       gruposDesenho[chave].qtd++;
     });
     Object.values(gruposDesenho).forEach(g => {
-      registrar(g.obra, { servico: g.servico, status: g.status, chips: [`${g.qtd} trecho${g.qtd > 1 ? 's' : ''} no mapa`], planta: g.planta });
+      registrar(g.obra, { servico: g.servico, status: g.status, qtd: g.qtd, desde: null, planta: g.planta, trecho: true });
     });
 
     const linhas = [];
@@ -3200,12 +3203,14 @@
         const info = STATUS_INFO[st];
         const itens = b.porStatus[st];
         const cardsHtml = itens.length ? itens.map(l => {
-          const chips = (l.chips || []).map(c => `<span class="dob-chip mini ${info.chipClasse}">${c}</span>`).join('');
           const irMapaAttr = `data-ir-mapa="${b.raw}|||${l.servico}|||${l.planta || ''}"`;
+          const desdeTxt = l.desde ? ` · desde ${fmtDate(l.desde)}` : '';
+          const qtdTxt = l.trecho ? `${l.qtd} trecho${l.qtd === 1 ? '' : 's'}` : `${l.qtd} bloco${l.qtd === 1 ? '' : 's'}`;
           return `
-            <div class="dob-kanban-card" ${irMapaAttr} title="🗺️ Clique pra abrir no mapa e atualizar">
-              <div style="font-weight:600; font-size:11.5px; margin-bottom:4px; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:2px;">${l.servico}</div>
-              <div style="display:flex; flex-wrap:wrap; gap:4px;">${chips}</div>
+            <div class="dob-kanban-card-compacta" ${irMapaAttr} title="🗺️ Clique pra abrir no mapa">
+              <span class="dot" style="background:${info.cor};"></span>
+              <span class="nome">${l.servico}</span>
+              <span class="qtd">${qtdTxt}${desdeTxt}</span>
             </div>`;
         }).join('') : `<div style="font-size:11px; color:#8a8272; padding:6px 2px;">Nada aqui.</div>`;
         return `
