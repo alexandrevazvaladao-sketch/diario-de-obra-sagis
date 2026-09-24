@@ -3436,10 +3436,44 @@
     saveCampoState(st);
   }
 
+  function resolverLocalizacaoCampo(item){
+    if(item.tipo !== 'bloco') return null;
+    const partes = item.chave.split('|||');
+    const blocoId = partes[2];
+    const tipoServico = mapaState.tipoPorServico[item.servico];
+    if(tipoServico === 'vaga'){
+      const v = (typeof VAGAS_ITENS !== 'undefined' ? VAGAS_ITENS : []).find(x => x.id === blocoId);
+      if(!v) return null;
+      return { imagem: MAPA_IMAGEM_B64, x: v.x, y: v.y, w: v.w, h: v.h };
+    }
+    if(tipoServico === 'bloco' || tipoServico === 'area_comum'){
+      const b = BLOCOS_MAPA.find(x => x.id === blocoId);
+      if(!b) return null;
+      return { imagem: MAPA_IMAGEM_B64, x: b.x, y: b.y, w: b.w, h: b.h };
+    }
+    return null;
+  }
+
+  function mostrarPreviewCampo(item){
+    const preview = document.getElementById('dob-campo-preview');
+    if(!preview) return;
+    const loc = resolverLocalizacaoCampo(item);
+    if(!loc){
+      preview.innerHTML = `<div class="dob-dica" style="padding:12px; text-align:center;">Sem planta cadastrada pra esse item — provavelmente é rede/tubulação ou algo que você adicionou na hora.</div>`;
+      return;
+    }
+    preview.innerHTML = `
+      <div style="position:relative; width:100%; max-height:280px; overflow:auto; border-radius:10px; border:1px solid var(--line);">
+        <img src="data:image/jpeg;base64,${loc.imagem}" style="width:100%; display:block;" />
+        <div style="position:absolute; left:${loc.x}%; top:${loc.y}%; width:${Math.max(loc.w,1.5)}%; height:${Math.max(loc.h,1.5)}%; border:3px solid #d9662f; border-radius:4px; box-shadow:0 0 0 3000px rgba(0,0,0,0.4); pointer-events:none;"></div>
+      </div>
+      <div style="text-align:center; font-size:12px; font-weight:600; color:var(--clay-dark,#c2551f); margin-top:6px;">📍 ${item.nome}</div>`;
+  }
+
   function itemCampoHtml(i){
     const sub = i.tipo === 'bloco' ? `${i.servico} · ${obraLabelCampo(i.obra)}` : 'Adicionado por você';
     return `
-      <div style="display:flex; align-items:center; gap:10px; padding:12px; background:${i.fotografado ? 'var(--paper2,#f3ede1)' : '#fff'}; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+      <div class="dob-campo-item-linha" data-chave="${i.chave}" data-tipo="${i.tipo}" style="display:flex; align-items:center; gap:10px; padding:12px; background:${i.fotografado ? 'var(--paper2,#f3ede1)' : '#fff'}; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; box-shadow:0 1px 2px rgba(0,0,0,0.05); cursor:pointer;">
         <div style="flex:1; min-width:0;">
           <div style="font-weight:600; font-size:14.5px; ${i.fotografado ? 'text-decoration:line-through; color:#8a8272;' : 'color:var(--ink,#16233d);'}">${i.nome}</div>
           <div style="font-size:11.5px; color:#8a8272; margin-top:2px;">${sub}</div>
@@ -3460,7 +3494,10 @@
     container.innerHTML = `
       <div class="dob-card-form" style="margin-top:14px; max-width:640px;">
         <h3 style="margin:0 0 4px; font-size:19px;">📷 Modo Campo</h3>
-        <p class="dob-dica" style="margin:0 0 14px;">Fotografe cada item da lista abaixo. Se você vir algo que não está aqui, adiciona no campo lá embaixo — o mapa é só um ponto de partida.</p>
+        <p class="dob-dica" style="margin:0 0 10px;">Toque num item pra ver onde fica no mapa. Fotografe cada um. Se você vir algo que não está aqui, adiciona no campo lá embaixo — o mapa é só um ponto de partida.</p>
+        <div id="dob-campo-preview" style="margin-bottom:14px;">
+          <div class="dob-dica" style="padding:12px; text-align:center; border:1px dashed var(--line); border-radius:10px;">Toque num item da lista pra ver a localização aqui</div>
+        </div>
         <div style="font-size:13px; font-weight:700; color:var(--clay-dark,#c2551f); margin-bottom:10px;">${feitos.length}/${itens.length || 0} fotografados hoje</div>
         ${itens.length === 0 ? '<p class="dob-dica">Nada em execução no mapa agora. Adicione algo que você viu no local aí embaixo.</p>' : ''}
         <div id="dob-campo-pendentes">${pendentes.map(i => itemCampoHtml(i)).join('')}</div>
@@ -3474,8 +3511,17 @@
         </div>
       </div>
     `;
+    container.querySelectorAll('.dob-campo-item-linha').forEach(linha => {
+      linha.addEventListener('click', () => {
+        const chave = linha.dataset.chave;
+        const tipo = linha.dataset.tipo;
+        const item = itens.find(i => i.tipo === tipo && i.chave === chave);
+        if(item) mostrarPreviewCampo(item);
+      });
+    });
     container.querySelectorAll('.dob-campo-item-foto').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
         const chave = btn.dataset.chave;
         const tipo = btn.dataset.tipo;
         campoItemAtual = itens.find(i => i.tipo === tipo && i.chave === chave);
