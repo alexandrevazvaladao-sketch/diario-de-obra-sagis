@@ -282,6 +282,31 @@
   .dob-stat-num{ font-family:"Inter", -apple-system, sans-serif; font-size:24px; font-weight:700; color:var(--ink); line-height:1.1; }
   .dob-stat-label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.6px; margin-top:4px; }
 
+  /* ---------- Modo simples (celular) ---------- */
+  .dob-modo-compacto-toggle{
+    display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600;
+    color:#cfe0d6; cursor:pointer; user-select:none; background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.22); padding:6px 12px; border-radius:999px;
+    font-family:inherit; white-space:nowrap;
+  }
+  .dob-modo-compacto-toggle:hover{ background:rgba(255,255,255,0.14); }
+  .dob-modo-compacto-toggle.ativo{ background:rgba(217,102,47,0.4); border-color:rgba(217,102,47,0.7); color:#fff; }
+  .dob-stats-resumo{
+    display:none; align-items:center; gap:6px; font-size:12.5px; color:var(--muted);
+    margin:-10px 0 18px; cursor:pointer; user-select:none; padding:2px 2px;
+  }
+  .dob-stats-resumo b{ color:var(--ink); font-weight:700; }
+  .dob-stats-resumo .seta{ font-size:10px; }
+  .dob-filtros-toggle{ display:none; }
+  body.dob-compacto .dob-stats{ display:none; }
+  body.dob-compacto .dob-stats-resumo{ display:flex; }
+  body.dob-compacto.dob-stats-abertas .dob-stats{ display:grid; }
+  body.dob-compacto.dob-stats-abertas .dob-stats-resumo .seta{ transform:rotate(180deg); }
+  body.dob-compacto #dob-filtros-painel{ display:none; }
+  body.dob-compacto.dob-filtros-abertos #dob-filtros-painel{ display:flex; }
+  body.dob-compacto .dob-filtros-toggle{ display:inline-flex; }
+  body.dob-compacto .dob-status-bar{ padding:9px 14px; font-size:12px; }
+
   /* ---------- Tira de datas ---------- */
   .dob-datestrip{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:18px; }
   .dob-daypill{
@@ -456,6 +481,30 @@
     .dob-entry{ padding: 16px; }
     .dob-entry-fotos img{ width: 78px; height: 78px; }
     .dob-thumb, .dob-thumb-uploading{ width: 66px; height: 66px; }
+
+    /* Campos maiores pra não dar zoom automático no iOS e ficar mais fácil de tocar */
+    .dob-input, .dob-select, .dob-textarea{ font-size:16px; padding:11px 12px; }
+    .dob-btn{ min-height:44px; }
+    .dob-btn.pequeno{ min-height:38px; }
+
+    /* Mapa de Acompanhamento (dentro do apontamento e na tela cheia): cartões e ações maiores pra tocar */
+    .dob-kanban-card-compacta{ padding:11px 12px; font-size:13px; min-height:44px; }
+    .dob-kanban-card-compacta .qtd{ font-size:11px; }
+    .dob-mapa-bloco-chip{ padding:6px 12px; font-size:12px; }
+    .dob-mapa-detail-acoes{ flex-direction:column; align-items:stretch; gap:8px; }
+    .dob-mapa-detail-acoes .dob-btn.pequeno{ width:100%; padding:11px 14px; font-size:13px; text-align:center; }
+    .dob-mapa-ver-mapa{ text-align:center; padding:8px 0; font-size:12.5px; }
+    .dob-mapa-fotos-strip{ grid-template-columns:repeat(auto-fill,minmax(80px,1fr)); }
+    .dob-mapa-foto-desvincular{ width:24px; height:24px; line-height:22px; font-size:13px; }
+
+    /* Checklist de chamada (equipamentos/mão de obra): linhas e caixinhas maiores */
+    .dob-chamada-item{ padding:10px 4px; font-size:14px; }
+    .dob-chamada-item input[type="checkbox"]{ width:19px; height:19px; }
+    .dob-clima-btn{ width:44px; height:44px; }
+
+    /* Menos badge decorativo no topo, prioriza o essencial */
+    .dob-stamp{ display:none; }
+    .dob-sub{ font-size:9.5px; }
   }
 </style>
 </head>
@@ -488,6 +537,7 @@
     </div>
     <div class="dob-header-right" style="display:flex; align-items:center; gap:10px;">
       <a class="dob-drive-link" id="dob-link-pasta" href="#" target="_blank" style="display:none;">Abrir pasta no Drive →</a>
+      <button type="button" class="dob-modo-compacto-toggle" id="dob-modo-compacto-toggle" title="Alterna entre a tela completa e uma versão mais simples e direta">📱 Modo simples</button>
       <div class="dob-stamp">Apontamento de campo</div>
     </div>
   </div>
@@ -503,6 +553,7 @@
   </div>
 
   <div class="dob-stats dob-home-only" id="dob-stats"></div>
+  <div class="dob-stats-resumo dob-home-only" id="dob-stats-resumo" title="Toque pra ver os números completos"></div>
 
   <div class="dob-datestrip dob-home-only" id="dob-datestrip"></div>
 
@@ -515,7 +566,8 @@
     <button class="dob-btn secundario" id="dob-btn-producao-diaria" style="display:none;">Produção Diária</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-mapa">Mapa de Acompanhamento</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-campo">📷 Modo Campo</button>
-    <div class="dob-filtros">
+    <button type="button" class="dob-btn secundario pequeno dob-filtros-toggle" id="dob-filtros-toggle">🔍 Filtros</button>
+    <div class="dob-filtros" id="dob-filtros-painel">
       <select class="dob-select" id="dob-filtro-obra">
         <option value="">Todas as obras</option>
         <option value="Pequis">Solar dos Pequis</option>
@@ -592,6 +644,10 @@
         <div class="dob-stat-label">${s.label}</div>
       </div>
     `).join('');
+    const resumoEl = document.getElementById('dob-stats-resumo');
+    if(resumoEl){
+      resumoEl.innerHTML = `<span><b>${entries.length}</b> apontamentos · <b>${registrosSemana}</b> nos últimos 7 dias · <b>${totalFotos}</b> fotos</span><span class="seta">▾</span>`;
+    }
   }
 
   // ---------- Tira de datas (últimos 10 dias) ----------
@@ -3969,6 +4025,40 @@
     const formContainerEl = document.getElementById('dob-form-container');
     if(formContainerEl) obsTexto.observe(formContainerEl, { childList:true });
     sincronizarSidebar();
+  })();
+
+  (function initModoCompacto(){
+    const btnToggle = document.getElementById('dob-modo-compacto-toggle');
+    const resumoEl = document.getElementById('dob-stats-resumo');
+    const btnFiltros = document.getElementById('dob-filtros-toggle');
+    if(!btnToggle) return;
+    function aplicarModoCompacto(ativo){
+      document.body.classList.toggle('dob-compacto', ativo);
+      if(!ativo){
+        document.body.classList.remove('dob-stats-abertas', 'dob-filtros-abertos');
+      }
+      btnToggle.classList.toggle('ativo', ativo);
+      btnToggle.textContent = ativo ? '📱 Modo simples ✓' : '📱 Modo simples';
+      try{ localStorage.setItem('dob:modo-compacto', ativo ? '1' : '0'); }catch(e){}
+    }
+    const salvo = (function(){
+      try{
+        const v = localStorage.getItem('dob:modo-compacto');
+        if(v !== null) return v === '1';
+        return window.innerWidth < 640; // sem preferência salva: já entra simplificado no celular
+      }catch(e){ return false; }
+    })();
+    aplicarModoCompacto(salvo);
+    btnToggle.addEventListener('click', () => aplicarModoCompacto(!document.body.classList.contains('dob-compacto')));
+    if(resumoEl){
+      resumoEl.addEventListener('click', () => document.body.classList.toggle('dob-stats-abertas'));
+    }
+    if(btnFiltros){
+      btnFiltros.addEventListener('click', () => {
+        const abertos = document.body.classList.toggle('dob-filtros-abertos');
+        btnFiltros.textContent = abertos ? '🔍 Filtros ✓' : '🔍 Filtros';
+      });
+    }
   })();
 
   renderSetup();
