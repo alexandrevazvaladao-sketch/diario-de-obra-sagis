@@ -170,7 +170,10 @@
   .dob-btn.pequeno{ padding:7px 14px; font-size:12px; }
   .dob-btn:disabled{ opacity:0.5; cursor:not-allowed; }
 
-  .dob-filtros{ display:flex; gap:10px; flex-wrap:wrap; flex:1; }
+  .dob-filtros{ display:flex; gap:10px; flex-wrap:wrap; flex:1; align-items:center; }
+  /* Ações que já existem no menu lateral (Novo apontamento, Mapa, Modo Campo):
+     ficam ocultas aqui pra não duplicar e não "roubar" a linha dos filtros. */
+  .dob-btn-oculto-lateral{ display:none !important; }
   .dob-input, .dob-select, .dob-textarea{
     font-family: inherit; border: 1px solid var(--line); background: var(--card); padding:9px 12px;
     border-radius:8px; font-size:13.5px; color: var(--ink-text);
@@ -504,14 +507,14 @@
   <div class="dob-datestrip dob-home-only" id="dob-datestrip"></div>
 
   <div class="dob-toolbar dob-home-only">
-    <button class="dob-btn" id="dob-novo">+ Novo apontamento</button>
+    <button class="dob-btn dob-btn-oculto-lateral" id="dob-novo">+ Novo apontamento</button>
     <button class="dob-btn secundario" id="dob-btn-relatorio" style="display:none;">Gerar apresentação</button>
     <button class="dob-btn secundario" id="dob-btn-gamma" style="display:none;">Comando para o Gamma</button>
     <button class="dob-btn secundario" id="dob-btn-resumo-macro" style="display:none;">Resumo por macro-serviço</button>
     <button class="dob-btn secundario" id="dob-btn-resumo-semana" style="display:none;">Resumo da semana</button>
     <button class="dob-btn secundario" id="dob-btn-producao-diaria" style="display:none;">Produção Diária</button>
-    <button class="dob-btn secundario" id="dob-btn-mapa">Mapa de Acompanhamento</button>
-    <button class="dob-btn secundario" id="dob-btn-campo">📷 Modo Campo</button>
+    <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-mapa">Mapa de Acompanhamento</button>
+    <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-campo">📷 Modo Campo</button>
     <div class="dob-filtros">
       <select class="dob-select" id="dob-filtro-obra">
         <option value="">Todas as obras</option>
@@ -522,8 +525,8 @@
       <input class="dob-input" type="date" id="dob-filtro-data" />
       <input class="dob-input" type="text" id="dob-filtro-texto" placeholder="Buscar no texto..." style="min-width:180px;" />
       <button class="dob-btn secundario pequeno" id="dob-limpar-filtro">Limpar filtros</button>
+      <span class="dob-contador" id="dob-contador"></span>
     </div>
-    <span class="dob-contador" id="dob-contador"></span>
   </div>
 
   <div id="dob-relatorio-container"></div>
@@ -3318,7 +3321,7 @@
       const overlay = document.createElement('div');
       overlay.style.cssText = 'position:fixed; inset:0; background:rgba(20,20,20,0.4); z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px;';
       const itensHtml = lista.length
-        ? `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(76px,1fr)); gap:8px;">${lista.map((x, i) => `
+        ? `<div id="dob-escolha-foto-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(76px,1fr)); gap:8px;">${lista.map((x, i) => `
             <div class="dob-escolha-foto" data-i="${i}" style="cursor:pointer; border-radius:8px; overflow:hidden; border:2px solid var(--line); background:#fff; position:relative;">
               <span class="dob-escolha-foto-check" style="position:absolute; top:4px; right:4px; width:20px; height:20px; border-radius:50%; background:#fff; border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:12px; color:#fff; font-weight:700; box-shadow:0 1px 3px rgba(0,0,0,0.25); z-index:1;"></span>
               <img src="${x.foto.thumb || x.foto.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" style="width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:#eee;" />
@@ -3341,6 +3344,30 @@
         </div>`;
       document.body.appendChild(overlay);
       const caixa = overlay.querySelector('#dob-escolha-foto-box');
+      const grade = overlay.querySelector('#dob-escolha-foto-grid');
+      const listaScroll = overlay.querySelector('#dob-escolha-foto-lista');
+      if(grade && listaScroll){
+        // Em vez de só empacotar mais miniaturas pequenas conforme a janela cresce,
+        // recalcula quantas colunas cabem mantendo cada miniatura entre ~110px e ~200px —
+        // assim, ao aumentar a janela, as fotos existentes crescem até certo ponto antes
+        // de abrir uma coluna nova.
+        const MIN_COL = 110;
+        const MAX_COL = 200;
+        const GAP = 8;
+        const ajustarColunas = () => {
+          const largura = listaScroll.clientWidth;
+          if(!largura) return;
+          let colunas = Math.max(1, Math.floor((largura + GAP) / (MIN_COL + GAP)));
+          while(colunas > 1 && (largura - GAP * (colunas - 1)) / colunas > MAX_COL){
+            colunas--;
+          }
+          grade.style.gridTemplateColumns = `repeat(${colunas}, 1fr)`;
+        };
+        ajustarColunas();
+        if(window.ResizeObserver){
+          new ResizeObserver(() => ajustarColunas()).observe(listaScroll);
+        }
+      }
       if(caixa && window.ResizeObserver){
         let salvarTimeout = null;
         new ResizeObserver(() => {
