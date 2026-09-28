@@ -333,7 +333,9 @@
   .dob-mapa-bloco-chip{ font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:999px; }
   .dob-mapa-fotos-label{ font-size:10px; font-weight:700; letter-spacing:.03em; color:#8a8272; text-transform:uppercase; margin:10px 0 6px; }
   .dob-mapa-fotos-strip{ display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:6px; }
-  .dob-mapa-foto-item{ border-radius:6px; overflow:hidden; border:1px solid var(--line); background:#fff; }
+  .dob-mapa-foto-item{ position:relative; border-radius:6px; overflow:hidden; border:1px solid var(--line); background:#fff; }
+  .dob-mapa-foto-desvincular{ position:absolute; top:3px; right:3px; z-index:1; width:18px; height:18px; line-height:16px; padding:0; border-radius:50%; border:none; background:rgba(20,20,20,0.65); color:#fff; font-size:11px; cursor:pointer; text-align:center; }
+  .dob-mapa-foto-desvincular:hover{ background:rgba(192,82,47,0.9); }
   .dob-mapa-foto-item img{ width:100%; aspect-ratio:1; object-fit:cover; display:block; background:#eee; }
   .dob-mapa-foto-data{ display:block; font-size:9px; color:#8a8272; text-align:center; padding:2px 3px; }
   .dob-mapa-sem-foto{ font-size:11px; color:#8a8272; padding:6px 0; }
@@ -2419,8 +2421,10 @@
       try{
         const foto = normalizeFoto(entry.fotos[index]);
         const filename = `${entry.date}_${entry.id}_${index}.jpg`;
+        let thumb;
+        try{ thumb = await compressDataUrl(foto.data, 180, 0.5); }catch(err){ /* segue sem thumb se não der */ }
         const fileId = await uploadToDrive(foto.data, filename);
-        entry.fotos[index] = { type: 'drive', fileId };
+        entry.fotos[index] = { type: 'drive', fileId, thumb, legenda: foto.legenda };
         ok++;
       }catch(e){ falhas++; }
       if(btn) btn.textContent = `📤 Sincronizando ${ok + falhas}/${pendentes.length}...`;
@@ -2465,6 +2469,23 @@
   });
 
   // ---------- Compressão de imagem ----------
+  function compressDataUrl(dataUrl, maxDim, quality){
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if(w > h && w > maxDim){ h = h * (maxDim / w); w = maxDim; }
+        else if(h >= w && h > maxDim){ w = w * (maxDim / h); h = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  }
+
   function compressImage(file, maxDim, quality){
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -3132,6 +3153,7 @@
     });
   }
   function normalizeFoto(foto){ return typeof foto === 'string' ? { type:'local', data: foto } : foto; }
+  const FOTO_SEM_THUMB = "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' fill='#e2d9c6'/><text x='40' y='48' font-size='30' text-anchor='middle'>📷</text></svg>`);
 
   function humanizarNomeBloco(id, tipo){
     if(tipo === 'bloco' || tipo === 'vaga'){
@@ -3243,7 +3265,7 @@
       const itensHtml = lista.length
         ? `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:8px; max-height:50vh; overflow-y:auto;">${lista.map((x, i) => `
             <div class="dob-escolha-foto" data-i="${i}" style="cursor:pointer; border-radius:8px; overflow:hidden; border:1px solid var(--line); background:#fff;">
-              <img src="${x.foto.thumb || x.foto.data || ''}" style="width:100%; height:80px; object-fit:cover; display:block; background:#eee;" />
+              <img src="${x.foto.thumb || x.foto.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" style="width:100%; height:80px; object-fit:cover; display:block; background:#eee;" />
               <div style="padding:3px 5px; font-size:9.5px; color:#8a8272; text-align:center;">${fmtDate(x.data)}</div>
             </div>`).join('')}</div>`
         : `<p class="dob-dica" style="margin:0;">Nenhuma foto sem vínculo no momento. Tire fotos no Modo Campo primeiro.</p>`;
@@ -3304,7 +3326,8 @@
           const fotosHtml = fotos.length
             ? `<div class="dob-mapa-fotos-strip">${fotos.map(x => `
                 <div class="dob-mapa-foto-item">
-                  <img src="${x.foto.thumb || x.foto.data || ''}" alt="Foto" />
+                  <button type="button" class="dob-mapa-foto-desvincular" data-entry-id="${x.entryId}" data-idx="${x.idx}" title="Desvincular esta foto">✕</button>
+                  <img src="${x.foto.thumb || x.foto.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" alt="Foto" />
                   <span class="dob-mapa-foto-data">${fmtDate(x.data)}</span>
                 </div>`).join('')}</div>`
             : `<div class="dob-mapa-sem-foto">Nenhuma foto vinculada a essa atividade ainda.</div>`;
@@ -3360,6 +3383,20 @@
     saveEntry(entry);
     render();
     mostrarToastSalvo(`Foto vinculada a "${servico}"`);
+  });
+  document.addEventListener('click', (ev) => {
+    const alvo = ev.target.closest('.dob-mapa-foto-desvincular');
+    if(!alvo) return;
+    ev.stopPropagation();
+    const entry = entries.find(e => e.id === alvo.dataset.entryId);
+    const idx = Number(alvo.dataset.idx);
+    if(!entry || !entry.fotos || !entry.fotos[idx]) return;
+    const fotoAtual = normalizeFoto(entry.fotos[idx]);
+    delete fotoAtual.legenda;
+    entry.fotos[idx] = fotoAtual;
+    saveEntry(entry);
+    render();
+    mostrarToastSalvo('Vínculo removido');
   });
 
   function marcacoesMapaHtml(data){
@@ -3802,7 +3839,18 @@
 
   if('serviceWorker' in navigator){
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(() => { /* segue sem SW se falhar */ });
+      navigator.serviceWorker.register('sw.js').then((reg) => {
+        // Checa se tem versão nova do service worker toda vez que o app é aberto.
+        reg.update().catch(() => {});
+        // Se um SW novo assumir (skipWaiting), recarrega a página uma vez pra pegar
+        // a versão mais nova do app automaticamente, sem precisar de Ctrl+Shift+R.
+        let jaRecarregou = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if(jaRecarregou) return;
+          jaRecarregou = true;
+          window.location.reload();
+        });
+      }).catch(() => { /* segue sem SW se falhar */ });
     });
   }
 })();
