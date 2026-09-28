@@ -333,7 +333,9 @@
   .dob-mapa-bloco-chip{ font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:999px; }
   .dob-mapa-fotos-label{ font-size:10px; font-weight:700; letter-spacing:.03em; color:#8a8272; text-transform:uppercase; margin:10px 0 6px; }
   .dob-mapa-fotos-strip{ display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:6px; }
-  .dob-mapa-fotos-strip img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; display:block; background:#eee; }
+  .dob-mapa-foto-item{ border-radius:6px; overflow:hidden; border:1px solid var(--line); background:#fff; }
+  .dob-mapa-foto-item img{ width:100%; aspect-ratio:1; object-fit:cover; display:block; background:#eee; }
+  .dob-mapa-foto-data{ display:block; font-size:9px; color:#8a8272; text-align:center; padding:2px 3px; }
   .dob-mapa-sem-foto{ font-size:11px; color:#8a8272; padding:6px 0; }
   .dob-mapa-detail-acoes{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:8px; }
   .dob-mapa-detail-acoes .dob-btn.pequeno{ padding:5px 10px; font-size:10.5px; }
@@ -3199,13 +3201,22 @@
     return linhas;
   }
 
-  function fotosDoServicoNoDia(data, servico){
-    const entry = entries.find(e => e.date === data);
-    if(!entry) return [];
-    return (entry.fotos || [])
-      .map((f, i) => ({ foto: normalizeFoto(f), idx: i }))
-      .filter(x => x.foto.legenda && x.foto.legenda.split(' — ').pop() === servico)
-      .reverse(); // mais recente primeiro
+  function fotosDoServico(servico){
+    const lista = [];
+    entries.forEach(e => {
+      (e.fotos || []).forEach((f, i) => {
+        const nf = normalizeFoto(f);
+        if(nf.legenda && nf.legenda.split(' — ').pop() === servico){
+          lista.push({ data: e.date, entryId: e.id, idx: i, foto: nf });
+        }
+      });
+    });
+    lista.sort((a, b) => {
+      const chaveA = a.data + '_' + String(a.idx).padStart(4, '0');
+      const chaveB = b.data + '_' + String(b.idx).padStart(4, '0');
+      return chaveB.localeCompare(chaveA); // mais recente primeiro
+    });
+    return lista;
   }
 
   function fotosNaoVinculadas(){
@@ -3288,11 +3299,15 @@
           const blocosChipsHtml = (l.itens && l.itens.length)
             ? `<div class="dob-mapa-blocos">${l.itens.map(it => `<span class="dob-mapa-bloco-chip" style="color:${info.cor}; background:${info.bg};">${it.nome}</span>`).join('')}</div>`
             : '';
-          const fotos = data ? fotosDoServicoNoDia(data, l.servico) : [];
+          const fotos = fotosDoServico(l.servico);
           const fotosLabelHtml = `<div class="dob-mapa-fotos-label">Fotos vinculadas${fotos.length ? ` (${fotos.length})` : ''}</div>`;
           const fotosHtml = fotos.length
-            ? `<div class="dob-mapa-fotos-strip">${fotos.map(x => `<img src="${x.foto.thumb || x.foto.data || ''}" alt="Foto" />`).join('')}</div>`
-            : `<div class="dob-mapa-sem-foto">Nenhuma foto vinculada a essa atividade ainda. Vincule pelo Modo Campo.</div>`;
+            ? `<div class="dob-mapa-fotos-strip">${fotos.map(x => `
+                <div class="dob-mapa-foto-item">
+                  <img src="${x.foto.thumb || x.foto.data || ''}" alt="Foto" />
+                  <span class="dob-mapa-foto-data">${fmtDate(x.data)}</span>
+                </div>`).join('')}</div>`
+            : `<div class="dob-mapa-sem-foto">Nenhuma foto vinculada a essa atividade ainda.</div>`;
           return `
             <div class="dob-kanban-item" id="${itemId}">
               <div class="dob-kanban-card-compacta" data-toggle-mapa-item title="Clique pra ver detalhes">
