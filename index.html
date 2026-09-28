@@ -3318,24 +3318,38 @@
       const overlay = document.createElement('div');
       overlay.style.cssText = 'position:fixed; inset:0; background:rgba(20,20,20,0.4); z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px;';
       const itensHtml = lista.length
-        ? `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:8px; max-height:50vh; overflow-y:auto;">${lista.map((x, i) => `
+        ? `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(76px,1fr)); gap:8px;">${lista.map((x, i) => `
             <div class="dob-escolha-foto" data-i="${i}" style="cursor:pointer; border-radius:8px; overflow:hidden; border:2px solid var(--line); background:#fff; position:relative;">
-              <span class="dob-escolha-foto-check" style="position:absolute; top:4px; right:4px; width:20px; height:20px; border-radius:50%; background:#fff; border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:12px; color:#fff; font-weight:700; box-shadow:0 1px 3px rgba(0,0,0,0.25);"></span>
-              <img src="${x.foto.thumb || x.foto.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" style="width:100%; height:80px; object-fit:cover; display:block; background:#eee;" />
+              <span class="dob-escolha-foto-check" style="position:absolute; top:4px; right:4px; width:20px; height:20px; border-radius:50%; background:#fff; border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:12px; color:#fff; font-weight:700; box-shadow:0 1px 3px rgba(0,0,0,0.25); z-index:1;"></span>
+              <img src="${x.foto.thumb || x.foto.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" style="width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:#eee;" />
               <div style="padding:3px 5px; font-size:9.5px; color:#8a8272; text-align:center;">${fmtDate(x.data)}</div>
             </div>`).join('')}</div>`
         : `<p class="dob-dica" style="margin:0;">Nenhuma foto sem vínculo no momento. Tire fotos no Modo Campo primeiro.</p>`;
+      let tamanhoSalvo = null;
+      try{ tamanhoSalvo = JSON.parse(localStorage.getItem('dob:vincular-foto-tamanho') || 'null'); }catch(err){ /* ignora */ }
+      const larguraInicial = (tamanhoSalvo && tamanhoSalvo.w) || 480;
+      const alturaInicial = (tamanhoSalvo && tamanhoSalvo.h) || 480;
       overlay.innerHTML = `
-        <div style="background:#fff; border-radius:10px; padding:20px; max-width:460px; width:100%; max-height:80vh; overflow-y:auto; box-shadow:0 10px 30px rgba(0,0,0,0.3); font-family:inherit;">
-          <p style="margin:0 0 4px; font-size:15px; font-weight:700; color:var(--ink,#16233d);">Vincular foto a "${servico}"</p>
-          <p class="dob-dica" style="margin:0 0 12px;">Fotos ainda sem vínculo, mais recentes primeiro. Toque pra selecionar — pode escolher mais de uma.</p>
-          <div id="dob-escolha-foto-lista">${itensHtml}</div>
-          <div style="margin-top:14px; display:flex; justify-content:flex-end; gap:8px;">
+        <div id="dob-escolha-foto-box" style="display:flex; flex-direction:column; background:#fff; border-radius:10px; padding:18px 20px; width:${larguraInicial}px; height:${alturaInicial}px; max-width:96vw; max-height:92vh; min-width:300px; min-height:280px; overflow:hidden; resize:both; box-shadow:0 10px 30px rgba(0,0,0,0.3); font-family:inherit;">
+          <p style="margin:0 0 4px; font-size:15px; font-weight:700; color:var(--ink,#16233d); flex-shrink:0;">Vincular foto a "${servico}"</p>
+          <p class="dob-dica" style="margin:0 0 10px; flex-shrink:0;">Fotos ainda sem vínculo, mais recentes primeiro. Toque pra selecionar — pode escolher mais de uma. Arraste o canto ⌟ pra aumentar a janela e ver mais fotos maiores.</p>
+          <div id="dob-escolha-foto-lista" style="flex:1 1 auto; overflow-y:auto; min-height:0;">${itensHtml}</div>
+          <div style="margin-top:14px; display:flex; justify-content:flex-end; gap:8px; flex-shrink:0;">
             <button type="button" id="dob-escolha-foto-cancelar" style="padding:9px 14px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:13px;">Fechar</button>
             ${lista.length ? `<button type="button" id="dob-escolha-foto-confirmar" disabled style="padding:9px 14px; border-radius:6px; border:none; background:var(--ink,#16233d); color:#fff; cursor:pointer; font-size:13px; opacity:.4;">Vincular</button>` : ''}
           </div>
         </div>`;
       document.body.appendChild(overlay);
+      const caixa = overlay.querySelector('#dob-escolha-foto-box');
+      if(caixa && window.ResizeObserver){
+        let salvarTimeout = null;
+        new ResizeObserver(() => {
+          clearTimeout(salvarTimeout);
+          salvarTimeout = setTimeout(() => {
+            try{ localStorage.setItem('dob:vincular-foto-tamanho', JSON.stringify({ w: caixa.offsetWidth, h: caixa.offsetHeight })); }catch(err){ /* ignora */ }
+          }, 300);
+        }).observe(caixa);
+      }
       const finalizar = (valor) => { overlay.remove(); resolve(valor); };
       const btnConfirmar = overlay.querySelector('#dob-escolha-foto-confirmar');
       const atualizarBotaoConfirmar = () => {
