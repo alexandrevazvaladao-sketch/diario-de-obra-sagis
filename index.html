@@ -372,7 +372,17 @@
   .dob-mapa-detail-acoes{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:8px; }
   .dob-mapa-detail-acoes .dob-btn.pequeno{ padding:5px 10px; font-size:10.5px; }
   .dob-mapa-ver-mapa{ display:inline-block; font-size:11px; font-weight:600; color:var(--clay-dark,#c2551f); text-decoration:underline; text-decoration-style:dotted; text-underline-offset:2px; cursor:pointer; }
-  @media (max-width: 480px){ .dob-kanban-board{ grid-template-columns:1fr; } }
+  @media (max-width: 480px){
+    .dob-kanban-board{ grid-template-columns:1fr; }
+    /* Em telas estreitas, "13 blocos · desde 17/09/2026" some com quase todo
+       o espaço da linha e o nome do serviço fica espremido a 1 caractere.
+       Aqui o nome ganha a linha toda e a data desce pra uma segunda linha. */
+    .dob-kanban-card-compacta{ flex-wrap:wrap; row-gap:2px; padding:9px 10px; }
+    .dob-kanban-card-compacta .dot{ order:1; }
+    .dob-kanban-card-compacta .nome{ order:2; white-space:normal; overflow-wrap:break-word; }
+    .dob-kanban-card-compacta .chevron{ order:3; }
+    .dob-kanban-card-compacta .qtd{ order:4; flex-basis:100%; margin-left:14px; }
+  }
   .dob-mapa-servico-linha{ margin:5px 0 2px 10px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
   .dob-mapa-status-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
   .dob-mapa-status-label{ font-size:10.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; padding:1px 8px; border-radius:999px; }
