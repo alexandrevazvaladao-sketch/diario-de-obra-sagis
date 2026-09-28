@@ -495,6 +495,7 @@
     <span><span class="dob-dot off" id="dob-dot"></span><span id="dob-status-texto">Drive não conectado</span></span>
     <button class="dob-btn secundario pequeno" id="dob-btn-conectar">Conectar ao Google Drive</button>
     <button class="dob-btn secundario pequeno" id="dob-btn-sync-fotos" style="display:none;">📤 Sincronizar fotos locais</button>
+    <button class="dob-btn secundario pequeno" id="dob-btn-reparar-thumbs" style="display:none;">🔧 Reparar miniaturas</button>
     <button class="dob-btn secundario pequeno" id="dob-btn-config">Configurações</button>
   </div>
 
@@ -2436,6 +2437,57 @@
     render();
     mostrarToastSalvo(`${ok} foto${ok === 1 ? '' : 's'} sincronizada${ok === 1 ? '' : 's'} no Drive${falhas ? ` — ${falhas} falharam, tenta de novo` : ''}`);
   }
+
+  function contarFotosSemThumb(){
+    let n = 0;
+    entries.forEach(e => (e.fotos || []).forEach(f => { const nf = normalizeFoto(f); if(nf.type === 'drive' && !nf.thumb && !nf.data) n++; }));
+    return n;
+  }
+  async function repararMiniaturas(){
+    if(!accessToken) return;
+    const pendentes = [];
+    entries.forEach(e => (e.fotos || []).forEach((f, i) => {
+      const nf = normalizeFoto(f);
+      if(nf.type === 'drive' && !nf.thumb && !nf.data) pendentes.push({ entry: e, index: i });
+    }));
+    if(!pendentes.length) return;
+    const btn = document.getElementById('dob-btn-reparar-thumbs');
+    if(btn){ btn.disabled = true; btn.textContent = `🔧 Reparando 0/${pendentes.length}...`; }
+    let ok = 0, falhas = 0;
+    for(const { entry, index } of pendentes){
+      try{
+        const foto = normalizeFoto(entry.fotos[index]);
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${foto.fileId}?alt=media`, {
+          headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
+        if(!res.ok) throw new Error('download falhou');
+        const blob = await res.blob();
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        const thumb = await compressDataUrl(dataUrl, 180, 0.5);
+        entry.fotos[index] = { ...foto, thumb };
+        ok++;
+      }catch(e){ falhas++; }
+      if(btn) btn.textContent = `🔧 Reparando ${ok + falhas}/${pendentes.length}...`;
+    }
+    entries.forEach(e => db.set('dob:entry:' + e.id, JSON.stringify(e)));
+    await syncEntriesToDrive();
+    if(btn){ btn.disabled = false; }
+    atualizarBotaoReparar();
+    render();
+    mostrarToastSalvo(`${ok} miniatura${ok === 1 ? '' : 's'} reparada${ok === 1 ? '' : 's'}${falhas ? ` — ${falhas} falharam, tenta de novo` : ''}`);
+  }
+  function atualizarBotaoReparar(){
+    const btn = document.getElementById('dob-btn-reparar-thumbs');
+    if(!btn) return;
+    const pendentes = accessToken ? contarFotosSemThumb() : 0;
+    btn.style.display = pendentes > 0 ? 'inline-flex' : 'none';
+    btn.textContent = `🔧 Reparar ${pendentes} miniatura${pendentes === 1 ? '' : 's'}`;
+  }
   function updateStatus(){
     if(accessToken){
       statusDot.className = 'dob-dot on';
@@ -2452,6 +2504,7 @@
       btnSync.style.display = pendentes > 0 ? 'inline-flex' : 'none';
       btnSync.textContent = `📤 Sincronizar ${pendentes} foto${pendentes === 1 ? '' : 's'} local${pendentes === 1 ? '' : 'is'}`;
     }
+    atualizarBotaoReparar();
   }
 
   document.getElementById('dob-btn-conectar').addEventListener('click', () => {
@@ -2459,6 +2512,7 @@
     tokenClient.requestAccessToken({ prompt: '' });
   });
   document.getElementById('dob-btn-sync-fotos').addEventListener('click', () => { sincronizarFotosLocaisPendentes(); });
+  document.getElementById('dob-btn-reparar-thumbs').addEventListener('click', () => { repararMiniaturas(); });
   document.getElementById('dob-btn-config').addEventListener('click', () => {
     if(confirm('Deseja trocar o Client ID configurado?')){
       localStorage.removeItem('dob:client_id');
@@ -3260,11 +3314,13 @@
   function escolherFotoParaVincular(servico){
     return new Promise(resolve => {
       const lista = fotosNaoVinculadas();
+      const selecionados = new Set();
       const overlay = document.createElement('div');
       overlay.style.cssText = 'position:fixed; inset:0; background:rgba(20,20,20,0.4); z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px;';
       const itensHtml = lista.length
         ? `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:8px; max-height:50vh; overflow-y:auto;">${lista.map((x, i) => `
-            <div class="dob-escolha-foto" data-i="${i}" style="cursor:pointer; border-radius:8px; overflow:hidden; border:1px solid var(--line); background:#fff;">
+            <div class="dob-escolha-foto" data-i="${i}" style="cursor:pointer; border-radius:8px; overflow:hidden; border:2px solid var(--line); background:#fff; position:relative;">
+              <span class="dob-escolha-foto-check" style="position:absolute; top:4px; right:4px; width:20px; height:20px; border-radius:50%; background:#fff; border:2px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:12px; color:#fff; font-weight:700; box-shadow:0 1px 3px rgba(0,0,0,0.25);"></span>
               <img src="${x.foto.thumb || x.foto.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" style="width:100%; height:80px; object-fit:cover; display:block; background:#eee;" />
               <div style="padding:3px 5px; font-size:9.5px; color:#8a8272; text-align:center;">${fmtDate(x.data)}</div>
             </div>`).join('')}</div>`
@@ -3272,20 +3328,44 @@
       overlay.innerHTML = `
         <div style="background:#fff; border-radius:10px; padding:20px; max-width:460px; width:100%; max-height:80vh; overflow-y:auto; box-shadow:0 10px 30px rgba(0,0,0,0.3); font-family:inherit;">
           <p style="margin:0 0 4px; font-size:15px; font-weight:700; color:var(--ink,#16233d);">Vincular foto a "${servico}"</p>
-          <p class="dob-dica" style="margin:0 0 12px;">Fotos ainda sem vínculo, mais recentes primeiro.</p>
+          <p class="dob-dica" style="margin:0 0 12px;">Fotos ainda sem vínculo, mais recentes primeiro. Toque pra selecionar — pode escolher mais de uma.</p>
           <div id="dob-escolha-foto-lista">${itensHtml}</div>
-          <div style="margin-top:14px; display:flex; justify-content:flex-end;">
+          <div style="margin-top:14px; display:flex; justify-content:flex-end; gap:8px;">
             <button type="button" id="dob-escolha-foto-cancelar" style="padding:9px 14px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:13px;">Fechar</button>
+            ${lista.length ? `<button type="button" id="dob-escolha-foto-confirmar" disabled style="padding:9px 14px; border-radius:6px; border:none; background:var(--ink,#16233d); color:#fff; cursor:pointer; font-size:13px; opacity:.4;">Vincular</button>` : ''}
           </div>
         </div>`;
       document.body.appendChild(overlay);
       const finalizar = (valor) => { overlay.remove(); resolve(valor); };
+      const btnConfirmar = overlay.querySelector('#dob-escolha-foto-confirmar');
+      const atualizarBotaoConfirmar = () => {
+        if(!btnConfirmar) return;
+        btnConfirmar.disabled = selecionados.size === 0;
+        btnConfirmar.style.opacity = selecionados.size === 0 ? '.4' : '1';
+        btnConfirmar.textContent = selecionados.size > 1 ? `Vincular ${selecionados.size} fotos` : 'Vincular foto';
+      };
       overlay.querySelectorAll('.dob-escolha-foto').forEach(el => {
         el.addEventListener('click', () => {
           const i = Number(el.dataset.i);
-          finalizar(lista[i]);
+          const check = el.querySelector('.dob-escolha-foto-check');
+          if(selecionados.has(i)){
+            selecionados.delete(i);
+            el.style.borderColor = 'var(--line)';
+            if(check){ check.style.background = '#fff'; check.textContent = ''; }
+          }else{
+            selecionados.add(i);
+            el.style.borderColor = 'var(--ink,#16233d)';
+            if(check){ check.style.background = 'var(--ink,#16233d)'; check.textContent = '✓'; }
+          }
+          atualizarBotaoConfirmar();
         });
       });
+      if(btnConfirmar){
+        btnConfirmar.addEventListener('click', () => {
+          if(!selecionados.size) return;
+          finalizar([...selecionados].map(i => lista[i]));
+        });
+      }
       overlay.querySelector('#dob-escolha-foto-cancelar').addEventListener('click', () => finalizar(undefined));
       overlay.addEventListener('click', (ev) => { if(ev.target === overlay) finalizar(undefined); });
     });
@@ -3315,6 +3395,7 @@
         const cardsHtml = itens.length ? itens.map(l => {
           mapaItemContador++;
           const itemId = `dob-mapa-item-${data || 'x'}-${mapaItemContador}`;
+          const itemKey = `${data || 'x'}|||${b.raw}|||${l.servico}|||${st}`;
           const irMapaAttr = `data-ir-mapa="${b.raw}|||${l.servico}|||${l.planta || ''}"`;
           const desdeTxt = l.desde ? ` · desde ${fmtDate(l.desde)}` : '';
           const qtdTxt = l.trecho ? `${l.qtd} trecho${l.qtd === 1 ? '' : 's'}` : `${l.qtd} bloco${l.qtd === 1 ? '' : 's'}`;
@@ -3332,7 +3413,7 @@
                 </div>`).join('')}</div>`
             : `<div class="dob-mapa-sem-foto">Nenhuma foto vinculada a essa atividade ainda.</div>`;
           return `
-            <div class="dob-kanban-item" id="${itemId}">
+            <div class="dob-kanban-item" id="${itemId}" data-item-key="${itemKey.replace(/"/g, '&quot;')}">
               <div class="dob-kanban-card-compacta" data-toggle-mapa-item title="Clique pra ver detalhes">
                 <span class="dot" style="background:${info.cor};"></span>
                 <span class="nome">${l.servico}</span>
@@ -3370,19 +3451,34 @@
     wrap.querySelectorAll('.dob-kanban-item.open').forEach(el => { if(el !== item) el.classList.remove('open'); });
     item.classList.toggle('open', !jaAberto);
   });
+  function preservarEstadoAoRenderizar(){
+    const itemAberto = document.querySelector('.dob-kanban-item.open');
+    const chaveAberta = itemAberto ? itemAberto.dataset.itemKey : null;
+    const scrollY = window.scrollY;
+    render();
+    if(chaveAberta){
+      const novoItem = document.querySelector(`.dob-kanban-item[data-item-key="${CSS.escape(chaveAberta)}"]`);
+      if(novoItem) novoItem.classList.add('open');
+    }
+    window.scrollTo(0, scrollY);
+  }
   document.addEventListener('click', async (ev) => {
     const alvo = ev.target.closest('[data-vincular-foto]');
     if(!alvo) return;
     const servico = alvo.dataset.vincularFoto;
-    const escolha = await escolherFotoParaVincular(servico);
-    if(!escolha) return;
-    const entry = entries.find(e => e.id === escolha.entryId);
-    if(!entry || !entry.fotos || !entry.fotos[escolha.idx]) return;
-    const fotoAtual = normalizeFoto(entry.fotos[escolha.idx]);
-    entry.fotos[escolha.idx] = { ...fotoAtual, legenda: servico };
-    saveEntry(entry);
-    render();
-    mostrarToastSalvo(`Foto vinculada a "${servico}"`);
+    const escolhas = await escolherFotoParaVincular(servico);
+    if(!escolhas || !escolhas.length) return;
+    const entriesAtualizados = new Set();
+    escolhas.forEach(escolha => {
+      const entry = entries.find(e => e.id === escolha.entryId);
+      if(!entry || !entry.fotos || !entry.fotos[escolha.idx]) return;
+      const fotoAtual = normalizeFoto(entry.fotos[escolha.idx]);
+      entry.fotos[escolha.idx] = { ...fotoAtual, legenda: servico };
+      entriesAtualizados.add(entry);
+    });
+    entriesAtualizados.forEach(entry => saveEntry(entry));
+    preservarEstadoAoRenderizar();
+    mostrarToastSalvo(escolhas.length > 1 ? `${escolhas.length} fotos vinculadas a "${servico}"` : `Foto vinculada a "${servico}"`);
   });
   document.addEventListener('click', (ev) => {
     const alvo = ev.target.closest('.dob-mapa-foto-desvincular');
@@ -3395,7 +3491,7 @@
     delete fotoAtual.legenda;
     entry.fotos[idx] = fotoAtual;
     saveEntry(entry);
-    render();
+    preservarEstadoAoRenderizar();
     mostrarToastSalvo('Vínculo removido');
   });
 
@@ -3501,7 +3597,7 @@
         ${secaoHtml('Equipamentos', e.equipamentos)}
         ${secaoHtml('Mão de obra', e.maodeobra)}
         ${e.texto ? `<div class="dob-entry-secao"><div class="dob-entry-secao-label">Observações</div><div class="dob-entry-secao-texto">${e.texto.replace(/</g,'&lt;')}</div></div>` : ''}
-        ${e.fotos && e.fotos.length ? `<div class="dob-entry-fotos">${e.fotos.map((f,i) => { const nf=normalizeFoto(f); return `<img src="${nf.thumb || nf.data}" data-eid="${e.id}" data-fidx="${i}" />`; }).join('')}</div>` : ''}
+        ${e.fotos && e.fotos.length ? `<div class="dob-entry-fotos">${e.fotos.map((f,i) => { const nf=normalizeFoto(f); return `<img src="${nf.thumb || nf.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" data-eid="${e.id}" data-fidx="${i}" />`; }).join('')}</div>` : ''}
         <div class="dob-entry-acoes">
           <button class="dob-btn secundario pequeno dob-editar" data-id="${e.id}">Editar</button>
           <button class="dob-btn perigo pequeno dob-excluir" data-id="${e.id}">Excluir</button>
