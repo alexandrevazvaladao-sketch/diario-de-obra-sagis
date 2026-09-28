@@ -318,12 +318,24 @@
   .dob-card-bloco-linha span{ color:#8a8272; }
   .dob-kanban-board{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
   .dob-kanban-col{ background:var(--paper2,#f3ede1); border-radius:10px; padding:8px; min-width:0; }
-  .dob-kanban-card-compacta{ display:flex; align-items:center; gap:7px; background:#fff; border-radius:7px; padding:6px 9px; margin-bottom:4px; box-shadow:0 1px 2px rgba(0,0,0,0.08); cursor:pointer; font-size:11.5px; }
-  .dob-kanban-card-compacta:last-child{ margin-bottom:0; }
+  .dob-kanban-item{ background:#fff; border-radius:7px; margin-bottom:4px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,0.08); }
+  .dob-kanban-item:last-child{ margin-bottom:0; }
+  .dob-kanban-card-compacta{ display:flex; align-items:center; gap:7px; padding:6px 9px; cursor:pointer; font-size:11.5px; }
   .dob-kanban-card-compacta:hover{ background:#faf8f4; }
   .dob-kanban-card-compacta .dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
-  .dob-kanban-card-compacta .nome{ font-weight:600; color:var(--ink,#16233d); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-decoration:underline; text-decoration-style:dotted; text-underline-offset:2px; }
+  .dob-kanban-card-compacta .nome{ font-weight:600; color:var(--ink,#16233d); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .dob-kanban-card-compacta .qtd{ font-size:10.5px; color:#8a8272; white-space:nowrap; flex-shrink:0; }
+  .dob-kanban-card-compacta .chevron{ font-size:9px; color:#8a8272; flex-shrink:0; transition:transform .15s ease; }
+  .dob-kanban-item.open .chevron{ transform:rotate(90deg); }
+  .dob-kanban-detail{ display:none; padding:2px 9px 10px; border-top:1px solid var(--line); }
+  .dob-kanban-item.open .dob-kanban-detail{ display:block; }
+  .dob-mapa-blocos{ display:flex; flex-wrap:wrap; gap:5px; margin:8px 0; }
+  .dob-mapa-bloco-chip{ font-size:10.5px; font-weight:600; padding:3px 9px; border-radius:999px; }
+  .dob-mapa-fotos-label{ font-size:10px; font-weight:700; letter-spacing:.03em; color:#8a8272; text-transform:uppercase; margin:10px 0 6px; }
+  .dob-mapa-fotos-strip{ display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:6px; }
+  .dob-mapa-fotos-strip img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; display:block; background:#eee; }
+  .dob-mapa-sem-foto{ font-size:11px; color:#8a8272; padding:6px 0; }
+  .dob-mapa-ver-mapa{ display:inline-block; margin-top:8px; font-size:11px; font-weight:600; color:var(--clay-dark,#c2551f); text-decoration:underline; text-decoration-style:dotted; text-underline-offset:2px; cursor:pointer; }
   @media (max-width: 480px){ .dob-kanban-board{ grid-template-columns:1fr; } }
   .dob-mapa-servico-linha{ margin:5px 0 2px 10px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
   .dob-mapa-status-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
@@ -2548,7 +2560,7 @@
       <div class="dob-campo" style="margin-bottom:10px; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--paper2, #f3ede1);" id="dob-f-painel-mapa">
         <label>Mapa de Acompanhamento</label>
         <div id="dob-f-painel-mapa-conteudo">
-          ${marcacoesNoDia.length ? `<div style="font-size:13px; margin:4px 0;">${linhasMapaParaHtml(marcacoesNoDia)}</div>` : '<div class="dob-dica" style="margin:4px 0;">Nada marcado no mapa pra esse dia ainda.</div>'}
+          ${marcacoesNoDia.length ? `<div style="font-size:13px; margin:4px 0;">${linhasMapaParaHtml(marcacoesNoDia, draft.date)}</div>` : '<div class="dob-dica" style="margin:4px 0;">Nada marcado no mapa pra esse dia ainda.</div>'}
         </div>
         <button type="button" class="dob-btn secundario pequeno" id="dob-f-marcar-mapa">📍 Marcar no mapa</button>
       </div>`;
@@ -2741,7 +2753,7 @@
       const dataAtual = document.getElementById('dob-f-data').value || todayStr();
       const linhas = marcacoesMapaDoDia(dataAtual);
       document.getElementById('dob-f-painel-mapa-conteudo').innerHTML = linhas.length
-        ? `<div style="font-size:13px; margin:4px 0;">${linhasMapaParaHtml(linhas)}</div>`
+        ? `<div style="font-size:13px; margin:4px 0;">${linhasMapaParaHtml(linhas, dataAtual)}</div>`
         : '<div class="dob-dica" style="margin:4px 0;">Nada marcado no mapa pra esse dia ainda.</div>';
     }
     document.getElementById('dob-f-data').addEventListener('change', atualizarPainelMapa);
@@ -3161,7 +3173,7 @@
         : null;
       const tipoMapa = mapaState.tipoPorServico[g.servico];
       const planta = tipoMapa === 'rede' ? encontrarRedeDoBloco(g.obra, g.itens[0].bloco) : null;
-      registrar(g.obra, { servico: g.servico, status: g.status, qtd: g.itens.length, desde, planta });
+      registrar(g.obra, { servico: g.servico, status: g.status, qtd: g.itens.length, desde, planta, itens: g.itens });
     });
 
     const gruposDesenho = {};
@@ -3185,7 +3197,16 @@
     return linhas;
   }
 
-  function linhasMapaParaHtml(linhas){
+  function fotosDoServicoNoDia(data, servico){
+    const entry = entries.find(e => e.date === data);
+    if(!entry) return [];
+    return (entry.fotos || [])
+      .map((f, i) => ({ foto: normalizeFoto(f), idx: i }))
+      .filter(x => x.foto.legenda && x.foto.legenda.split(' — ').pop() === servico);
+  }
+
+  let mapaItemContador = 0;
+  function linhasMapaParaHtml(linhas, data){
     const STATUS_INFO = {
       andamento: { cor: '#a97e2c', bg: 'rgba(201,154,61,0.18)', label: '🟡 Em Execução', chipClasse: 'mapa-andamento' },
       concluido: { cor: '#2f5f45', bg: 'rgba(63,125,92,0.14)',  label: '🟢 Concluído',    chipClasse: 'mapa-concluido' }
@@ -3200,20 +3221,39 @@
         atual.porStatus[l.status].push(l);
       }
     });
-    return blocosObra.map(b => {
+    const corpo = blocosObra.map(b => {
       const obraHtml = `<div style="font-weight:700; font-size:15px; margin:12px 0 6px; color:var(--ink,#16233d);">🏗️ ${b.texto}</div>`;
       const colunasHtml = ['andamento', 'concluido'].map(st => {
         const info = STATUS_INFO[st];
         const itens = b.porStatus[st];
         const cardsHtml = itens.length ? itens.map(l => {
+          mapaItemContador++;
+          const itemId = `dob-mapa-item-${data || 'x'}-${mapaItemContador}`;
           const irMapaAttr = `data-ir-mapa="${b.raw}|||${l.servico}|||${l.planta || ''}"`;
           const desdeTxt = l.desde ? ` · desde ${fmtDate(l.desde)}` : '';
           const qtdTxt = l.trecho ? `${l.qtd} trecho${l.qtd === 1 ? '' : 's'}` : `${l.qtd} bloco${l.qtd === 1 ? '' : 's'}`;
+          const blocosChipsHtml = (l.itens && l.itens.length)
+            ? `<div class="dob-mapa-blocos">${l.itens.map(it => `<span class="dob-mapa-bloco-chip" style="color:${info.cor}; background:${info.bg};">${it.nome}</span>`).join('')}</div>`
+            : '';
+          const fotos = data ? fotosDoServicoNoDia(data, l.servico) : [];
+          const fotosLabelHtml = `<div class="dob-mapa-fotos-label">Fotos vinculadas${fotos.length ? ` (${fotos.length})` : ''}</div>`;
+          const fotosHtml = fotos.length
+            ? `<div class="dob-mapa-fotos-strip">${fotos.map(x => `<img src="${x.foto.thumb || x.foto.data || ''}" alt="Foto" />`).join('')}</div>`
+            : `<div class="dob-mapa-sem-foto">Nenhuma foto vinculada a essa atividade ainda. Vincule pelo Modo Campo.</div>`;
           return `
-            <div class="dob-kanban-card-compacta" ${irMapaAttr} title="🗺️ Clique pra abrir no mapa">
-              <span class="dot" style="background:${info.cor};"></span>
-              <span class="nome">${l.servico}</span>
-              <span class="qtd">${qtdTxt}${desdeTxt}</span>
+            <div class="dob-kanban-item" id="${itemId}">
+              <div class="dob-kanban-card-compacta" data-toggle-mapa-item title="Clique pra ver detalhes">
+                <span class="dot" style="background:${info.cor};"></span>
+                <span class="nome">${l.servico}</span>
+                <span class="qtd">${qtdTxt}${desdeTxt}</span>
+                <span class="chevron">▶</span>
+              </div>
+              <div class="dob-kanban-detail">
+                ${blocosChipsHtml}
+                ${fotosLabelHtml}
+                ${fotosHtml}
+                <span class="dob-mapa-ver-mapa" ${irMapaAttr}>🗺️ Ver no mapa →</span>
+              </div>
             </div>`;
         }).join('') : `<div style="font-size:11px; color:#8a8272; padding:6px 2px;">Nada aqui.</div>`;
         return `
@@ -3224,12 +3264,23 @@
       }).join('');
       return obraHtml + `<div class="dob-kanban-board">${colunasHtml}</div>`;
     }).join('');
+    return `<div class="dob-mapa-wrap" style="display:contents;">${corpo}</div>`;
   }
+  document.addEventListener('click', (ev) => {
+    const alvo = ev.target.closest('[data-toggle-mapa-item]');
+    if(!alvo) return;
+    const item = alvo.closest('.dob-kanban-item');
+    if(!item) return;
+    const wrap = item.closest('.dob-mapa-wrap') || document;
+    const jaAberto = item.classList.contains('open');
+    wrap.querySelectorAll('.dob-kanban-item.open').forEach(el => { if(el !== item) el.classList.remove('open'); });
+    item.classList.toggle('open', !jaAberto);
+  });
 
   function marcacoesMapaHtml(data){
     const linhas = marcacoesMapaDoDia(data);
     if(!linhas.length) return '';
-    return `<div class="dob-entry-secao"><div class="dob-entry-secao-label">📍 Marcações do mapa nesse dia</div><div class="dob-entry-secao-texto">${linhasMapaParaHtml(linhas)}</div></div>`;
+    return `<div class="dob-entry-secao"><div class="dob-entry-secao-label">📍 Marcações do mapa nesse dia</div><div class="dob-entry-secao-texto">${linhasMapaParaHtml(linhas, data)}</div></div>`;
   }
 
   function datasComMarcacaoSemRegistro(){
