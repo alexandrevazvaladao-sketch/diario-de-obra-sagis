@@ -3463,7 +3463,7 @@
     const legenda = nf.legenda;
     return `
       <div class="dob-campo-thumb" data-idx="${i}" style="cursor:pointer; border-radius:8px; overflow:hidden; border:1px solid var(--line); background:#fff;">
-        <img src="data:image/jpeg;base64,${src}" style="width:100%; height:90px; object-fit:cover; display:block; background:#eee;" />
+        <img src="${src}" style="width:100%; height:90px; object-fit:cover; display:block; background:#eee;" />
         <div style="padding:4px 6px; font-size:10px; line-height:1.3; ${legenda ? 'color:var(--clay-dark,#c2551f); font-weight:600;' : 'color:#8a8272;'} white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${legenda ? '🔗 ' + legenda : 'Toque pra vincular'}</div>
       </div>`;
   }
