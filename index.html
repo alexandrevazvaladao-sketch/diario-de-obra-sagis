@@ -335,7 +335,9 @@
   .dob-mapa-fotos-strip{ display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:6px; }
   .dob-mapa-fotos-strip img{ width:100%; aspect-ratio:1; object-fit:cover; border-radius:6px; display:block; background:#eee; }
   .dob-mapa-sem-foto{ font-size:11px; color:#8a8272; padding:6px 0; }
-  .dob-mapa-ver-mapa{ display:inline-block; margin-top:8px; font-size:11px; font-weight:600; color:var(--clay-dark,#c2551f); text-decoration:underline; text-decoration-style:dotted; text-underline-offset:2px; cursor:pointer; }
+  .dob-mapa-detail-acoes{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:8px; }
+  .dob-mapa-detail-acoes .dob-btn.pequeno{ padding:5px 10px; font-size:10.5px; }
+  .dob-mapa-ver-mapa{ display:inline-block; font-size:11px; font-weight:600; color:var(--clay-dark,#c2551f); text-decoration:underline; text-decoration-style:dotted; text-underline-offset:2px; cursor:pointer; }
   @media (max-width: 480px){ .dob-kanban-board{ grid-template-columns:1fr; } }
   .dob-mapa-servico-linha{ margin:5px 0 2px 10px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
   .dob-mapa-status-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
@@ -3202,7 +3204,58 @@
     if(!entry) return [];
     return (entry.fotos || [])
       .map((f, i) => ({ foto: normalizeFoto(f), idx: i }))
-      .filter(x => x.foto.legenda && x.foto.legenda.split(' — ').pop() === servico);
+      .filter(x => x.foto.legenda && x.foto.legenda.split(' — ').pop() === servico)
+      .reverse(); // mais recente primeiro
+  }
+
+  function fotosNaoVinculadas(){
+    const lista = [];
+    entries.forEach(e => {
+      (e.fotos || []).forEach((f, i) => {
+        const nf = normalizeFoto(f);
+        if(!nf.legenda) lista.push({ data: e.date, entryId: e.id, idx: i, foto: nf });
+      });
+    });
+    lista.sort((a, b) => {
+      const chaveA = a.data + '_' + String(a.idx).padStart(4, '0');
+      const chaveB = b.data + '_' + String(b.idx).padStart(4, '0');
+      return chaveB.localeCompare(chaveA); // mais recente primeiro
+    });
+    return lista;
+  }
+
+  function escolherFotoParaVincular(servico){
+    return new Promise(resolve => {
+      const lista = fotosNaoVinculadas();
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed; inset:0; background:rgba(20,20,20,0.4); z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px;';
+      const itensHtml = lista.length
+        ? `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:8px; max-height:50vh; overflow-y:auto;">${lista.map((x, i) => `
+            <div class="dob-escolha-foto" data-i="${i}" style="cursor:pointer; border-radius:8px; overflow:hidden; border:1px solid var(--line); background:#fff;">
+              <img src="${x.foto.thumb || x.foto.data || ''}" style="width:100%; height:80px; object-fit:cover; display:block; background:#eee;" />
+              <div style="padding:3px 5px; font-size:9.5px; color:#8a8272; text-align:center;">${fmtDate(x.data)}</div>
+            </div>`).join('')}</div>`
+        : `<p class="dob-dica" style="margin:0;">Nenhuma foto sem vínculo no momento. Tire fotos no Modo Campo primeiro.</p>`;
+      overlay.innerHTML = `
+        <div style="background:#fff; border-radius:10px; padding:20px; max-width:460px; width:100%; max-height:80vh; overflow-y:auto; box-shadow:0 10px 30px rgba(0,0,0,0.3); font-family:inherit;">
+          <p style="margin:0 0 4px; font-size:15px; font-weight:700; color:var(--ink,#16233d);">Vincular foto a "${servico}"</p>
+          <p class="dob-dica" style="margin:0 0 12px;">Fotos ainda sem vínculo, mais recentes primeiro.</p>
+          <div id="dob-escolha-foto-lista">${itensHtml}</div>
+          <div style="margin-top:14px; display:flex; justify-content:flex-end;">
+            <button type="button" id="dob-escolha-foto-cancelar" style="padding:9px 14px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:13px;">Fechar</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const finalizar = (valor) => { overlay.remove(); resolve(valor); };
+      overlay.querySelectorAll('.dob-escolha-foto').forEach(el => {
+        el.addEventListener('click', () => {
+          const i = Number(el.dataset.i);
+          finalizar(lista[i]);
+        });
+      });
+      overlay.querySelector('#dob-escolha-foto-cancelar').addEventListener('click', () => finalizar(undefined));
+      overlay.addEventListener('click', (ev) => { if(ev.target === overlay) finalizar(undefined); });
+    });
   }
 
   let mapaItemContador = 0;
@@ -3252,7 +3305,10 @@
                 ${blocosChipsHtml}
                 ${fotosLabelHtml}
                 ${fotosHtml}
-                <span class="dob-mapa-ver-mapa" ${irMapaAttr}>🗺️ Ver no mapa →</span>
+                <div class="dob-mapa-detail-acoes">
+                  <button type="button" class="dob-btn secundario pequeno" data-vincular-foto="${l.servico.replace(/"/g, '&quot;')}">🔗 Vincular foto</button>
+                  <span class="dob-mapa-ver-mapa" ${irMapaAttr}>🗺️ Ver no mapa →</span>
+                </div>
               </div>
             </div>`;
         }).join('') : `<div style="font-size:11px; color:#8a8272; padding:6px 2px;">Nada aqui.</div>`;
@@ -3275,6 +3331,20 @@
     const jaAberto = item.classList.contains('open');
     wrap.querySelectorAll('.dob-kanban-item.open').forEach(el => { if(el !== item) el.classList.remove('open'); });
     item.classList.toggle('open', !jaAberto);
+  });
+  document.addEventListener('click', async (ev) => {
+    const alvo = ev.target.closest('[data-vincular-foto]');
+    if(!alvo) return;
+    const servico = alvo.dataset.vincularFoto;
+    const escolha = await escolherFotoParaVincular(servico);
+    if(!escolha) return;
+    const entry = entries.find(e => e.id === escolha.entryId);
+    if(!entry || !entry.fotos || !entry.fotos[escolha.idx]) return;
+    const fotoAtual = normalizeFoto(entry.fotos[escolha.idx]);
+    entry.fotos[escolha.idx] = { ...fotoAtual, legenda: servico };
+    saveEntry(entry);
+    render();
+    mostrarToastSalvo(`Foto vinculada a "${servico}"`);
   });
 
   function marcacoesMapaHtml(data){
