@@ -300,7 +300,9 @@
   .dob-filtros-toggle{ display:none; }
   body.dob-compacto .dob-stats{ display:none; }
   body.dob-compacto .dob-stats-resumo{ display:flex; }
-  body.dob-compacto.dob-stats-abertas .dob-stats{ display:grid; }
+  body.dob-compacto.dob-stats-abertas .dob-stats{ display:grid; margin-top:10px; }
+  body.dob-compacto.dob-stats-abertas .dob-stats-resumo .txt{ display:none; }
+  body.dob-compacto.dob-stats-abertas .dob-stats-resumo::before{ content:"Recolher estatísticas"; }
   body.dob-compacto.dob-stats-abertas .dob-stats-resumo .seta{ transform:rotate(180deg); }
   body.dob-compacto #dob-filtros-painel{ display:none; }
   body.dob-compacto.dob-filtros-abertos #dob-filtros-painel{ display:flex; }
@@ -646,7 +648,7 @@
     `).join('');
     const resumoEl = document.getElementById('dob-stats-resumo');
     if(resumoEl){
-      resumoEl.innerHTML = `<span><b>${entries.length}</b> apontamentos · <b>${registrosSemana}</b> nos últimos 7 dias · <b>${totalFotos}</b> fotos</span><span class="seta">▾</span>`;
+      resumoEl.innerHTML = `<span class="txt"><b>${entries.length}</b> apontamentos · <b>${registrosSemana}</b> nos últimos 7 dias · <b>${totalFotos}</b> fotos</span><span class="seta">▾</span>`;
     }
   }
 
