@@ -3424,10 +3424,18 @@
         : `<p class="dob-dica" style="margin:0;">Nenhuma foto sem vínculo no momento. Tire fotos no Modo Campo primeiro.</p>`;
       let tamanhoSalvo = null;
       try{ tamanhoSalvo = JSON.parse(localStorage.getItem('dob:vincular-foto-tamanho') || 'null'); }catch(err){ /* ignora */ }
-      const larguraInicial = (tamanhoSalvo && tamanhoSalvo.w) || 480;
-      const alturaInicial = (tamanhoSalvo && tamanhoSalvo.h) || 480;
+      const larguraMax = window.innerWidth * 0.96;
+      const alturaMax = window.innerHeight * 0.92;
+      const larguraInicial = Math.min((tamanhoSalvo && tamanhoSalvo.w) || 480, larguraMax);
+      const alturaInicial = Math.min((tamanhoSalvo && tamanhoSalvo.h) || 480, alturaMax);
+      // A caixa usa position:fixed com left/top calculados uma vez (em vez de deixar o
+      // flex do overlay centralizar), pra que durante o arraste só o canto inferior
+      // direito (onde fica a alça) se mova — assim ela fica presa embaixo do dedo e não
+      // sai da tela, evitando toques acidentais na área escura de fundo.
+      const topoInicial = Math.max(8, (window.innerHeight - alturaInicial) / 2);
+      const esquerdaInicial = Math.max(8, (window.innerWidth - larguraInicial) / 2);
       overlay.innerHTML = `
-        <div id="dob-escolha-foto-box" style="position:relative; display:flex; flex-direction:column; background:#fff; border-radius:10px; padding:18px 20px; width:${larguraInicial}px; height:${alturaInicial}px; max-width:96vw; max-height:92vh; min-width:300px; min-height:280px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.3); font-family:inherit;">
+        <div id="dob-escolha-foto-box" style="position:fixed; left:${esquerdaInicial}px; top:${topoInicial}px; display:flex; flex-direction:column; background:#fff; border-radius:10px; padding:18px 20px; width:${larguraInicial}px; height:${alturaInicial}px; max-width:96vw; max-height:92vh; min-width:300px; min-height:280px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,0.3); font-family:inherit;">
           <p style="margin:0 0 4px; font-size:15px; font-weight:700; color:var(--ink,#16233d); flex-shrink:0;">Vincular foto a "${servico}"</p>
           <p class="dob-dica" style="margin:0 0 10px; flex-shrink:0;">Fotos ainda sem vínculo, mais recentes primeiro. Toque pra selecionar — pode escolher mais de uma. Arraste o canto ⌟ pra aumentar a janela e ver mais fotos maiores.</p>
           <div id="dob-escolha-foto-lista" style="flex:1 1 auto; overflow-y:auto; min-height:0;">${itensHtml}</div>
@@ -3435,11 +3443,13 @@
             <button type="button" id="dob-escolha-foto-cancelar" style="padding:9px 14px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; font-size:13px;">Fechar</button>
             ${lista.length ? `<button type="button" id="dob-escolha-foto-confirmar" disabled style="padding:9px 14px; border-radius:6px; border:none; background:var(--ink,#16233d); color:#fff; cursor:pointer; font-size:13px; opacity:.4;">Vincular</button>` : ''}
           </div>
-          <div id="dob-escolha-foto-handle" title="Arraste pra redimensionar" style="position:absolute; right:0; bottom:0; width:34px; height:34px; cursor:nwse-resize; touch-action:none; display:flex; align-items:flex-end; justify-content:flex-end; padding:4px 5px; color:#8a8272; font-size:16px; line-height:1; user-select:none; -webkit-user-select:none;">⌟</div>
+          <div id="dob-escolha-foto-handle" title="Arraste pra redimensionar" style="position:absolute; right:-6px; bottom:-6px; width:44px; height:44px; cursor:nwse-resize; touch-action:none; display:flex; align-items:flex-end; justify-content:flex-end; padding:6px 8px; color:#8a8272; font-size:18px; line-height:1; user-select:none; -webkit-user-select:none;">⌟</div>
         </div>`;
       document.body.appendChild(overlay);
       const caixa = overlay.querySelector('#dob-escolha-foto-box');
       const handle = overlay.querySelector('#dob-escolha-foto-handle');
+      let arrastandoAgora = false;
+      let arrasteAcabouAgora = 0;
       if(caixa && handle){
         // resize:both do CSS não funciona por toque no celular (Safari/Chrome mobile
         // ignoram o "puxar o canto" com o dedo), então controlamos o redimensionamento
@@ -3447,17 +3457,27 @@
         let arrastando = null;
         handle.addEventListener('pointerdown', (ev) => {
           ev.preventDefault();
+          ev.stopPropagation();
           arrastando = { x: ev.clientX, y: ev.clientY, w: caixa.offsetWidth, h: caixa.offsetHeight };
+          arrastandoAgora = true;
           handle.setPointerCapture(ev.pointerId);
         });
         handle.addEventListener('pointermove', (ev) => {
           if(!arrastando) return;
-          const novaLargura = Math.min(Math.max(300, arrastando.w + (ev.clientX - arrastando.x)), window.innerWidth * 0.96);
-          const novaAltura = Math.min(Math.max(280, arrastando.h + (ev.clientY - arrastando.y)), window.innerHeight * 0.92);
+          ev.preventDefault();
+          const limiteLargura = window.innerWidth - esquerdaInicial - 8;
+          const limiteAltura = window.innerHeight - topoInicial - 8;
+          const novaLargura = Math.min(Math.max(300, arrastando.w + (ev.clientX - arrastando.x)), limiteLargura);
+          const novaAltura = Math.min(Math.max(280, arrastando.h + (ev.clientY - arrastando.y)), limiteAltura);
           caixa.style.width = novaLargura + 'px';
           caixa.style.height = novaAltura + 'px';
         });
-        const pararArraste = (ev) => { arrastando = null; try{ handle.releasePointerCapture(ev.pointerId); }catch(err){} };
+        const pararArraste = (ev) => {
+          arrastando = null;
+          arrastandoAgora = false;
+          arrasteAcabouAgora = Date.now();
+          try{ handle.releasePointerCapture(ev.pointerId); }catch(err){}
+        };
         handle.addEventListener('pointerup', pararArraste);
         handle.addEventListener('pointercancel', pararArraste);
       }
@@ -3525,7 +3545,12 @@
         });
       }
       overlay.querySelector('#dob-escolha-foto-cancelar').addEventListener('click', () => finalizar(undefined));
-      overlay.addEventListener('click', (ev) => { if(ev.target === overlay) finalizar(undefined); });
+      overlay.addEventListener('click', (ev) => {
+        // Ignora cliques no fundo enquanto arrasta a alça de redimensionar, ou logo
+        // depois (o gesto de soltar o dedo pode disparar um "click" fantasma no fundo).
+        if(arrastandoAgora || (Date.now() - arrasteAcabouAgora) < 300) return;
+        if(ev.target === overlay) finalizar(undefined);
+      });
     });
   }
 
