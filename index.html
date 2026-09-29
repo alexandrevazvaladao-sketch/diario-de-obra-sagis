@@ -249,9 +249,8 @@
     box-shadow:0 20px 60px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center;
     overflow:hidden;
   }
-  .dob-lightbox img{ max-width:100%; max-height:100%; object-fit:contain; display:block; border-radius:10px; cursor:zoom-in; touch-action:none; }
-  .dob-lightbox img.dob-lb-zoomed{ cursor:grab; }
-  .dob-lightbox img.dob-lb-arrastando{ cursor:grabbing; }
+  .dob-lightbox img{ max-width:100%; max-height:100%; object-fit:contain; display:block; cursor:zoom-in; touch-action:none; will-change:transform; backface-visibility:hidden; }
+  .dob-lightbox img.dob-lb-zoomed{ cursor:zoom-out; }
   .dob-lightbox-fechar{ position:absolute; top:20px; right:24px; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:22px; width:38px; height:38px; border-radius:50%; cursor:pointer; z-index:2; }
   .dob-lightbox-nav{
     position:absolute; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.12); border:none; color:#fff;
@@ -3293,69 +3292,53 @@
         box.querySelector('.prev').addEventListener('click', (e) => { e.stopPropagation(); idx = (idx - 1 + total) % total; renderFrame(); });
         box.querySelector('.next').addEventListener('click', (e) => { e.stopPropagation(); idx = (idx + 1) % total; renderFrame(); });
       }
-      // Zoom com o mouse: clique esquerdo na foto aumenta (com transform:scale,
-      // sem redimensionar a caixa nem criar barra de rolagem), clique direito
-      // diminui até o tamanho padrão. Ampliado, dá pra arrastar com o mouse pra
-      // ver as partes que saem da tela — a imagem segue o dedo/mouse.
+      // Zoom com o mouse: clique esquerdo aumenta (transform:scale, sem
+      // redimensionar a caixa nem criar barra de rolagem), clique direito
+      // diminui até o tamanho padrão. Depois de ampliar, NÃO precisa clicar e
+      // arrastar (isso conflitava com o clique de zoom) — é só mover o mouse
+      // por cima da foto que ela acompanha, tipo uma lupa.
       const imgZoomEl = document.getElementById('dob-lb-img');
-      if(imgZoomEl){
+      const wrapZoomEl = imgZoomEl ? imgZoomEl.closest('.dob-lb-img-wrap') : null;
+      if(imgZoomEl && wrapZoomEl){
         const ESCALA_MIN = 1;
         const ESCALA_MAX = 3.5;
         const ESCALA_PASSO = 0.75;
         let escala = ESCALA_MIN;
         let panX = 0, panY = 0;
-        let arraste = null; // {x, y, panX, panY}
-        let arrastouDeVerdade = false;
 
         const aplicarTransform = () => {
           imgZoomEl.style.transform = escala === ESCALA_MIN ? '' : `translate(${panX}px, ${panY}px) scale(${escala})`;
           imgZoomEl.classList.toggle('dob-lb-zoomed', escala > ESCALA_MIN);
         };
-
-        imgZoomEl.addEventListener('pointerdown', (e) => {
-          e.stopPropagation();
-          arraste = { x: e.clientX, y: e.clientY, panX, panY };
-          arrastouDeVerdade = false;
-          imgZoomEl.setPointerCapture(e.pointerId);
-        });
-        imgZoomEl.addEventListener('pointermove', (e) => {
-          if(!arraste || escala <= ESCALA_MIN) return;
-          const dx = e.clientX - arraste.x;
-          const dy = e.clientY - arraste.y;
-          if(Math.abs(dx) > 4 || Math.abs(dy) > 4){
-            arrastouDeVerdade = true;
-            imgZoomEl.classList.add('dob-lb-arrastando');
-          }
-          if(arrastouDeVerdade){
-            panX = arraste.panX + dx;
-            panY = arraste.panY + dy;
-            aplicarTransform();
-          }
-        });
-        const soltarArraste = (e) => {
-          if(arraste && !arrastouDeVerdade){
-            // Não moveu de verdade: foi um clique normal, então aumenta o zoom.
-            escala = Math.min(ESCALA_MAX, escala + ESCALA_PASSO);
-            if(escala === ESCALA_MIN){ panX = 0; panY = 0; }
-            aplicarTransform();
-          }
-          arraste = null;
-          arrastouDeVerdade = false;
-          imgZoomEl.classList.remove('dob-lb-arrastando');
-          try{ imgZoomEl.releasePointerCapture(e.pointerId); }catch(err){}
+        const moverConformeMouse = (clientX, clientY) => {
+          if(escala <= ESCALA_MIN) return;
+          const rect = wrapZoomEl.getBoundingClientRect();
+          const fx = (clientX - rect.left) / rect.width;
+          const fy = (clientY - rect.top) / rect.height;
+          const maxPanX = (rect.width * (escala - 1)) / 2;
+          const maxPanY = (rect.height * (escala - 1)) / 2;
+          panX = (0.5 - fx) * 2 * maxPanX;
+          panY = (0.5 - fy) * 2 * maxPanY;
+          aplicarTransform();
         };
-        imgZoomEl.addEventListener('pointerup', soltarArraste);
-        imgZoomEl.addEventListener('pointercancel', () => {
-          arraste = null;
-          arrastouDeVerdade = false;
-          imgZoomEl.classList.remove('dob-lb-arrastando');
+
+        imgZoomEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          escala = Math.min(ESCALA_MAX, escala + ESCALA_PASSO);
+          if(escala === ESCALA_MIN){ panX = 0; panY = 0; }
+          aplicarTransform();
+          moverConformeMouse(e.clientX, e.clientY);
         });
         imgZoomEl.addEventListener('contextmenu', (e) => {
           e.preventDefault();
           e.stopPropagation();
           escala = Math.max(ESCALA_MIN, escala - ESCALA_PASSO);
-          if(escala === ESCALA_MIN){ panX = 0; panY = 0; }
-          aplicarTransform();
+          if(escala === ESCALA_MIN){ panX = 0; panY = 0; aplicarTransform(); }
+          else{ moverConformeMouse(e.clientX, e.clientY); }
+        });
+        imgZoomEl.addEventListener('mousemove', (e) => moverConformeMouse(e.clientX, e.clientY));
+        imgZoomEl.addEventListener('mouseleave', () => {
+          if(escala === ESCALA_MIN){ panX = 0; panY = 0; aplicarTransform(); }
         });
       }
       const legendaInput = document.getElementById('dob-lb-legenda-input');
