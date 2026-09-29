@@ -3426,8 +3426,11 @@
       try{ tamanhoSalvo = JSON.parse(localStorage.getItem('dob:vincular-foto-tamanho') || 'null'); }catch(err){ /* ignora */ }
       const larguraMax = window.innerWidth * 0.96;
       const alturaMax = window.innerHeight * 0.92;
-      const larguraInicial = Math.min((tamanhoSalvo && tamanhoSalvo.w) || 480, larguraMax);
-      const alturaInicial = Math.min((tamanhoSalvo && tamanhoSalvo.h) || 480, alturaMax);
+      // Padrão maior (era 480x480) pra já abrir com miniaturas visíveis de cara, sem
+      // precisar arrastar o canto primeiro. Só usa o tamanho salvo se o usuário já
+      // redimensionou antes; senão abre grande, limitado ao que cabe na tela.
+      const larguraInicial = Math.min((tamanhoSalvo && tamanhoSalvo.w) || 680, larguraMax);
+      const alturaInicial = Math.min((tamanhoSalvo && tamanhoSalvo.h) || 620, alturaMax);
       // A caixa usa position:fixed com left/top calculados uma vez (em vez de deixar o
       // flex do overlay centralizar), pra que durante o arraste só o canto inferior
       // direito (onde fica a alça) se mova — assim ela fica presa embaixo do dedo e não
@@ -3488,8 +3491,8 @@
         // recalcula quantas colunas cabem mantendo cada miniatura entre ~110px e ~200px —
         // assim, ao aumentar a janela, as fotos existentes crescem até certo ponto antes
         // de abrir uma coluna nova.
-        const MIN_COL = 110;
-        const MAX_COL = 200;
+        const MIN_COL = 140;
+        const MAX_COL = 220;
         const GAP = 8;
         const ajustarColunas = () => {
           const largura = listaScroll.clientWidth;
