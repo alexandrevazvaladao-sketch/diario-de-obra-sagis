@@ -2476,6 +2476,17 @@
   }
 
   // ---------- Autenticação Google (GIS) ----------
+  let renovacaoSilenciosaTimer = null;
+  function agendarRenovacaoSilenciosa(){
+    // O token do Google dura ~1h. Em vez de deixar expirar e esperar o usuário
+    // notar/clicar em "Reconectar", pede um token novo sozinho, em silêncio,
+    // um pouco antes de vencer — assim a conexão fica "sempre ligada" enquanto
+    // o navegador continuar logado na conta do Google.
+    if(renovacaoSilenciosaTimer) clearTimeout(renovacaoSilenciosaTimer);
+    renovacaoSilenciosaTimer = setTimeout(() => {
+      if(tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+    }, 50 * 60 * 1000); // 50 min
+  }
   function initGis(){
     if(!window.google || !google.accounts || !google.accounts.oauth2){
       setTimeout(initGis, 300);
@@ -2487,6 +2498,10 @@
       callback: (resp) => {
         if(resp && resp.access_token){
           accessToken = resp.access_token;
+          // Lembra que já conectou uma vez, pra poder reconectar sozinho (sem
+          // precisar clicar) nas próximas vezes que abrir o app.
+          try{ localStorage.setItem('dob:drive_conectado_antes', '1'); }catch(err){ /* ignora */ }
+          agendarRenovacaoSilenciosa();
           updateStatus();
           (async () => {
             await syncFromDriveOnConnect();
@@ -2505,6 +2520,15 @@
       linkPastaEl.style.display = 'inline';
     }
     updateStatus();
+    // Se já conectou ao Drive alguma vez neste navegador, tenta reconectar
+    // sozinho, em silêncio (sem abrir nenhuma tela de login) assim que o app
+    // abre — assim, na prática, só pede login de novo se você sair da conta
+    // do Google no navegador ou revogar o acesso.
+    try{
+      if(localStorage.getItem('dob:drive_conectado_antes') === '1'){
+        tokenClient.requestAccessToken({ prompt: '' });
+      }
+    }catch(err){ /* ignora */ }
   }
 
   function contarFotosLocaisPendentes(){
