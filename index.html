@@ -244,7 +244,12 @@
     position:fixed; inset:0; background:rgba(15,20,30,0.92); display:flex; flex-direction:column;
     align-items:center; justify-content:center; z-index:1000; padding:24px; gap:12px;
   }
-  .dob-lightbox img{ max-width:min(92vw,720px); max-height:64vh; border-radius:10px; box-shadow:0 20px 60px rgba(0,0,0,0.5); }
+  .dob-lb-img-wrap{
+    max-width:min(92vw,720px); max-height:64vh; overflow:auto; border-radius:10px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center;
+  }
+  .dob-lightbox img{ max-width:100%; max-height:64vh; display:block; border-radius:10px; cursor:zoom-in; transition:transform .15s ease; }
+  .dob-lightbox img.dob-lb-zoomed{ cursor:zoom-out; }
   .dob-lightbox-fechar{ position:absolute; top:20px; right:24px; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:22px; width:38px; height:38px; border-radius:50%; cursor:pointer; z-index:2; }
   .dob-lightbox-nav{
     position:absolute; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.12); border:none; color:#fff;
@@ -3250,7 +3255,7 @@
         <button class="dob-lightbox-fechar">×</button>
         ${total > 1 ? `<button class="dob-lightbox-nav prev" aria-label="Foto anterior">‹</button>` : ''}
         ${total > 1 ? `<button class="dob-lightbox-nav next" aria-label="Próxima foto">›</button>` : ''}
-        <img id="dob-lb-img" src="${jaEmCache ? driveBlobCache[foto.fileId] : (foto.thumb || foto.data)}" />
+        <div class="dob-lb-img-wrap"><img id="dob-lb-img" src="${jaEmCache ? driveBlobCache[foto.fileId] : (foto.thumb || foto.data)}" title="Clique esquerdo pra aumentar, clique direito pra diminuir" /></div>
         <input class="dob-input dob-lb-legenda" id="dob-lb-legenda-input" placeholder="+ adicionar legenda..." value="${(foto.legenda || '').replace(/"/g,'&quot;')}" />
         <div class="dob-lightbox-info" id="dob-lb-info">${jaEmCache ? 'Imagem em alta resolução (carregada rápido do cache).' : foto.type==='drive' ? (accessToken ? 'Carregando versão em alta resolução do Drive...' : 'Prévia local. Conecte ao Drive para ver em alta resolução.') : 'Foto salva apenas localmente neste navegador.'}</div>
         ${driveViewUrl ? `<a class="dob-lightbox-drivelink" href="${driveViewUrl}" target="_blank">Abrir no Drive →</a>` : ''}
@@ -3261,6 +3266,30 @@
       if(total > 1){
         box.querySelector('.prev').addEventListener('click', (e) => { e.stopPropagation(); idx = (idx - 1 + total) % total; renderFrame(); });
         box.querySelector('.next').addEventListener('click', (e) => { e.stopPropagation(); idx = (idx + 1) % total; renderFrame(); });
+      }
+      // Zoom com o mouse: clique esquerdo na foto aumenta, clique direito diminui
+      // até voltar ao tamanho padrão (não fica menor que o normal).
+      const imgZoomEl = document.getElementById('dob-lb-img');
+      if(imgZoomEl){
+        const ESCALA_MIN = 1;
+        const ESCALA_MAX = 3;
+        const ESCALA_PASSO = 0.5;
+        let escala = ESCALA_MIN;
+        const aplicarZoom = () => {
+          imgZoomEl.style.transform = escala === ESCALA_MIN ? '' : `scale(${escala})`;
+          imgZoomEl.classList.toggle('dob-lb-zoomed', escala > ESCALA_MIN);
+        };
+        imgZoomEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          escala = Math.min(ESCALA_MAX, escala + ESCALA_PASSO);
+          aplicarZoom();
+        });
+        imgZoomEl.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          escala = Math.max(ESCALA_MIN, escala - ESCALA_PASSO);
+          aplicarZoom();
+        });
       }
       const legendaInput = document.getElementById('dob-lb-legenda-input');
       legendaInput.addEventListener('click', (e) => e.stopPropagation());
