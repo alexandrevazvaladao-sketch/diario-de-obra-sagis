@@ -245,11 +245,16 @@
     align-items:center; justify-content:center; z-index:1000; padding:24px; gap:12px;
   }
   .dob-lb-img-wrap{
-    max-width:min(92vw,720px); max-height:64vh; overflow:auto; border-radius:10px;
+    max-width:min(92vw,720px); max-height:64vh; border-radius:10px; flex:0 1 auto; min-height:0;
     box-shadow:0 20px 60px rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center;
+    transition:max-width .18s ease, max-height .18s ease;
   }
-  .dob-lightbox img{ max-width:100%; max-height:64vh; display:block; border-radius:10px; cursor:zoom-in; transition:transform .15s ease; }
+  .dob-lightbox img{ max-width:100%; max-height:100%; object-fit:contain; display:block; border-radius:10px; cursor:zoom-in; }
   .dob-lightbox img.dob-lb-zoomed{ cursor:zoom-out; }
+  .dob-lightbox.dob-lb-zoom-max .dob-lb-legenda,
+  .dob-lightbox.dob-lb-zoom-max .dob-lightbox-info,
+  .dob-lightbox.dob-lb-zoom-max .dob-lightbox-drivelink,
+  .dob-lightbox.dob-lb-zoom-max .dob-lightbox-contador{ display:none; }
   .dob-lightbox-fechar{ position:absolute; top:20px; right:24px; background:rgba(255,255,255,0.1); border:none; color:#fff; font-size:22px; width:38px; height:38px; border-radius:50%; cursor:pointer; z-index:2; }
   .dob-lightbox-nav{
     position:absolute; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.12); border:none; color:#fff;
@@ -3267,27 +3272,34 @@
         box.querySelector('.prev').addEventListener('click', (e) => { e.stopPropagation(); idx = (idx - 1 + total) % total; renderFrame(); });
         box.querySelector('.next').addEventListener('click', (e) => { e.stopPropagation(); idx = (idx + 1) % total; renderFrame(); });
       }
-      // Zoom com o mouse: clique esquerdo na foto aumenta, clique direito diminui
-      // até voltar ao tamanho padrão (não fica menor que o normal).
+      // Zoom com o mouse: clique esquerdo na foto aumenta o quadro dela na tela
+      // (não é lupa por cima da imagem, é a própria foto crescendo de verdade),
+      // clique direito diminui até voltar ao tamanho padrão.
       const imgZoomEl = document.getElementById('dob-lb-img');
-      if(imgZoomEl){
-        const ESCALA_MIN = 1;
-        const ESCALA_MAX = 3;
-        const ESCALA_PASSO = 0.5;
-        let escala = ESCALA_MIN;
+      const wrapZoomEl = imgZoomEl ? imgZoomEl.closest('.dob-lb-img-wrap') : null;
+      if(imgZoomEl && wrapZoomEl){
+        const NIVEIS = [
+          { w: 'min(92vw,720px)', h: '64vh' }, // padrão
+          { w: '96vw', h: '82vh' },
+          { w: '100vw', h: '94vh' }
+        ];
+        let nivel = 0;
         const aplicarZoom = () => {
-          imgZoomEl.style.transform = escala === ESCALA_MIN ? '' : `scale(${escala})`;
-          imgZoomEl.classList.toggle('dob-lb-zoomed', escala > ESCALA_MIN);
+          wrapZoomEl.style.maxWidth = NIVEIS[nivel].w;
+          wrapZoomEl.style.maxHeight = NIVEIS[nivel].h;
+          imgZoomEl.classList.toggle('dob-lb-zoomed', nivel > 0);
+          // No nível máximo, some com legenda/infos pra imagem ter o máximo de espaço.
+          box.classList.toggle('dob-lb-zoom-max', nivel === NIVEIS.length - 1);
         };
         imgZoomEl.addEventListener('click', (e) => {
           e.stopPropagation();
-          escala = Math.min(ESCALA_MAX, escala + ESCALA_PASSO);
+          nivel = Math.min(NIVEIS.length - 1, nivel + 1);
           aplicarZoom();
         });
         imgZoomEl.addEventListener('contextmenu', (e) => {
           e.preventDefault();
           e.stopPropagation();
-          escala = Math.max(ESCALA_MIN, escala - ESCALA_PASSO);
+          nivel = Math.max(0, nivel - 1);
           aplicarZoom();
         });
       }
