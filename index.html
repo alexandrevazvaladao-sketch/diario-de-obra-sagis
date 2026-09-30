@@ -3446,13 +3446,37 @@
     btn.style.display = pendentes > 0 ? 'inline-flex' : 'none';
     btn.textContent = `🔧 Reparar ${pendentes} miniatura${pendentes === 1 ? '' : 's'}`;
   }
+  // Pequeno modal (não usa prompt()/alert() nativos, que travam o app) pra escolher a data
+  // e confirmar a recuperação.
+  function perguntarDataRecuperacao(){
+    return new Promise(resolve => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed; inset:0; background:rgba(20,20,20,0.45); z-index:100000; display:flex; align-items:center; justify-content:center; padding:16px;';
+      overlay.innerHTML = `
+        <div style="background:#fff; border-radius:12px; padding:18px 20px; max-width:340px; width:100%; box-shadow:0 16px 40px rgba(0,0,0,0.3); font-family:inherit;">
+          <div style="font-size:22px; margin-bottom:6px;">🔄</div>
+          <p style="margin:0 0 10px; font-size:13.5px; color:#222; line-height:1.45;">Procurar no Drive fotos enviadas mas que nunca ficaram vinculadas a um apontamento, de qual data?</p>
+          <input type="date" id="dob-recuperar-data" class="dob-input" value="${todayStr()}" style="margin-bottom:14px;" />
+          <div style="display:flex; gap:8px;">
+            <button type="button" id="dob-recuperar-cancelar" style="flex:1; padding:9px; border-radius:8px; border:1px solid var(--line); background:#fff; color:#444; font-weight:600; font-size:13px; cursor:pointer;">Cancelar</button>
+            <button type="button" id="dob-recuperar-ok" style="flex:1; padding:9px; border-radius:8px; border:none; background:#274b74; color:#fff; font-weight:600; font-size:13px; cursor:pointer;">Buscar</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const finalizar = (valor) => { overlay.remove(); resolve(valor); };
+      overlay.querySelector('#dob-recuperar-ok').addEventListener('click', () => finalizar(overlay.querySelector('#dob-recuperar-data').value || null));
+      overlay.querySelector('#dob-recuperar-cancelar').addEventListener('click', () => finalizar(null));
+      overlay.addEventListener('click', (ev) => { if(ev.target === overlay) finalizar(null); });
+    });
+  }
+
   // Recupera fotos que já foram enviadas ao Drive (upload acontece assim que a foto é
   // tirada/escolhida) mas cujo apontamento nunca chegou a ser salvo — por exemplo, o app
   // foi fechado ou a página recarregada antes de tocar em "Salvar". Sem isso, a foto existe
   // no Drive só não tem nenhum apontamento apontando pra ela.
   async function recuperarFotosOrfasDrive(){
-    if(!accessToken){ alert('Conecte ao Google Drive primeiro.'); return; }
-    const dataAlvo = prompt('Recuperar fotos de qual data? (AAAA-MM-DD)', todayStr());
+    if(!accessToken){ mostrarToastSalvo('Conecte ao Google Drive primeiro.'); return; }
+    const dataAlvo = await perguntarDataRecuperacao();
     if(!dataAlvo) return;
     const btn = document.getElementById('dob-btn-recuperar-fotos');
     if(btn){ btn.disabled = true; btn.textContent = '🔄 Procurando...'; }
@@ -3499,7 +3523,7 @@
       loadEntries();
       mostrarToastSalvo(`${ok} foto${ok === 1 ? '' : 's'} recuperada${ok === 1 ? '' : 's'} e vinculada${ok === 1 ? '' : 's'} ao apontamento de ${fmtDate(dataAlvo)}`);
     }catch(e){
-      alert('Não foi possível recuperar as fotos agora: ' + e.message);
+      mostrarToastSalvo('Não foi possível recuperar as fotos agora: ' + e.message);
     }finally{
       if(btn){ btn.disabled = false; btn.textContent = '🔄 Recuperar fotos do Drive'; }
     }
