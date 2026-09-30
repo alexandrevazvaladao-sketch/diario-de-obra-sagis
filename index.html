@@ -942,7 +942,7 @@
           if(okCount >= L * 0.9){
             let text = String.fromCharCode.apply(null, codes);
             text = text.replace(/\0+$/, '').replace(/[\x00-\x1f]/g,' ').replace(/\s+/g,' ').trim();
-            if(attr === 350) text = text.replace(/^[^A-Za-zÀ-ÿ0-9]+/, '').trim();
+            if(TEXTO_LONGO_ATTRS.includes(attr)) text = text.replace(/^[^A-Za-zÀ-ÿ0-9]+/, '').trim();
             recs.push({ X:F1, Y:F2, W:F3, attr, text });
             i = strStart + L*2;
             continue;
@@ -954,6 +954,12 @@
     return recs;
   }
 
+  // Campos de texto longo/quebrado (objeto, fornecedor, descrição de item) no relatório "Contratos por Obra"
+  // usam uma família de atributos em sequência aritmética (passo 160) conforme a altura do texto quebrado,
+  // não apenas 350. Confirmado via inspeção direta dos 4 arquivos reais.
+  const TEXTO_LONGO_ATTRS = [350,510,670,830,990,1150,1310,1470];
+  function ehCampoTexto(attr){ return attr === 284 || attr === 285 || TEXTO_LONGO_ATTRS.includes(attr); }
+
   // Reconhece o relatório "Contratos por Obra" do UAU (lista todos os contratos com seus itens/valores
   // contratados, tenha ou não medição lançada ainda)
   function parseUauContratos(arrayBuffer){
@@ -961,7 +967,7 @@
     const obraRec = all.find(r => r.attr === 232);
     const obra = obraRec ? obraRec.text : '';
 
-    const relevant = all.filter(r => [283,284,285,350].includes(r.attr));
+    const relevant = all.filter(r => r.attr === 283 || ehCampoTexto(r.attr));
     const PAGE = 100000;
     let page = 0, prevY = null;
     const withAY = relevant.map(r => {
@@ -978,12 +984,12 @@
     headers.forEach((h, idx) => {
       const rowRecs = byAY[h.AY] || [];
       const numRec = rowRecs.find(r => r.X > 2900 && r.X < 3400 && r.attr === 285);
-      const objRec = rowRecs.find(r => r.X > 4200 && r.X < 4700 && (r.attr === 285 || r.attr === 350));
+      const objRec = rowRecs.find(r => r.X > 4200 && r.X < 4700 && ehCampoTexto(r.attr));
       const empRec = rowRecs.find(r => r.X > 1200 && r.X < 1500 && r.attr === 285);
       // fornecedor: registro mais próximo (X na margem esquerda) logo acima desta linha de cabeçalho
       let fornRec = null;
       withAY.forEach(r => {
-        if(r.X < 200 && (r.attr === 284 || r.attr === 350) && r.AY < h.AY){
+        if(r.X < 200 && ehCampoTexto(r.attr) && r.AY < h.AY){
           if(!fornRec || r.AY > fornRec.AY) fornRec = r;
         }
       });
@@ -1003,7 +1009,7 @@
         const row = byAY[ay];
         const itemNumRec = row.find(r => r.X > 2050 && r.X < 2300 && r.attr === 284);
         if(!itemNumRec) return;
-        const descRec = row.find(r => r.X > 3150 && r.X < 3500 && (r.attr === 284 || r.attr === 350));
+        const descRec = row.find(r => r.X > 3150 && r.X < 3500 && ehCampoTexto(r.attr));
         const undRec = row.find(r => r.X > 6100 && r.X < 6400 && r.attr === 284);
         const qtdeRec = row.find(r => r.X > 6950 && r.X < 7250 && r.attr === 284);
         const precoRec = row.find(r => r.X > 7650 && r.X < 7950 && r.attr === 284);
