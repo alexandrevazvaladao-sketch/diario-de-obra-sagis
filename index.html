@@ -1933,12 +1933,29 @@
   }
   function bloqueiosDoBloco(servico, obra, blocoId){
     return prereqsDoServico(servico).filter(pred => {
+      // Se o pré-requisito já tem histórico (marcação ou escopo) em OUTRA obra mas nunca foi
+      // usado nessa obra aqui, ele é específico daquela outra obra (ex: um serviço nomeado
+      // "... PEQUIS" escolhido sem querer como pré-requisito de algo do Buritis) — não deve
+      // travar nada aqui.
+      if(servicoRestritoAOutrasObras(pred, obra)) return false;
       // Se o pré-requisito tem escopo definido (só vale pra alguns blocos) e esse bloco está
       // fora dele, o pré-requisito simplesmente não se aplica aqui — não deve travar nada.
       const escopoPred = escopoDoServico(pred, obra);
       if(escopoPred && !escopoPred.includes(blocoId)) return false;
       return corDoBloco(pred, obra, blocoId) !== 'verde';
     });
+  }
+  // Detecta um pré-requisito "órfão" numa obra: já tem marcação ou escopo em alguma outra
+  // obra, mas nenhuma marcação nem escopo na obra atual — sinal de que ele nunca foi pensado
+  // pra essa obra e não deveria travar nada nela (mesmo sem estar oficialmente "escopado").
+  function servicoRestritoAOutrasObras(servico, obraAtual){
+    const temNaAtual = mapaState.estados.some(e => e.servico === servico && e.obra === obraAtual)
+      || !!escopoDoServico(servico, obraAtual);
+    if(temNaAtual) return false;
+    const escoposPorObra = (mapaState.escopoPorServico && mapaState.escopoPorServico[servico]) || {};
+    const temEmOutra = mapaState.estados.some(e => e.servico === servico && e.obra !== obraAtual)
+      || Object.keys(escoposPorObra).some(o => o !== obraAtual && escoposPorObra[o] && escoposPorObra[o].length);
+    return temEmOutra;
   }
   // ---------- Escopo: alguns serviços só valem pra um subconjunto de blocos DENTRO DE UMA OBRA (ex: só blocos 2 a 7 do
   // Pequis). Nunca trava a obra em si, porque o mesmo serviço pode ser usado em Pequis e Buritis ao mesmo tempo. ----------
