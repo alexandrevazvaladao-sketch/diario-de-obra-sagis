@@ -2277,6 +2277,7 @@
               <button class="dob-btn secundario pequeno" id="dob-mapa-editar-servico" type="button" title="Editar nome do serviço">✏️ Editar</button>
               <button class="dob-btn secundario pequeno" id="dob-mapa-escopo-servico" type="button" title="Restringir este serviço a apenas alguns blocos (ex: só blocos 2 a 7)">🎯 Escopo</button>
               <button class="dob-btn secundario pequeno" id="dob-mapa-prereq-servico" type="button" title="Escolher quais outros serviços precisam estar concluídos antes deste">🔗 Pré-requisitos</button>
+              <button class="dob-btn secundario pequeno" id="dob-mapa-fotos-servico" type="button" title="Ver e vincular fotos deste serviço, de qualquer dia (mesmo já concluído)">📷 Fotos</button>
               <button class="dob-btn perigo pequeno" id="dob-mapa-excluir-servico" type="button" title="Excluir este serviço">Excluir</button>
             </div>
           </div>
@@ -2828,6 +2829,11 @@
       if(btnEscopo) btnEscopo.textContent = temAlgumEscopo(servicoSelAtual.value) ? '🎯 Escopo ✓' : '🎯 Escopo';
       const btnPrereq = document.getElementById('dob-mapa-prereq-servico');
       if(btnPrereq) btnPrereq.textContent = prereqs.length ? `🔗 Pré-requisitos (${prereqs.length})` : '🔗 Pré-requisitos';
+      const btnFotos = document.getElementById('dob-mapa-fotos-servico');
+      if(btnFotos){
+        const qtdFotos = servicoSelAtual.value ? fotosDoServico(servicoSelAtual.value).length : 0;
+        btnFotos.textContent = qtdFotos ? `📷 Fotos (${qtdFotos})` : '📷 Fotos';
+      }
     }
     document.getElementById('dob-mapa-obra').addEventListener('change', () => {
       mapaObraAtual = document.getElementById('dob-mapa-obra').value;
@@ -2962,6 +2968,12 @@
         renderGrid();
         fechar();
       });
+    });
+
+    document.getElementById('dob-mapa-fotos-servico').addEventListener('click', () => {
+      const servico = document.getElementById('dob-mapa-servico').value;
+      if(!servico) return;
+      abrirGerenciadorFotosServico(servico);
     });
 
     document.getElementById('dob-mapa-excluir-servico').addEventListener('click', () => {
@@ -4567,6 +4579,87 @@
         if(arrastandoAgora || (Date.now() - arrasteAcabouAgora) < 300) return;
         if(ev.target === overlay) finalizar(undefined);
       });
+    });
+  }
+
+  // Gerenciador de fotos de um serviço, independente de data — abre a partir do botão
+  // "📷 Fotos" na tela de Mapa. Serve pra quando o serviço já foi concluído num dia
+  // passado e por isso não aparece mais na lista "Marcações do mapa nesse dia" (que é
+  // só do dia específico), mas o usuário ainda quer ver/vincular/desvincular fotos dele.
+  function abrirGerenciadorFotosServico(servico){
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed; inset:0; background:rgba(20,20,20,0.45); z-index:99998; display:flex; align-items:center; justify-content:center; padding:16px;';
+    const atualizarBotaoMapa = () => {
+      const btn = document.getElementById('dob-mapa-fotos-servico');
+      if(!btn) return;
+      const qtd = fotosDoServico(servico).length;
+      btn.textContent = qtd ? `📷 Fotos (${qtd})` : '📷 Fotos';
+    };
+    const render = () => {
+      const fotos = fotosDoServico(servico);
+      const corpo = document.getElementById('dob-ger-fotos-corpo');
+      if(!corpo) return;
+      corpo.innerHTML = fotos.length
+        ? `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:10px;">${fotos.map((x, i) => `
+            <div style="position:relative; border-radius:8px; overflow:hidden; border:1px solid var(--line); background:#fff;">
+              <button type="button" data-ger-desvincular="${x.entryId}|||${x.idx}" title="Desvincular esta foto" style="position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:50%; background:rgba(0,0,0,0.55); color:#fff; border:none; font-size:13px; line-height:1; cursor:pointer; z-index:1;">✕</button>
+              <img src="${x.foto.thumb || x.foto.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" data-ger-abrir="${i}" style="width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:#eee; cursor:pointer;" />
+              <div style="padding:3px 5px; font-size:9.5px; color:#8a8272; text-align:center;">${fmtDate(x.data)}</div>
+            </div>`).join('')}</div>`
+        : `<p class="dob-dica" style="margin:0;">Nenhuma foto vinculada a "${servico}" ainda.</p>`;
+      corpo.querySelectorAll('[data-ger-desvincular]').forEach(el => {
+        el.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const [entryId, idxStr] = el.dataset.gerDesvincular.split('|||');
+          const idx = Number(idxStr);
+          const entry = entries.find(e => e.id === entryId);
+          if(!entry || !entry.fotos || !entry.fotos[idx]) return;
+          const fotoAtual = normalizeFoto(entry.fotos[idx]);
+          delete fotoAtual.legenda;
+          entry.fotos[idx] = fotoAtual;
+          saveEntry(entry);
+          mostrarToastSalvo('Vínculo removido');
+          render();
+          atualizarBotaoMapa();
+        });
+      });
+      corpo.querySelectorAll('[data-ger-abrir]').forEach(el => {
+        el.addEventListener('click', () => {
+          const idx = Number(el.dataset.gerAbrir);
+          openLightbox(fotos.map(x => x.foto), idx);
+        });
+      });
+    };
+    overlay.innerHTML = `
+      <div style="background:#fff; border-radius:12px; padding:18px 20px; max-width:520px; width:100%; max-height:82vh; display:flex; flex-direction:column; box-shadow:0 16px 40px rgba(0,0,0,0.3); font-family:inherit;">
+        <p style="margin:0 0 4px; font-size:15px; font-weight:700; color:var(--ink,#16233d);">📷 Fotos de "${servico}"</p>
+        <p class="dob-dica" style="margin:0 0 12px;">Fotos de qualquer dia, mesmo se o serviço já tiver sido concluído. Toque numa foto pra ampliar, ou no ✕ pra desvincular.</p>
+        <div id="dob-ger-fotos-corpo" style="overflow-y:auto; flex:1; margin-bottom:14px;"></div>
+        <div style="display:flex; gap:8px;">
+          <button type="button" id="dob-ger-fotos-fechar" class="dob-btn secundario pequeno" style="flex:1;">Fechar</button>
+          <button type="button" id="dob-ger-fotos-vincular" class="dob-btn pequeno" style="flex:1;">+ Vincular foto</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    render();
+    const fechar = () => overlay.remove();
+    overlay.querySelector('#dob-ger-fotos-fechar').addEventListener('click', fechar);
+    overlay.addEventListener('click', (ev) => { if(ev.target === overlay) fechar(); });
+    overlay.querySelector('#dob-ger-fotos-vincular').addEventListener('click', async () => {
+      const escolhas = await escolherFotoParaVincular(servico);
+      if(!escolhas || !escolhas.length) return;
+      const entriesAtualizados = new Set();
+      escolhas.forEach(escolha => {
+        const entry = entries.find(e => e.id === escolha.entryId);
+        if(!entry || !entry.fotos || !entry.fotos[escolha.idx]) return;
+        const fotoAtual = normalizeFoto(entry.fotos[escolha.idx]);
+        entry.fotos[escolha.idx] = { ...fotoAtual, legenda: servico };
+        entriesAtualizados.add(entry);
+      });
+      entriesAtualizados.forEach(entry => saveEntry(entry));
+      mostrarToastSalvo(escolhas.length > 1 ? `${escolhas.length} fotos vinculadas a "${servico}"` : `Foto vinculada a "${servico}"`);
+      render();
+      atualizarBotaoMapa();
     });
   }
 
