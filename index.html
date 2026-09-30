@@ -808,12 +808,16 @@
 
   // ---------- UAU → BEE: leitura dos relatórios .rdf do UAU (Medição por Obra) pra facilitar a "tradução" manual pro BEE ----------
   let uauBeeAberto = false;
-  let uauBeeState = { items: [] }; // cada item: {key, obra, objeto, fornecedorCodigo, fornecedorNome, contratado, anterior, atual, acumulado, saldo, atualizadoEm}
+  let uauBeeState = { items: [], contratos: [] };
+  // items: relatório "Planilha de Medição por Obra" -> {key, obra, objeto, fornecedorCodigo, fornecedorNome, contratado, anterior, atual, acumulado, saldo, atualizadoEm}
+  // contratos: relatório "Contratos por Obra" -> {key, obra, contratoNumero, objeto, empresaCodigo, fornecedorCodigo, fornecedorNome, itens[], valorTotalContrato, atualizadoEm}
   (function loadUauBeeState(){
     try{
       const raw = localStorage.getItem('dob:uaubee_state');
       if(raw) uauBeeState = JSON.parse(raw);
     }catch(e){ /* usa estado vazio padrão */ }
+    if(!Array.isArray(uauBeeState.items)) uauBeeState.items = [];
+    if(!Array.isArray(uauBeeState.contratos)) uauBeeState.contratos = [];
   })();
   function saveUauBeeState(sincronizar){
     localStorage.setItem('dob:uaubee_state', JSON.stringify(uauBeeState));
@@ -909,6 +913,119 @@
     return n.toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
   }
 
+  // Variante "relaxada" do leitor de .rdf, usada só pro relatório de Contratos: esse relatório usa um
+  // tipo de registro extra (atributo 350) pra textos longos/quebrados (objeto e descrição de item), cujo
+  // campo de "checagem" não é sempre zero como nos registros normais — por isso essa versão não exige
+  // esse campo zerado, só valida a qualidade do texto decodificado.
+  function parseUauRdfRecordsContratos(arrayBuffer){
+    const dv = new DataView(arrayBuffer);
+    const n = arrayBuffer.byteLength;
+    const recs = [];
+    let i = 0;
+    while(i <= n - 24){
+      if(dv.getUint32(i, true) === 27){
+        const pos = i + 4;
+        const F1 = dv.getUint32(pos, true);
+        const F2 = dv.getUint32(pos+4, true);
+        const F3 = dv.getUint32(pos+8, true);
+        const attr = dv.getUint32(pos+12, true);
+        const L = dv.getUint16(pos+18, true);
+        const strStart = pos + 20;
+        if(L > 0 && L <= 300 && strStart + L*2 <= n){
+          let okCount = 0;
+          const codes = new Array(L);
+          for(let k=0;k<L;k++){
+            const code = dv.getUint16(strStart + k*2, true);
+            codes[k] = code;
+            if(code === 0 || (code >= 9 && code < 0x250)) okCount++;
+          }
+          if(okCount >= L * 0.9){
+            let text = String.fromCharCode.apply(null, codes);
+            text = text.replace(/\0+$/, '').replace(/[\x00-\x1f]/g,' ').replace(/\s+/g,' ').trim();
+            if(attr === 350) text = text.replace(/^[^A-Za-zÀ-ÿ0-9]+/, '').trim();
+            recs.push({ X:F1, Y:F2, W:F3, attr, text });
+            i = strStart + L*2;
+            continue;
+          }
+        }
+      }
+      i++;
+    }
+    return recs;
+  }
+
+  // Reconhece o relatório "Contratos por Obra" do UAU (lista todos os contratos com seus itens/valores
+  // contratados, tenha ou não medição lançada ainda)
+  function parseUauContratos(arrayBuffer){
+    const all = parseUauRdfRecordsContratos(arrayBuffer);
+    const obraRec = all.find(r => r.attr === 232);
+    const obra = obraRec ? obraRec.text : '';
+
+    const relevant = all.filter(r => [283,284,285,350].includes(r.attr));
+    const PAGE = 100000;
+    let page = 0, prevY = null;
+    const withAY = relevant.map(r => {
+      if(prevY !== null && r.Y < prevY - 3000) page++;
+      prevY = r.Y;
+      return Object.assign({}, r, { AY: page*PAGE + r.Y });
+    });
+
+    const headers = withAY.filter(r => r.text === 'Contrato nº:').sort((a,b) => a.AY - b.AY);
+    const byAY = {};
+    withAY.forEach(r => { (byAY[r.AY] = byAY[r.AY] || []).push(r); });
+
+    const contratos = [];
+    headers.forEach((h, idx) => {
+      const rowRecs = byAY[h.AY] || [];
+      const numRec = rowRecs.find(r => r.X > 2900 && r.X < 3400 && r.attr === 285);
+      const objRec = rowRecs.find(r => r.X > 4200 && r.X < 4700 && (r.attr === 285 || r.attr === 350));
+      const empRec = rowRecs.find(r => r.X > 1200 && r.X < 1500 && r.attr === 285);
+      // fornecedor: registro mais próximo (X na margem esquerda) logo acima desta linha de cabeçalho
+      let fornRec = null;
+      withAY.forEach(r => {
+        if(r.X < 200 && (r.attr === 284 || r.attr === 350) && r.AY < h.AY){
+          if(!fornRec || r.AY > fornRec.AY) fornRec = r;
+        }
+      });
+      let fornecedorCodigo = '', fornecedorNome = '';
+      if(fornRec){
+        const m = fornRec.text.match(/^(\d+)\s*-\s*(.+)$/);
+        if(m){ fornecedorCodigo = m[1]; fornecedorNome = m[2].trim(); }
+        else { fornecedorNome = fornRec.text; }
+      }
+
+      const nextAY = (idx+1 < headers.length) ? headers[idx+1].AY : Infinity;
+      const itemAYs = Object.keys(byAY).map(Number)
+        .filter(ay => ay > h.AY + 284 && ay < nextAY)
+        .sort((a,b) => a-b);
+      const itens = [];
+      itemAYs.forEach(ay => {
+        const row = byAY[ay];
+        const itemNumRec = row.find(r => r.X > 2050 && r.X < 2300 && r.attr === 284);
+        if(!itemNumRec) return;
+        const descRec = row.find(r => r.X > 3150 && r.X < 3500 && (r.attr === 284 || r.attr === 350));
+        const undRec = row.find(r => r.X > 6100 && r.X < 6400 && r.attr === 284);
+        const qtdeRec = row.find(r => r.X > 6950 && r.X < 7250 && r.attr === 284);
+        const precoRec = row.find(r => r.X > 7650 && r.X < 7950 && r.attr === 284);
+        const totalRec = row.find(r => r.X > 8800 && r.X < 9100 && r.attr === 284);
+        const preco = precoRec ? numeroBR(precoRec.text) : null;
+        const total = totalRec ? numeroBR(totalRec.text) : null;
+        let qtde = qtdeRec ? numeroBR(qtdeRec.text) : null;
+        if(qtde === null && preco && total) qtde = Math.round((total/preco)*100)/100;
+        itens.push({ numero: itemNumRec.text, descricao: descRec ? descRec.text : '', unidade: undRec ? undRec.text : '',
+          quantidade: qtde, precoUnitario: preco, total: total });
+      });
+
+      if(!numRec && !fornecedorNome) return; // registro incompleto, ignora
+      contratos.push({
+        obra, contratoNumero: numRec ? numRec.text : '', objeto: objRec ? objRec.text : '',
+        empresaCodigo: empRec ? empRec.text : '', fornecedorCodigo, fornecedorNome, itens,
+        valorTotalContrato: itens.reduce((s,it) => s + (it.total||0), 0)
+      });
+    });
+    return contratos;
+  }
+
   // acha o macro-serviço do BEE já vinculado (via tela de Contratos) pra esse fornecedor, se existir e for único
   function macroServicoParaFornecedor(fornecedorNome){
     if(!fornecedorNome) return null;
@@ -926,27 +1043,45 @@
 
   async function processarArquivosUauBee(fileList){
     const arquivos = Array.from(fileList || []).filter(f => /\.rdf$/i.test(f.name));
-    if(!arquivos.length){ alert('Selecione arquivo(s) .rdf exportados do UAU (Medição por Obra).'); return; }
-    let totalItens = 0, comFalha = [];
+    if(!arquivos.length){ alert('Selecione arquivo(s) .rdf exportados do UAU (Medição por Obra ou Contratos por Obra).'); return; }
+    let comFalha = [];
     for(const file of arquivos){
       try{
         const buffer = await file.arrayBuffer();
-        const items = parseUauMedicoes(buffer);
-        if(!items.length){ comFalha.push(file.name); continue; }
         const agora = new Date().toISOString();
-        items.forEach(it => {
-          const key = [it.obra, it.objeto, it.fornecedorCodigo].join('|');
-          const idx = uauBeeState.items.findIndex(x => x.key === key);
-          const registro = { key, ...it, atualizadoEm: agora, origemArquivo: file.name };
-          if(idx > -1) uauBeeState.items[idx] = registro;
-          else uauBeeState.items.push(registro);
-          totalItens++;
-        });
+
+        // tenta primeiro como "Planilha de Medição por Obra"
+        const medicoes = parseUauMedicoes(buffer);
+        if(medicoes.length){
+          medicoes.forEach(it => {
+            const key = [it.obra, it.objeto, it.fornecedorCodigo].join('|');
+            const idx = uauBeeState.items.findIndex(x => x.key === key);
+            const registro = { key, ...it, atualizadoEm: agora, origemArquivo: file.name };
+            if(idx > -1) uauBeeState.items[idx] = registro;
+            else uauBeeState.items.push(registro);
+          });
+          continue;
+        }
+
+        // senão, tenta como "Contratos por Obra"
+        const contratos = parseUauContratos(buffer);
+        if(contratos.length){
+          contratos.forEach(c => {
+            const key = [c.obra, c.contratoNumero].join('|');
+            const idx = uauBeeState.contratos.findIndex(x => x.key === key);
+            const registro = { key, ...c, atualizadoEm: agora, origemArquivo: file.name };
+            if(idx > -1) uauBeeState.contratos[idx] = registro;
+            else uauBeeState.contratos.push(registro);
+          });
+          continue;
+        }
+
+        comFalha.push(file.name);
       }catch(e){ comFalha.push(file.name); }
     }
     saveUauBeeState();
     renderUauBee();
-    if(comFalha.length) alert('Não consegui ler: ' + comFalha.join(', ') + '\n(confira se é o relatório "Planilha de Medição por Obra" exportado em .rdf)');
+    if(comFalha.length) alert('Não consegui ler: ' + comFalha.join(', ') + '\n(confira se é o relatório "Planilha de Medição por Obra" ou "Contratos por Obra" exportado em .rdf)');
   }
 
   function copiarTextoUauBee(texto, btnEl){
@@ -964,16 +1099,27 @@
     const porObra = {};
     uauBeeState.items.forEach(it => { (porObra[it.obra || 'Sem obra'] = porObra[it.obra || 'Sem obra'] || []).push(it); });
     const obras = Object.keys(porObra).sort();
-    const totalRegistros = uauBeeState.items.length;
+
+    const porObraContratos = {};
+    uauBeeState.contratos.forEach(c => { (porObraContratos[c.obra || 'Sem obra'] = porObraContratos[c.obra || 'Sem obra'] || []).push(c); });
+    const obrasContratos = Object.keys(porObraContratos).sort();
+    // fornecedores (código) que já têm alguma medição lançada, por obra — pra sinalizar contrato ainda sem medição
+    const fornecedoresMedidosPorObra = {};
+    uauBeeState.items.forEach(it => {
+      const k = it.obra || 'Sem obra';
+      (fornecedoresMedidosPorObra[k] = fornecedoresMedidosPorObra[k] || new Set()).add(it.fornecedorCodigo);
+    });
+
+    const totalRegistros = uauBeeState.items.length + uauBeeState.contratos.length;
 
     let html = `
       <div class="dob-card" style="margin-top:16px;">
         <h3 style="margin-top:0;">UAU → BEE — tradução dos contratos/medições</h3>
-        <p style="color:var(--muted); font-size:13px;">Suba aqui o(s) arquivo(s) <b>.rdf</b> exportados da tela "Planilha de Medição por Obra" do UAU (Contrato, Contratado, Anterior, Atual, Acumulada, Saldo). O app lê o arquivo no seu navegador (nada é enviado pra fora) e organiza tudo numa tabela fácil de copiar pra digitar no BEE. Cada novo envio complementa/atualiza os dados já salvos — nada é apagado automaticamente.</p>
+        <p style="color:var(--muted); font-size:13px;">Suba aqui o(s) arquivo(s) <b>.rdf</b> exportados do UAU — tanto da tela "Planilha de Medição por Obra" (Contrato, Contratado, Anterior, Atual, Acumulada, Saldo) quanto da tela "Contratos por Obra" (lista completa de contratos e itens, incluindo os que ainda não têm medição lançada). O app reconhece o tipo de relatório sozinho, lê o arquivo no seu navegador (nada é enviado pra fora) e organiza tudo em tabelas fáceis de copiar pra digitar no BEE. Cada novo envio complementa/atualiza os dados já salvos — nada é apagado automaticamente.</p>
         <div id="dob-uaubee-drop" style="border:2px dashed var(--line); border-radius:var(--radius-sm); padding:24px; text-align:center; cursor:pointer; background:var(--paper);">
           <div style="font-size:28px;">📂</div>
           <div style="font-weight:600; margin-top:6px;">Arraste os arquivos .rdf aqui ou clique pra escolher</div>
-          <div style="color:var(--muted); font-size:12px; margin-top:4px;">Aceita vários arquivos de uma vez (ex: Medições 43 e 44)</div>
+          <div style="color:var(--muted); font-size:12px; margin-top:4px;">Aceita vários arquivos de uma vez (ex: Medições 43 e 44, Contratos 43 e 44)</div>
           <input type="file" id="dob-uaubee-file-input" accept=".rdf" multiple style="display:none;" />
         </div>
     `;
@@ -982,6 +1128,7 @@
       html += `<p style="color:var(--muted); margin-top:16px;">Nenhum dado importado ainda.</p>`;
     } else {
       html += `<div style="margin-top:8px; text-align:right;"><button type="button" class="dob-btn secundario pequeno" id="dob-uaubee-limpar">Limpar tudo</button></div>`;
+      if(obras.length) html += `<h3 style="margin:26px 0 4px;">Medições lançadas</h3>`;
       obras.forEach(obra => {
         const itens = porObra[obra].slice().sort((a,b) => (a.objeto||'').localeCompare(b.objeto||'', 'pt-BR', {numeric:true}));
         const totContratado = itens.reduce((s,i) => s + (numeroBR(i.contratado)||0), 0);
@@ -1030,6 +1177,58 @@
           </div>
         `;
       });
+
+      if(obrasContratos.length) html += `<h3 style="margin:34px 0 4px;">Contratos (todos, com ou sem medição)</h3>`;
+      obrasContratos.forEach(obra => {
+        const contratos = porObraContratos[obra].slice().sort((a,b) => (parseInt(a.contratoNumero)||0) - (parseInt(b.contratoNumero)||0));
+        const medidos = fornecedoresMedidosPorObra[obra] || new Set();
+        const totContratado = contratos.reduce((s,c) => s + (c.valorTotalContrato||0), 0);
+        const semMedicaoQtd = contratos.filter(c => !medidos.has(c.fornecedorCodigo)).length;
+        html += `
+          <h4 style="margin:22px 0 8px;">${obra} <span style="font-weight:400; color:var(--muted); font-size:13px;">(${contratos.length} contratos${semMedicaoQtd ? `, ${semMedicaoQtd} sem medição lançada` : ''})</span></h4>
+          <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="text-align:left; border-bottom:2px solid var(--line);">
+                <th style="padding:6px 8px;">Nº</th>
+                <th style="padding:6px 8px;">Objeto</th>
+                <th style="padding:6px 8px;">Fornecedor</th>
+                <th style="padding:6px 8px;">Macro BEE</th>
+                <th style="padding:6px 8px; text-align:right;">Itens</th>
+                <th style="padding:6px 8px; text-align:right;">Valor total contrato</th>
+                <th style="padding:6px 8px;">Situação</th>
+                <th style="padding:6px 8px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${contratos.map(c => {
+                const macro = macroServicoParaFornecedor(c.fornecedorNome);
+                const semMedicao = !medidos.has(c.fornecedorCodigo);
+                const itensTxt = c.itens.map(it => `${it.numero}) ${it.descricao || '(sem descrição)'} — ${it.unidade || ''} ${it.quantidade != null ? 'qtd ' + fmtBR(it.quantidade) : ''} x ${fmtBR(it.precoUnitario)} = ${fmtBR(it.total)}`).join('\n');
+                const texto = `Contrato ${c.contratoNumero} | ${c.objeto} | ${c.fornecedorCodigo ? c.fornecedorCodigo + ' - ' : ''}${c.fornecedorNome} | Total: ${fmtBR(c.valorTotalContrato)}\n${itensTxt}`;
+                return `<tr style="border-bottom:1px solid var(--line);" data-key="${c.key}">
+                  <td style="padding:6px 8px;">${c.contratoNumero}</td>
+                  <td style="padding:6px 8px;">${c.objeto || '—'}</td>
+                  <td style="padding:6px 8px;">${c.fornecedorCodigo ? c.fornecedorCodigo + ' - ' : ''}${c.fornecedorNome || '—'}</td>
+                  <td style="padding:6px 8px; color:var(--muted);">${macro || '—'}</td>
+                  <td style="padding:6px 8px; text-align:right;">${c.itens.length}</td>
+                  <td style="padding:6px 8px; text-align:right;">${fmtBR(c.valorTotalContrato)}</td>
+                  <td style="padding:6px 8px;">${semMedicao ? '<span style="color:#b45309; font-weight:600;">Sem medição</span>' : '<span style="color:#15803d;">Medido</span>'}</td>
+                  <td style="padding:6px 8px;"><button type="button" class="dob-btn secundario pequeno dob-uaubee-copiar" data-texto="${texto.replace(/"/g,'&quot;')}">Copiar</button></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="font-weight:700; border-top:2px solid var(--line);">
+                <td style="padding:6px 8px;" colspan="5">Total ${obra}</td>
+                <td style="padding:6px 8px; text-align:right;">${fmtBR(totContratado)}</td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          </table>
+          </div>
+        `;
+      });
     }
     html += `</div>`;
     container.innerHTML = html;
@@ -1054,7 +1253,7 @@
     if(limparBtn){
       limparBtn.addEventListener('click', () => {
         if(!confirm('Apagar todos os dados UAU → BEE importados? Isso não afeta os arquivos originais no seu computador.')) return;
-        uauBeeState = { items: [] };
+        uauBeeState = { items: [], contratos: [] };
         saveUauBeeState();
         renderUauBee();
       });
@@ -2714,7 +2913,7 @@
   async function ensureUauBeeFile(){
     if(uauBeeFileId) return uauBeeFileId;
     let id = await driveFindNamedFile('diario_uaubee.json');
-    if(!id) id = await driveCreateNamedFile('diario_uaubee.json', JSON.stringify({ items: [] }));
+    if(!id) id = await driveCreateNamedFile('diario_uaubee.json', JSON.stringify({ items: [], contratos: [] }));
     uauBeeFileId = id;
     localStorage.setItem('dob:uaubee_file_id', id);
     return id;
@@ -2733,8 +2932,10 @@
     try{
       const id = await ensureUauBeeFile();
       const remoteText = await driveReadDataFile(id);
-      let remote = { items: [] };
+      let remote = { items: [], contratos: [] };
       try{ remote = JSON.parse(remoteText) || remote; }catch(e){ /* mantém vazio */ }
+      if(!Array.isArray(remote.items)) remote.items = [];
+      if(!Array.isArray(remote.contratos)) remote.contratos = [];
 
       const itemByKey = {};
       (remote.items||[]).forEach(i => { itemByKey[i.key] = i; });
@@ -2744,7 +2945,14 @@
         if(!existente || (i.atualizadoEm||'') > (existente.atualizadoEm||'')) itemByKey[i.key] = i;
       });
 
-      uauBeeState = { items: Object.values(itemByKey) };
+      const contratoByKey = {};
+      (remote.contratos||[]).forEach(c => { contratoByKey[c.key] = c; });
+      (uauBeeState.contratos||[]).forEach(c => {
+        const existente = contratoByKey[c.key];
+        if(!existente || (c.atualizadoEm||'') > (existente.atualizadoEm||'')) contratoByKey[c.key] = c;
+      });
+
+      uauBeeState = { items: Object.values(itemByKey), contratos: Object.values(contratoByKey) };
       saveUauBeeState(false);
       await driveWriteDataFile(id, JSON.stringify(uauBeeState));
     }catch(e){ /* segue só com os dados locais se a sincronização falhar */ }
