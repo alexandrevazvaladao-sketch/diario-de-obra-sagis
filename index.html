@@ -1093,29 +1093,50 @@
     }
   }
 
+  // A "Planilha de Medição por Obra" traz o nº do contrato colado no começo do campo objeto
+  // (ex: "10 - EXECUCAO DE CANTEIRO DE OBRA"). Separa isso pra poder casar com o relatório de Contratos.
+  function extrairNumeroObjeto(objetoComNumero){
+    const m = String(objetoComNumero||'').match(/^(\d+)\s*-\s*(.*)$/);
+    return m ? { numero: m[1], objeto: m[2].trim() } : { numero: '', objeto: String(objetoComNumero||'').trim() };
+  }
+
   function renderUauBee(){
     const container = document.getElementById('dob-uaubee-container');
     if(!uauBeeAberto){ container.innerHTML = ''; return; }
-    const porObra = {};
-    uauBeeState.items.forEach(it => { (porObra[it.obra || 'Sem obra'] = porObra[it.obra || 'Sem obra'] || []).push(it); });
-    const obras = Object.keys(porObra).sort();
 
-    const porObraContratos = {};
-    uauBeeState.contratos.forEach(c => { (porObraContratos[c.obra || 'Sem obra'] = porObraContratos[c.obra || 'Sem obra'] || []).push(c); });
-    const obrasContratos = Object.keys(porObraContratos).sort();
-    // fornecedores (código) que já têm alguma medição lançada, por obra — pra sinalizar contrato ainda sem medição
-    const fornecedoresMedidosPorObra = {};
+    // agrupa tudo (medições + contratos) numa única linha por [obra, nº do contrato]
+    const porObra = {}; // obra -> { numero -> linha }
+    function linhaDe(obra, numero){
+      const o = (porObra[obra] = porObra[obra] || {});
+      return (o[numero] = o[numero] || { numero, objeto:'', fornecedorCodigo:'', fornecedorNome:'', itens:[], valorTotalContrato:null,
+        contratado:null, anterior:null, atual:null, acumulado:null, saldo:null, keyContrato:null, keyMedicao:null });
+    }
+    uauBeeState.contratos.forEach(c => {
+      const l = linhaDe(c.obra, c.contratoNumero);
+      l.objeto = c.objeto || l.objeto;
+      l.fornecedorCodigo = c.fornecedorCodigo || l.fornecedorCodigo;
+      l.fornecedorNome = c.fornecedorNome || l.fornecedorNome;
+      l.itens = c.itens || [];
+      l.valorTotalContrato = c.valorTotalContrato;
+      l.keyContrato = c.key;
+    });
     uauBeeState.items.forEach(it => {
-      const k = it.obra || 'Sem obra';
-      (fornecedoresMedidosPorObra[k] = fornecedoresMedidosPorObra[k] || new Set()).add(it.fornecedorCodigo);
+      const { numero, objeto } = extrairNumeroObjeto(it.objeto);
+      const l = linhaDe(it.obra, numero || ('m:' + it.key));
+      if(!l.objeto) l.objeto = objeto;
+      if(!l.fornecedorCodigo) l.fornecedorCodigo = it.fornecedorCodigo;
+      if(!l.fornecedorNome) l.fornecedorNome = it.fornecedorNome;
+      l.contratado = it.contratado; l.anterior = it.anterior; l.atual = it.atual; l.acumulado = it.acumulado; l.saldo = it.saldo;
+      l.keyMedicao = it.key;
     });
 
+    const obras = Object.keys(porObra).sort();
     const totalRegistros = uauBeeState.items.length + uauBeeState.contratos.length;
 
     let html = `
       <div class="dob-card" style="margin-top:16px;">
         <h3 style="margin-top:0;">UAU → BEE — tradução dos contratos/medições</h3>
-        <p style="color:var(--muted); font-size:13px;">Suba aqui o(s) arquivo(s) <b>.rdf</b> exportados do UAU — tanto da tela "Planilha de Medição por Obra" (Contrato, Contratado, Anterior, Atual, Acumulada, Saldo) quanto da tela "Contratos por Obra" (lista completa de contratos e itens, incluindo os que ainda não têm medição lançada). O app reconhece o tipo de relatório sozinho, lê o arquivo no seu navegador (nada é enviado pra fora) e organiza tudo em tabelas fáceis de copiar pra digitar no BEE. Cada novo envio complementa/atualiza os dados já salvos — nada é apagado automaticamente.</p>
+        <p style="color:var(--muted); font-size:13px;">Suba aqui o(s) arquivo(s) <b>.rdf</b> exportados do UAU — tanto da tela "Planilha de Medição por Obra" (Contrato, Contratado, Anterior, Atual, Acumulada, Saldo) quanto da tela "Contratos por Obra" (lista completa de contratos e itens, incluindo os que ainda não têm medição lançada). O app reconhece o tipo de relatório sozinho, lê o arquivo no seu navegador (nada é enviado pra fora) e junta tudo numa tabela só por obra, fácil de copiar pra digitar no BEE. Cada novo envio complementa/atualiza os dados já salvos — nada é apagado automaticamente.</p>
         <div id="dob-uaubee-drop" style="border:2px dashed var(--line); border-radius:var(--radius-sm); padding:24px; text-align:center; cursor:pointer; background:var(--paper);">
           <div style="font-size:28px;">📂</div>
           <div style="font-weight:600; margin-top:6px;">Arraste os arquivos .rdf aqui ou clique pra escolher</div>
@@ -1128,64 +1149,15 @@
       html += `<p style="color:var(--muted); margin-top:16px;">Nenhum dado importado ainda.</p>`;
     } else {
       html += `<div style="margin-top:8px; text-align:right;"><button type="button" class="dob-btn secundario pequeno" id="dob-uaubee-limpar">Limpar tudo</button></div>`;
-      if(obras.length) html += `<h3 style="margin:26px 0 4px;">Medições lançadas</h3>`;
       obras.forEach(obra => {
-        const itens = porObra[obra].slice().sort((a,b) => (a.objeto||'').localeCompare(b.objeto||'', 'pt-BR', {numeric:true}));
-        const totContratado = itens.reduce((s,i) => s + (numeroBR(i.contratado)||0), 0);
-        const totAcumulado = itens.reduce((s,i) => s + (numeroBR(i.acumulado)||0), 0);
-        const totSaldo = itens.reduce((s,i) => s + (numeroBR(i.saldo)||0), 0);
+        const linhas = Object.values(porObra[obra]).sort((a,b) => (parseInt(a.numero)||99999) - (parseInt(b.numero)||99999));
+        const semMedicaoQtd = linhas.filter(l => l.contratado === null).length;
+        const totContrato = linhas.reduce((s,l) => s + (l.valorTotalContrato||0), 0);
+        const totContratado = linhas.reduce((s,l) => s + (numeroBR(l.contratado)||0), 0);
+        const totAcumulado = linhas.reduce((s,l) => s + (numeroBR(l.acumulado)||0), 0);
+        const totSaldo = linhas.reduce((s,l) => s + (numeroBR(l.saldo)||0), 0);
         html += `
-          <h4 style="margin:22px 0 8px;">${obra} <span style="font-weight:400; color:var(--muted); font-size:13px;">(${itens.length} contratos)</span></h4>
-          <div style="overflow-x:auto;">
-          <table style="width:100%; border-collapse:collapse; font-size:13px;">
-            <thead>
-              <tr style="text-align:left; border-bottom:2px solid var(--line);">
-                <th style="padding:6px 8px;">Contrato / Serviço</th>
-                <th style="padding:6px 8px;">Fornecedor</th>
-                <th style="padding:6px 8px;">Macro BEE</th>
-                <th style="padding:6px 8px; text-align:right;">Contratado</th>
-                <th style="padding:6px 8px; text-align:right;">Medido acum.</th>
-                <th style="padding:6px 8px; text-align:right;">Saldo</th>
-                <th style="padding:6px 8px;"></th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itens.map(it => {
-                const macro = macroServicoParaFornecedor(it.fornecedorNome);
-                const texto = `${it.objeto} | ${it.fornecedorCodigo ? it.fornecedorCodigo + ' - ' : ''}${it.fornecedorNome} | Contratado: ${it.contratado || '—'} | Medido acumulado: ${it.acumulado || '—'} | Saldo: ${it.saldo || '—'}`;
-                return `<tr style="border-bottom:1px solid var(--line);" data-key="${it.key}">
-                  <td style="padding:6px 8px;">${it.objeto}</td>
-                  <td style="padding:6px 8px;">${it.fornecedorCodigo ? it.fornecedorCodigo + ' - ' : ''}${it.fornecedorNome}</td>
-                  <td style="padding:6px 8px; color:var(--muted);">${macro || '—'}</td>
-                  <td style="padding:6px 8px; text-align:right;">${it.contratado || '—'}</td>
-                  <td style="padding:6px 8px; text-align:right;">${it.acumulado || '—'}</td>
-                  <td style="padding:6px 8px; text-align:right;">${it.saldo || '—'}</td>
-                  <td style="padding:6px 8px;"><button type="button" class="dob-btn secundario pequeno dob-uaubee-copiar" data-texto="${texto.replace(/"/g,'&quot;')}">Copiar</button></td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-            <tfoot>
-              <tr style="font-weight:700; border-top:2px solid var(--line);">
-                <td style="padding:6px 8px;" colspan="3">Total ${obra}</td>
-                <td style="padding:6px 8px; text-align:right;">${fmtBR(totContratado)}</td>
-                <td style="padding:6px 8px; text-align:right;">${fmtBR(totAcumulado)}</td>
-                <td style="padding:6px 8px; text-align:right;">${fmtBR(totSaldo)}</td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-          </div>
-        `;
-      });
-
-      if(obrasContratos.length) html += `<h3 style="margin:34px 0 4px;">Contratos (todos, com ou sem medição)</h3>`;
-      obrasContratos.forEach(obra => {
-        const contratos = porObraContratos[obra].slice().sort((a,b) => (parseInt(a.contratoNumero)||0) - (parseInt(b.contratoNumero)||0));
-        const medidos = fornecedoresMedidosPorObra[obra] || new Set();
-        const totContratado = contratos.reduce((s,c) => s + (c.valorTotalContrato||0), 0);
-        const semMedicaoQtd = contratos.filter(c => !medidos.has(c.fornecedorCodigo)).length;
-        html += `
-          <h4 style="margin:22px 0 8px;">${obra} <span style="font-weight:400; color:var(--muted); font-size:13px;">(${contratos.length} contratos${semMedicaoQtd ? `, ${semMedicaoQtd} sem medição lançada` : ''})</span></h4>
+          <h4 style="margin:22px 0 8px;">${obra} <span style="font-weight:400; color:var(--muted); font-size:13px;">(${linhas.length} contratos${semMedicaoQtd ? `, ${semMedicaoQtd} sem medição lançada` : ''})</span></h4>
           <div style="overflow-x:auto;">
           <table style="width:100%; border-collapse:collapse; font-size:13px;">
             <thead>
@@ -1194,25 +1166,30 @@
                 <th style="padding:6px 8px;">Objeto</th>
                 <th style="padding:6px 8px;">Fornecedor</th>
                 <th style="padding:6px 8px;">Macro BEE</th>
-                <th style="padding:6px 8px; text-align:right;">Itens</th>
-                <th style="padding:6px 8px; text-align:right;">Valor total contrato</th>
+                <th style="padding:6px 8px; text-align:right;">Valor contrato</th>
+                <th style="padding:6px 8px; text-align:right;">Contratado</th>
+                <th style="padding:6px 8px; text-align:right;">Medido acum.</th>
+                <th style="padding:6px 8px; text-align:right;">Saldo</th>
                 <th style="padding:6px 8px;">Situação</th>
                 <th style="padding:6px 8px;"></th>
               </tr>
             </thead>
             <tbody>
-              ${contratos.map(c => {
-                const macro = macroServicoParaFornecedor(c.fornecedorNome);
-                const semMedicao = !medidos.has(c.fornecedorCodigo);
-                const itensTxt = c.itens.map(it => `${it.numero}) ${it.descricao || '(sem descrição)'} — ${it.unidade || ''} ${it.quantidade != null ? 'qtd ' + fmtBR(it.quantidade) : ''} x ${fmtBR(it.precoUnitario)} = ${fmtBR(it.total)}`).join('\n');
-                const texto = `Contrato ${c.contratoNumero} | ${c.objeto} | ${c.fornecedorCodigo ? c.fornecedorCodigo + ' - ' : ''}${c.fornecedorNome} | Total: ${fmtBR(c.valorTotalContrato)}\n${itensTxt}`;
-                return `<tr style="border-bottom:1px solid var(--line);" data-key="${c.key}">
-                  <td style="padding:6px 8px;">${c.contratoNumero}</td>
-                  <td style="padding:6px 8px;">${c.objeto || '—'}</td>
-                  <td style="padding:6px 8px;">${c.fornecedorCodigo ? c.fornecedorCodigo + ' - ' : ''}${c.fornecedorNome || '—'}</td>
+              ${linhas.map(l => {
+                const macro = macroServicoParaFornecedor(l.fornecedorNome);
+                const semMedicao = l.contratado === null;
+                const numeroTxt = /^m:/.test(l.numero) ? '—' : l.numero;
+                const itensTxt = (l.itens||[]).map(it => `${it.numero}) ${it.descricao || '(sem descrição)'} — ${it.unidade || ''} ${it.quantidade != null ? 'qtd ' + fmtBR(it.quantidade) : ''} x ${fmtBR(it.precoUnitario)} = ${fmtBR(it.total)}`).join('\n');
+                const texto = `Contrato ${numeroTxt} | ${l.objeto} | ${l.fornecedorCodigo ? l.fornecedorCodigo + ' - ' : ''}${l.fornecedorNome} | Valor contrato: ${l.valorTotalContrato != null ? fmtBR(l.valorTotalContrato) : '—'} | Contratado: ${l.contratado || '—'} | Medido acumulado: ${l.acumulado || '—'} | Saldo: ${l.saldo || '—'}${itensTxt ? '\n' + itensTxt : ''}`;
+                return `<tr style="border-bottom:1px solid var(--line);" data-key-contrato="${l.keyContrato||''}" data-key-medicao="${l.keyMedicao||''}">
+                  <td style="padding:6px 8px;">${numeroTxt}</td>
+                  <td style="padding:6px 8px;">${l.objeto || '—'}</td>
+                  <td style="padding:6px 8px;">${l.fornecedorCodigo ? l.fornecedorCodigo + ' - ' : ''}${l.fornecedorNome || '—'}</td>
                   <td style="padding:6px 8px; color:var(--muted);">${macro || '—'}</td>
-                  <td style="padding:6px 8px; text-align:right;">${c.itens.length}</td>
-                  <td style="padding:6px 8px; text-align:right;">${fmtBR(c.valorTotalContrato)}</td>
+                  <td style="padding:6px 8px; text-align:right;">${l.valorTotalContrato != null ? fmtBR(l.valorTotalContrato) : '—'}</td>
+                  <td style="padding:6px 8px; text-align:right;">${l.contratado || '—'}</td>
+                  <td style="padding:6px 8px; text-align:right;">${l.acumulado || '—'}</td>
+                  <td style="padding:6px 8px; text-align:right;">${l.saldo || '—'}</td>
                   <td style="padding:6px 8px;">${semMedicao ? '<span style="color:#b45309; font-weight:600;">Sem medição</span>' : '<span style="color:#15803d;">Medido</span>'}</td>
                   <td style="padding:6px 8px;"><button type="button" class="dob-btn secundario pequeno dob-uaubee-copiar" data-texto="${texto.replace(/"/g,'&quot;')}">Copiar</button></td>
                 </tr>`;
@@ -1220,8 +1197,11 @@
             </tbody>
             <tfoot>
               <tr style="font-weight:700; border-top:2px solid var(--line);">
-                <td style="padding:6px 8px;" colspan="5">Total ${obra}</td>
+                <td style="padding:6px 8px;" colspan="4">Total ${obra}</td>
+                <td style="padding:6px 8px; text-align:right;">${fmtBR(totContrato)}</td>
                 <td style="padding:6px 8px; text-align:right;">${fmtBR(totContratado)}</td>
+                <td style="padding:6px 8px; text-align:right;">${fmtBR(totAcumulado)}</td>
+                <td style="padding:6px 8px; text-align:right;">${fmtBR(totSaldo)}</td>
                 <td colspan="2"></td>
               </tr>
             </tfoot>
