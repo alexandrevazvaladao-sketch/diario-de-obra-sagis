@@ -612,7 +612,7 @@
     <button class="dob-btn secundario" id="dob-btn-gamma" style="display:none;">Comando para o Gamma</button>
     <button class="dob-btn secundario" id="dob-btn-resumo-macro" style="display:none;">Resumo por macro-serviço</button>
     <button class="dob-btn secundario" id="dob-btn-resumo-semana" style="display:none;">Resumo da semana</button>
-    <button class="dob-btn secundario" id="dob-btn-producao-diaria" style="display:none;">Produção Diária</button>
+    <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-producao-diaria">Produção Diária</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-uaubee">UAU → BEE</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-mapa">Mapa de Acompanhamento</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-campo">📷 Modo Campo</button>
@@ -1099,6 +1099,11 @@
     const m = String(objetoComNumero||'').match(/^(\d+)\s*-\s*(.*)$/);
     return m ? { numero: m[1], objeto: m[2].trim() } : { numero: '', objeto: String(objetoComNumero||'').trim() };
   }
+  function obraCurta(obra){
+    if(/PEQUIS/i.test(obra||'')) return 'Pequis';
+    if(/BURITIS/i.test(obra||'')) return 'Buritis';
+    return obra || 'Obra';
+  }
 
   function renderUauBee(){
     const container = document.getElementById('dob-uaubee-container');
@@ -1109,7 +1114,7 @@
     function linhaDe(obra, numero){
       const o = (porObra[obra] = porObra[obra] || {});
       return (o[numero] = o[numero] || { numero, objeto:'', fornecedorCodigo:'', fornecedorNome:'', itens:[], valorTotalContrato:null,
-        contratado:null, anterior:null, atual:null, acumulado:null, saldo:null, keyContrato:null, keyMedicao:null });
+        contratado:null, anterior:null, atual:null, acumulado:null, saldo:null, keyContrato:null, keyMedicao:null, macroCod:'', macroDesc:'' });
     }
     uauBeeState.contratos.forEach(c => {
       const l = linhaDe(c.obra, c.contratoNumero);
@@ -1119,6 +1124,8 @@
       l.itens = c.itens || [];
       l.valorTotalContrato = c.valorTotalContrato;
       l.keyContrato = c.key;
+      l.macroCod = c.macroCod || '';
+      l.macroDesc = c.macroDesc || '';
     });
     uauBeeState.items.forEach(it => {
       const { numero, objeto } = extrairNumeroObjeto(it.objeto);
@@ -1176,16 +1183,23 @@
             </thead>
             <tbody>
               ${linhas.map(l => {
-                const macro = macroServicoParaFornecedor(l.fornecedorNome);
+                const macroAuto = l.macroCod ? '' : macroServicoParaFornecedor(l.fornecedorNome);
+                const macroTxt = l.macroCod ? `${l.macroCod} ${l.macroDesc||''}` : (macroAuto || '');
                 const semMedicao = l.contratado === null;
                 const numeroTxt = /^m:/.test(l.numero) ? '—' : l.numero;
                 const itensTxt = (l.itens||[]).map(it => `${it.numero}) ${it.descricao || '(sem descrição)'} — ${it.unidade || ''} ${it.quantidade != null ? 'qtd ' + fmtBR(it.quantidade) : ''} x ${fmtBR(it.precoUnitario)} = ${fmtBR(it.total)}`).join('\n');
-                const texto = `Contrato ${numeroTxt} | ${l.objeto} | ${l.fornecedorCodigo ? l.fornecedorCodigo + ' - ' : ''}${l.fornecedorNome} | Valor contrato: ${l.valorTotalContrato != null ? fmtBR(l.valorTotalContrato) : '—'} | Contratado: ${l.contratado || '—'} | Medido acumulado: ${l.acumulado || '—'} | Saldo: ${l.saldo || '—'}${itensTxt ? '\n' + itensTxt : ''}`;
+                const texto = `Contrato ${numeroTxt} | ${l.objeto} | ${l.fornecedorCodigo ? l.fornecedorCodigo + ' - ' : ''}${l.fornecedorNome} | Macro BEE: ${macroTxt || '—'} | Valor contrato: ${l.valorTotalContrato != null ? fmtBR(l.valorTotalContrato) : '—'} | Contratado: ${l.contratado || '—'} | Medido acumulado: ${l.acumulado || '—'} | Saldo: ${l.saldo || '—'}${itensTxt ? '\n' + itensTxt : ''}`;
+                const macroSelect = l.keyContrato
+                  ? `<select class="dob-select dob-uaubee-macro-sel" data-key-contrato="${l.keyContrato}" style="font-size:12px; padding:2px 4px; min-width:170px;">
+                      <option value="">${macroAuto ? 'Sugestão: ' + macroAuto : 'Sem macro-serviço...'}</option>
+                      ${MACRO_SERVICOS_REF.map(m => `<option value="${m.cod}" ${l.macroCod===m.cod?'selected':''}>${m.cod} ${m.desc}</option>`).join('')}
+                    </select>`
+                  : `<span style="color:var(--muted); font-size:12px;" title="Só dá pra vincular contratos importados da tela 'Contratos por Obra'">${macroTxt || '—'}</span>`;
                 return `<tr style="border-bottom:1px solid var(--line);" data-key-contrato="${l.keyContrato||''}" data-key-medicao="${l.keyMedicao||''}">
                   <td style="padding:6px 8px;">${numeroTxt}</td>
                   <td style="padding:6px 8px;">${l.objeto || '—'}</td>
                   <td style="padding:6px 8px;">${l.fornecedorCodigo ? l.fornecedorCodigo + ' - ' : ''}${l.fornecedorNome || '—'}</td>
-                  <td style="padding:6px 8px; color:var(--muted);">${macro || '—'}</td>
+                  <td style="padding:6px 8px;">${macroSelect}</td>
                   <td style="padding:6px 8px; text-align:right;">${l.valorTotalContrato != null ? fmtBR(l.valorTotalContrato) : '—'}</td>
                   <td style="padding:6px 8px; text-align:right;">${l.contratado || '—'}</td>
                   <td style="padding:6px 8px; text-align:right;">${l.acumulado || '—'}</td>
@@ -1228,6 +1242,19 @@
     }
     container.querySelectorAll('.dob-uaubee-copiar').forEach(btn => {
       btn.addEventListener('click', () => copiarTextoUauBee(btn.dataset.texto, btn));
+    });
+    container.querySelectorAll('.dob-uaubee-macro-sel').forEach(sel => {
+      sel.addEventListener('change', () => {
+        const key = sel.dataset.keyContrato;
+        const contrato = uauBeeState.contratos.find(c => c.key === key);
+        if(!contrato) return;
+        const macroCod = sel.value;
+        const macro = MACRO_SERVICOS_REF.find(m => m.cod === macroCod);
+        contrato.macroCod = macroCod;
+        contrato.macroDesc = macro ? macro.desc : '';
+        saveUauBeeState();
+        renderUauBee();
+      });
     });
     const limparBtn = document.getElementById('dob-uaubee-limpar');
     if(limparBtn){
@@ -3326,7 +3353,7 @@
               <button class="dob-btn secundario pequeno" id="dob-f-add-item" type="button">Cadastrar item</button>
             </div>
             <div class="dob-linha" style="margin-top:10px;">
-              <button class="dob-btn secundario pequeno" id="dob-f-importar-uau" type="button">Importar fornecedores reais do UAU (23)</button>
+              <button class="dob-btn secundario pequeno" id="dob-f-importar-uau" type="button">${uauBeeState.contratos.length ? `Importar/atualizar contratos do UAU → BEE (${uauBeeState.contratos.length})` : 'Importar fornecedores reais do UAU (23, lista antiga)'}</button>
             </div>
             <div id="dob-f-itens-pendentes" style="margin-top:12px;"></div>
           </details>
@@ -3564,17 +3591,29 @@
 
     document.getElementById('dob-f-importar-uau').addEventListener('click', () => {
       let novosContratos = 0, novosItens = 0;
-      SEED_CONTRATOS_UAU.forEach(f => {
+      // fonte real: contratos lidos dos .rdf do UAU (painel "UAU → BEE"). Se ainda não subiu nenhum
+      // arquivo de lá, cai pra lista antiga (fixa) só pra não deixar a tela vazia.
+      const fonte = (uauBeeState.contratos && uauBeeState.contratos.length)
+        ? uauBeeState.contratos.map(c => ({
+            nome: `${obraCurta(c.obra)} · Contrato ${c.contratoNumero} — ${c.fornecedorNome || c.fornecedorCodigo || 'Fornecedor'}${c.objeto ? ' (' + c.objeto + ')' : ''}`,
+            itens: (c.itens && c.itens.length) ? c.itens.map(it => it.descricao).filter(Boolean) : [c.objeto].filter(Boolean),
+            macroCodPadrao: c.macroCod || ''
+          }))
+        : SEED_CONTRATOS_UAU.map(f => ({ nome: f.nome, itens: f.itens, macroCodPadrao: '' }));
+
+      fonte.forEach(f => {
         let contrato = contratosState.contratos.find(c => c.nome === f.nome);
         if(!contrato){
           contrato = { id: 'c'+Date.now()+Math.random().toString(36).slice(2,6), nome: f.nome };
           contratosState.contratos.push(contrato);
           novosContratos++;
         }
-        f.itens.forEach(desc => {
+        const macro = f.macroCodPadrao ? MACRO_SERVICOS_REF.find(m => m.cod === f.macroCodPadrao) : null;
+        (f.itens.length ? f.itens : ['(item do contrato)']).forEach(desc => {
           const jaExiste = contratosState.itens.some(i => i.contratoId === contrato.id && i.descricao === desc);
           if(!jaExiste){
-            contratosState.itens.push({ id: 'i'+Date.now()+Math.random().toString(36).slice(2,6)+novosItens, contratoId: contrato.id, descricao: desc, macroCod: '', macroDesc: '' });
+            contratosState.itens.push({ id: 'i'+Date.now()+Math.random().toString(36).slice(2,6)+novosItens, contratoId: contrato.id, descricao: desc,
+              macroCod: macro ? macro.cod : '', macroDesc: macro ? macro.desc : '' });
             novosItens++;
           }
         });
@@ -3583,7 +3622,7 @@
       popularSelectsServico();
       atualizarItensDoContrato();
       renderItensPendentes();
-      alert(`Importado: ${novosContratos} contrato(s) novo(s), ${novosItens} item(ns) novo(s). Agora é só atribuir o macro-serviço de cada item na lista abaixo.`);
+      alert(`Importado: ${novosContratos} contrato(s) novo(s), ${novosItens} item(ns) novo(s). Agora é só atribuir o macro-serviço de cada item na lista abaixo (itens que já têm macro-serviço marcado na tela "UAU → BEE" já vêm preenchidos).`);
     });
 
     function renderItensPendentes(){
