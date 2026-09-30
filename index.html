@@ -1932,7 +1932,13 @@
     return Array.isArray(lista) ? lista.filter(s => mapaState.servicos.includes(s) && s !== servico) : [];
   }
   function bloqueiosDoBloco(servico, obra, blocoId){
-    return prereqsDoServico(servico).filter(pred => corDoBloco(pred, obra, blocoId) !== 'verde');
+    return prereqsDoServico(servico).filter(pred => {
+      // Se o pré-requisito tem escopo definido (só vale pra alguns blocos) e esse bloco está
+      // fora dele, o pré-requisito simplesmente não se aplica aqui — não deve travar nada.
+      const escopoPred = escopoDoServico(pred, obra);
+      if(escopoPred && !escopoPred.includes(blocoId)) return false;
+      return corDoBloco(pred, obra, blocoId) !== 'verde';
+    });
   }
   // ---------- Escopo: alguns serviços só valem pra um subconjunto de blocos DENTRO DE UMA OBRA (ex: só blocos 2 a 7 do
   // Pequis). Nunca trava a obra em si, porque o mesmo serviço pode ser usado em Pequis e Buritis ao mesmo tempo. ----------
