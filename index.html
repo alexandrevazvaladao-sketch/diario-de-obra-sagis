@@ -598,6 +598,7 @@
     <button class="dob-btn secundario pequeno" id="dob-btn-conectar">Conectar ao Google Drive</button>
     <button class="dob-btn secundario pequeno" id="dob-btn-sync-fotos" style="display:none;">📤 Sincronizar fotos locais</button>
     <button class="dob-btn secundario pequeno" id="dob-btn-reparar-thumbs" style="display:none;">🔧 Reparar miniaturas</button>
+    <button class="dob-btn secundario pequeno" id="dob-btn-recuperar-fotos">🔄 Recuperar fotos do Drive</button>
     <button class="dob-btn secundario pequeno" id="dob-btn-config">Configurações</button>
   </div>
 
@@ -3445,6 +3446,65 @@
     btn.style.display = pendentes > 0 ? 'inline-flex' : 'none';
     btn.textContent = `🔧 Reparar ${pendentes} miniatura${pendentes === 1 ? '' : 's'}`;
   }
+  // Recupera fotos que já foram enviadas ao Drive (upload acontece assim que a foto é
+  // tirada/escolhida) mas cujo apontamento nunca chegou a ser salvo — por exemplo, o app
+  // foi fechado ou a página recarregada antes de tocar em "Salvar". Sem isso, a foto existe
+  // no Drive só não tem nenhum apontamento apontando pra ela.
+  async function recuperarFotosOrfasDrive(){
+    if(!accessToken){ alert('Conecte ao Google Drive primeiro.'); return; }
+    const dataAlvo = prompt('Recuperar fotos de qual data? (AAAA-MM-DD)', todayStr());
+    if(!dataAlvo) return;
+    const btn = document.getElementById('dob-btn-recuperar-fotos');
+    if(btn){ btn.disabled = true; btn.textContent = '🔄 Procurando...'; }
+    try{
+      const folderId = await ensureFolder();
+      const q = encodeURIComponent(`'${folderId}' in parents and name contains 'diario_${dataAlvo}_' and trashed = false`);
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,createdTime)&pageSize=200&orderBy=name`, {
+        headers: { 'Authorization': 'Bearer ' + accessToken }
+      });
+      if(!res.ok) throw new Error('busca no Drive falhou');
+      const data = await res.json();
+      const arquivos = data.files || [];
+      if(!arquivos.length){ mostrarToastSalvo('Nenhuma foto encontrada no Drive para essa data.'); return; }
+
+      const referenciados = new Set();
+      entries.forEach(e => (e.fotos || []).forEach(f => { const nf = normalizeFoto(f); if(nf.type === 'drive' && nf.fileId) referenciados.add(nf.fileId); }));
+      const orfas = arquivos.filter(a => !referenciados.has(a.id));
+      if(!orfas.length){ mostrarToastSalvo('Todas as fotos dessa data já estão vinculadas a algum apontamento.'); return; }
+
+      // Anexa num apontamento já existente nessa data, ou cria um novo pra guardar as fotos recuperadas
+      let alvo = entries.find(e => e.date === dataAlvo);
+      if(!alvo){
+        alvo = { id: 'e' + Date.now() + Math.random().toString(36).slice(2,8), date: dataAlvo, obra: 'Geral', clima: 'sol', ocorrencia: false, texto: '', atividades: '', equipamentos: '', maodeobra: '', itensVinculados: [], fotos: [], createdAt: new Date().toISOString() };
+        entries.push(alvo);
+      }
+      if(!alvo.fotos) alvo.fotos = [];
+
+      let ok = 0, falhas = 0;
+      for(const arq of orfas){
+        let thumb;
+        try{
+          const imgRes = await fetch(`https://www.googleapis.com/drive/v3/files/${arq.id}?alt=media`, { headers: { 'Authorization': 'Bearer ' + accessToken } });
+          if(imgRes.ok){
+            const blob = await imgRes.blob();
+            const dataUrl = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = reject; r.readAsDataURL(blob); });
+            thumb = await compressDataUrl(dataUrl, 180, 0.5);
+          }
+        }catch(err){ /* segue sem thumb — dá pra reparar depois com o botão "Reparar miniaturas" */ }
+        alvo.fotos.push({ type: 'drive', fileId: arq.id, thumb });
+        ok++;
+      }
+      db.set('dob:entry:' + alvo.id, JSON.stringify(alvo));
+      await syncEntriesToDrive();
+      loadEntries();
+      mostrarToastSalvo(`${ok} foto${ok === 1 ? '' : 's'} recuperada${ok === 1 ? '' : 's'} e vinculada${ok === 1 ? '' : 's'} ao apontamento de ${fmtDate(dataAlvo)}`);
+    }catch(e){
+      alert('Não foi possível recuperar as fotos agora: ' + e.message);
+    }finally{
+      if(btn){ btn.disabled = false; btn.textContent = '🔄 Recuperar fotos do Drive'; }
+    }
+  }
+
   function updateStatus(){
     if(accessToken){
       statusDot.className = 'dob-dot on';
@@ -3470,6 +3530,7 @@
   });
   document.getElementById('dob-btn-sync-fotos').addEventListener('click', () => { sincronizarFotosLocaisPendentes(); });
   document.getElementById('dob-btn-reparar-thumbs').addEventListener('click', () => { repararMiniaturas(); });
+  document.getElementById('dob-btn-recuperar-fotos').addEventListener('click', () => { recuperarFotosOrfasDrive(); });
   document.getElementById('dob-btn-config').addEventListener('click', () => {
     if(confirm('Deseja trocar o Client ID configurado?')){
       localStorage.removeItem('dob:client_id');
