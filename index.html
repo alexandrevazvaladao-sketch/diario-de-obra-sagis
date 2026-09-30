@@ -2253,25 +2253,24 @@
           </div>
         ` : ''}
         <div id="dob-mapa-selecao-wrap" style="${mapaModoEdicao && !mapaMostrarSeletorCompleto ? 'display:none;' : ''}">
-          <div class="dob-linha">
-            <div class="dob-campo">
-              <label>Obra</label>
-              <select class="dob-select" id="dob-mapa-obra">
-                <option value="Pequis">Solar dos Pequis</option>
-                <option value="Buritis">Solar dos Buritis</option>
-              </select>
-            </div>
-            <div class="dob-campo" style="flex:2;">
-              <label>Serviço acompanhado</label>
-              <select class="dob-select" id="dob-mapa-servico" style="display:none;"></select>
-              <input class="dob-input" id="dob-mapa-servico-busca" placeholder="🔎 Buscar serviço..." style="margin-bottom:6px;" />
-              <div id="dob-mapa-servico-lista" style="display:flex; flex-direction:column; gap:4px; max-height:230px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:6px; background:#fbfaf6;"></div>
-              <div class="dob-linha" style="gap:6px; margin-top:8px; flex-wrap:wrap;">
-                <button class="dob-btn secundario pequeno" id="dob-mapa-editar-servico" type="button" title="Editar nome do serviço">✏️ Editar</button>
-                <button class="dob-btn secundario pequeno" id="dob-mapa-escopo-servico" type="button" title="Restringir este serviço a apenas alguns blocos (ex: só blocos 2 a 7)">🎯 Escopo</button>
-                <button class="dob-btn secundario pequeno" id="dob-mapa-prereq-servico" type="button" title="Escolher quais outros serviços precisam estar concluídos antes deste">🔗 Pré-requisitos</button>
-                <button class="dob-btn perigo pequeno" id="dob-mapa-excluir-servico" type="button" title="Excluir este serviço">Excluir</button>
-              </div>
+          <div class="dob-campo">
+            <label>Obra</label>
+            <select class="dob-select" id="dob-mapa-obra">
+              <option value="Pequis">Solar dos Pequis</option>
+              <option value="Buritis">Solar dos Buritis</option>
+            </select>
+          </div>
+          <div class="dob-campo" style="margin-top:14px;">
+            <label>Serviço acompanhado</label>
+            <select class="dob-select" id="dob-mapa-servico" style="display:none;"></select>
+            <input class="dob-input" id="dob-mapa-servico-busca" placeholder="🔎 Buscar serviço..." style="margin-bottom:6px;" />
+            <p class="dob-dica" style="margin:0 0 6px;">Arraste um serviço pelo ⠿ pra mudar a ordem em que aparece aqui.</p>
+            <div id="dob-mapa-servico-lista" style="display:flex; flex-direction:column; gap:6px; max-height:420px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:8px; background:#fbfaf6;"></div>
+            <div class="dob-linha" style="gap:6px; margin-top:10px; flex-wrap:wrap;">
+              <button class="dob-btn secundario pequeno" id="dob-mapa-editar-servico" type="button" title="Editar nome do serviço">✏️ Editar</button>
+              <button class="dob-btn secundario pequeno" id="dob-mapa-escopo-servico" type="button" title="Restringir este serviço a apenas alguns blocos (ex: só blocos 2 a 7)">🎯 Escopo</button>
+              <button class="dob-btn secundario pequeno" id="dob-mapa-prereq-servico" type="button" title="Escolher quais outros serviços precisam estar concluídos antes deste">🔗 Pré-requisitos</button>
+              <button class="dob-btn perigo pequeno" id="dob-mapa-excluir-servico" type="button" title="Excluir este serviço">Excluir</button>
             </div>
           </div>
           <details style="margin-top:8px;">
@@ -2313,6 +2312,7 @@
     }
 
     const TIPO_LABEL_SERVICO = { bloco: 'Blocos residenciais', area_comum: 'Área comum', vaga: 'Vagas de garagem', rede: 'Redes' };
+    let dobArrastandoServico = null;
     function renderizarListaServicos(){
       const listaEl = document.getElementById('dob-mapa-servico-lista');
       const buscaEl = document.getElementById('dob-mapa-servico-busca');
@@ -2320,7 +2320,10 @@
       const sel = document.getElementById('dob-mapa-servico');
       const atual = sel.value;
       const termo = (buscaEl && buscaEl.value || '').trim().toLowerCase();
-      const nomes = ordenarServicos(mapaState.servicos).filter(s => !termo || s.toLowerCase().includes(termo));
+      // A ordem exibida é mapaState.servicos (arrastável). Só dá pra arrastar sem busca ativa, pra não embaralhar a
+      // posição real com a lista filtrada.
+      const podeArrastar = !termo;
+      const nomes = mapaState.servicos.filter(s => !termo || s.toLowerCase().includes(termo));
       if(nomes.length === 0){
         listaEl.innerHTML = '<p class="dob-dica" style="margin:4px;">Nenhum serviço encontrado pra essa busca.</p>';
         return;
@@ -2331,16 +2334,52 @@
         if(temAlgumEscopo(s)) badges.push('🎯 escopo');
         const nPrereq = prereqsDoServico(s).length;
         if(nPrereq) badges.push(`🔗 ${nPrereq} pré-requisito${nPrereq > 1 ? 's' : ''}`);
-        return `<div class="dob-mapa-servico-card" data-servico="${s.replace(/"/g, '&quot;')}"
-          style="padding:8px 10px; border-radius:7px; cursor:pointer; transition:background .1s; ${selecionado ? 'background:#274b74; color:#fff;' : 'background:#fff; border:1px solid var(--line);'}">
-          <div style="font-size:13px; font-weight:600;">${s}</div>
-          <div style="font-size:10.5px; opacity:.8; margin-top:2px;">${badges.join(' · ')}</div>
+        return `<div class="dob-mapa-servico-card" data-servico="${s.replace(/"/g, '&quot;')}" ${podeArrastar ? 'draggable="true"' : ''}
+          style="display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:7px; cursor:pointer; transition:background .1s; ${selecionado ? 'background:#274b74; color:#fff;' : 'background:#fff; border:1px solid var(--line);'}">
+          ${podeArrastar ? '<span style="cursor:grab; opacity:.5; font-size:16px; flex-shrink:0;" title="Arrastar pra reordenar">⠿</span>' : ''}
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:13.5px; font-weight:600;">${s}</div>
+            <div style="font-size:11px; opacity:.8; margin-top:2px;">${badges.join(' · ')}</div>
+          </div>
         </div>`;
       }).join('');
       listaEl.querySelectorAll('.dob-mapa-servico-card').forEach(card => {
         card.addEventListener('click', () => {
+          if(dobArrastandoServico) return; // evita selecionar sem querer logo depois de soltar um arraste
           sel.value = card.dataset.servico;
           sel.dispatchEvent(new Event('change', {bubbles:true}));
+        });
+        if(!podeArrastar) return;
+        card.addEventListener('dragstart', (ev) => {
+          dobArrastandoServico = card.dataset.servico;
+          if(ev.dataTransfer) ev.dataTransfer.effectAllowed = 'move';
+          card.style.opacity = '0.4';
+        });
+        card.addEventListener('dragend', () => {
+          card.style.opacity = '';
+          dobArrastandoServico = null;
+        });
+        card.addEventListener('dragover', (ev) => {
+          if(!dobArrastandoServico || dobArrastandoServico === card.dataset.servico) return;
+          ev.preventDefault();
+          card.style.borderTop = '2px solid #274b74';
+        });
+        card.addEventListener('dragleave', () => { card.style.borderTop = ''; });
+        card.addEventListener('drop', (ev) => {
+          ev.preventDefault();
+          card.style.borderTop = '';
+          const origem = dobArrastandoServico;
+          const destino = card.dataset.servico;
+          dobArrastandoServico = null;
+          if(!origem || origem === destino) return;
+          const arr = mapaState.servicos;
+          const idxOrigem = arr.indexOf(origem);
+          if(idxOrigem < 0) return;
+          arr.splice(idxOrigem, 1);
+          const idxDestino = arr.indexOf(destino);
+          arr.splice(idxDestino < 0 ? arr.length : idxDestino, 0, origem);
+          saveMapaState();
+          renderizarListaServicos();
         });
       });
     }
