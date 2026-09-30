@@ -376,7 +376,7 @@
   .dob-mapa-foto-item{ position:relative; border-radius:6px; overflow:hidden; border:1px solid var(--line); background:#fff; }
   .dob-mapa-foto-desvincular{ position:absolute; top:3px; right:3px; z-index:1; width:18px; height:18px; line-height:16px; padding:0; border-radius:50%; border:none; background:rgba(20,20,20,0.65); color:#fff; font-size:11px; cursor:pointer; text-align:center; }
   .dob-mapa-foto-desvincular:hover{ background:rgba(192,82,47,0.9); }
-  .dob-mapa-foto-item img{ width:100%; aspect-ratio:1; object-fit:cover; display:block; background:#eee; }
+  .dob-mapa-foto-item img{ width:100%; aspect-ratio:1; object-fit:cover; display:block; background:#eee; cursor:pointer; }
   .dob-mapa-foto-data{ display:block; font-size:9px; color:#8a8272; text-align:center; padding:2px 3px; }
   .dob-mapa-sem-foto{ font-size:11px; color:#8a8272; padding:6px 0; }
   .dob-mapa-detail-acoes{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:8px; }
@@ -4206,10 +4206,10 @@
           const fotos = fotosDoServico(l.servico);
           const fotosLabelHtml = `<div class="dob-mapa-fotos-label">Fotos vinculadas${fotos.length ? ` (${fotos.length})` : ''}</div>`;
           const fotosHtml = fotos.length
-            ? `<div class="dob-mapa-fotos-strip">${fotos.map(x => `
+            ? `<div class="dob-mapa-fotos-strip">${fotos.map((x, fi) => `
                 <div class="dob-mapa-foto-item">
                   <button type="button" class="dob-mapa-foto-desvincular" data-entry-id="${x.entryId}" data-idx="${x.idx}" title="Desvincular esta foto">✕</button>
-                  <img src="${x.foto.thumb || x.foto.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" alt="Foto" />
+                  <img src="${x.foto.thumb || x.foto.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" alt="Foto" class="dob-mapa-foto-abrir" data-fv-servico="${l.servico.replace(/"/g, '&quot;')}" data-fv-idx="${fi}" title="Clique pra ver em tamanho grande" />
                   <span class="dob-mapa-foto-data">${fmtDate(x.data)}</span>
                 </div>`).join('')}</div>`
             : `<div class="dob-mapa-sem-foto">Nenhuma foto vinculada a essa atividade ainda.</div>`;
@@ -4294,6 +4294,16 @@
     saveEntry(entry);
     preservarEstadoAoRenderizar();
     mostrarToastSalvo('Vínculo removido');
+  });
+  document.addEventListener('click', (ev) => {
+    const alvo = ev.target.closest('.dob-mapa-foto-abrir');
+    if(!alvo) return;
+    ev.stopPropagation();
+    const servico = alvo.dataset.fvServico;
+    const idx = Number(alvo.dataset.fvIdx);
+    const fotos = fotosDoServico(servico);
+    if(!fotos.length) return;
+    openLightbox(fotos.map(x => x.foto), idx);
   });
 
   function marcacoesMapaHtml(data){
