@@ -1791,16 +1791,17 @@
       if(!mapaState.rotacoes) mapaState.rotacoes = {};
       if(!mapaState.servicosExcluidos) mapaState.servicosExcluidos = [];
       if(!mapaState.escopoPorServico) mapaState.escopoPorServico = {};
-      // Migra o formato antigo (array plano de ids, que travava a obra inteira) pro novo formato por obra.
-      Object.entries(mapaState.escopoPorServico).forEach(([servico, valor]) => {
-        if(Array.isArray(valor)){
-          const b = BLOCOS_MAPA.find(x => valor.includes(x.id));
-          if(b) mapaState.escopoPorServico[servico] = { [b.obra]: valor };
-          else delete mapaState.escopoPorServico[servico];
-        }
-      });
     }catch(e){ /* usa estado padrão */ }
     let mudouEscopo = false;
+    // Migra o formato antigo (array plano de ids, que travava a obra inteira) pro novo formato por obra.
+    Object.entries(mapaState.escopoPorServico).forEach(([servico, valor]) => {
+      if(Array.isArray(valor)){
+        const b = BLOCOS_MAPA.find(x => valor.includes(x.id));
+        if(b) mapaState.escopoPorServico[servico] = { [b.obra]: valor };
+        else delete mapaState.escopoPorServico[servico];
+        mudouEscopo = true;
+      }
+    });
     Object.entries(ESCOPO_PADRAO_SERVICOS).forEach(([servico, porObra]) => {
       if(mapaState.servicos.includes(servico) && !mapaState.escopoPorServico[servico]){
         mapaState.escopoPorServico[servico] = porObra;
