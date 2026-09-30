@@ -572,6 +572,7 @@
     <div class="dob-side-item" data-side="producao-diaria"><span class="ic">📈</span><span class="label">Produção diária</span></div>
     <div class="dob-side-item" data-side="relatorio"><span class="ic">📑</span><span class="label">Apresentação</span></div>
     <div class="dob-side-item" data-side="gamma"><span class="ic">🤖</span><span class="label">Comando Gamma</span></div>
+    <div class="dob-side-item" data-side="uaubee"><span class="ic">🔄</span><span class="label">UAU → BEE</span></div>
     <div class="dob-side-item" data-side="drive"><span class="ic">☁️</span><span class="label">Google Drive</span></div>
     <div class="dob-side-item" data-side="config"><span class="ic">⚙️</span><span class="label">Configurações</span></div>
     <div class="dob-side-recolher" id="dob-side-recolher-link"><span class="ic">←</span><span class="label">Recolher</span></div>
@@ -612,6 +613,7 @@
     <button class="dob-btn secundario" id="dob-btn-resumo-macro" style="display:none;">Resumo por macro-serviço</button>
     <button class="dob-btn secundario" id="dob-btn-resumo-semana" style="display:none;">Resumo da semana</button>
     <button class="dob-btn secundario" id="dob-btn-producao-diaria" style="display:none;">Produção Diária</button>
+    <button class="dob-btn secundario" id="dob-btn-uaubee" style="display:none;">UAU → BEE</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-mapa">Mapa de Acompanhamento</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-campo">📷 Modo Campo</button>
     <button type="button" class="dob-btn secundario pequeno dob-filtros-toggle" id="dob-filtros-toggle">🔍 Filtros</button>
@@ -634,6 +636,7 @@
   <div id="dob-resumo-macro-container"></div>
   <div id="dob-resumo-semana-container"></div>
   <div id="dob-producao-diaria-container"></div>
+  <div id="dob-uaubee-container"></div>
   <div id="dob-mapa-container"></div>
   <div id="dob-campo-container"></div>
   <input type="file" id="dob-campo-file-input" accept="image/*" capture="environment" style="display:none;" />
@@ -801,6 +804,261 @@
   function saveContratosState(sincronizar){
     localStorage.setItem('dob:contratos_state', JSON.stringify(contratosState));
     if(sincronizar !== false && accessToken) syncContratosToDrive();
+  }
+
+  // ---------- UAU → BEE: leitura dos relatórios .rdf do UAU (Medição por Obra) pra facilitar a "tradução" manual pro BEE ----------
+  let uauBeeAberto = false;
+  let uauBeeState = { items: [] }; // cada item: {key, obra, objeto, fornecedorCodigo, fornecedorNome, contratado, anterior, atual, acumulado, saldo, atualizadoEm}
+  (function loadUauBeeState(){
+    try{
+      const raw = localStorage.getItem('dob:uaubee_state');
+      if(raw) uauBeeState = JSON.parse(raw);
+    }catch(e){ /* usa estado vazio padrão */ }
+  })();
+  function saveUauBeeState(sincronizar){
+    localStorage.setItem('dob:uaubee_state', JSON.stringify(uauBeeState));
+    if(sincronizar !== false && accessToken) syncUauBeeToDrive();
+  }
+
+  // Lê o binário .rdf do UAU: cada campo de texto do relatório é gravado como um "registro"
+  // com uma constante fixa (27), posição X, posição Y, largura, um atributo (189=rótulo fixo / 190=dado do banco)
+  // e o texto em UTF-16LE. Isso foi descoberto fazendo engenharia reversa do arquivo (não é documentado pelo UAU).
+  function parseUauRdfRecords(arrayBuffer){
+    const dv = new DataView(arrayBuffer);
+    const n = arrayBuffer.byteLength;
+    const recs = [];
+    let i = 0;
+    while(i <= n - 24){
+      if(dv.getUint32(i, true) === 27){
+        const pos = i + 4;
+        const F1 = dv.getUint32(pos, true);
+        const F2 = dv.getUint32(pos+4, true);
+        const F3 = dv.getUint32(pos+8, true);
+        const attr = dv.getUint32(pos+12, true);
+        const zero = dv.getUint16(pos+16, true);
+        const L = dv.getUint16(pos+18, true);
+        const strStart = pos + 20;
+        if(zero === 0 && L > 0 && L <= 300 && strStart + L*2 <= n){
+          let okCount = 0;
+          const codes = new Array(L);
+          for(let k=0;k<L;k++){
+            const code = dv.getUint16(strStart + k*2, true);
+            codes[k] = code;
+            if(code === 0 || (code >= 32 && code < 0x250)) okCount++;
+          }
+          if(okCount >= L * 0.95){
+            const text = String.fromCharCode.apply(null, codes).replace(/\0+$/, '');
+            recs.push({ X:F1, Y:F2, W:F3, attr, text });
+            i = strStart + L*2;
+            continue;
+          }
+        }
+      }
+      i++;
+    }
+    return recs;
+  }
+
+  // Reconhece o relatório "Planilha de Medição por Obra" (Contrato / Contratado / Total Contrato)
+  function parseUauMedicoes(arrayBuffer){
+    const recs = parseUauRdfRecords(arrayBuffer);
+    const obraLabelIdx = recs.findIndex(r => r.text === 'Obra: ');
+    let obra = '';
+    if(obraLabelIdx >= 0){
+      const y = recs[obraLabelIdx].Y;
+      for(let k=obraLabelIdx; k<Math.min(obraLabelIdx+6, recs.length); k++){
+        if(recs[k].Y === y && recs[k].attr === 190){ obra = recs[k].text.trim(); break; }
+      }
+    }
+    const blockStarts = [];
+    recs.forEach((r,idx) => { if(r.text === 'Contrato: ') blockStarts.push(idx); });
+    const items = [];
+    blockStarts.forEach((start, bi) => {
+      const end = (bi+1 < blockStarts.length) ? blockStarts[bi+1] : recs.length;
+      const block = recs.slice(start, end);
+      if(!block.length) return;
+      const y0 = block[0].Y;
+      const objetoR = block.find(r => r.Y===y0 && r.attr===190 && r.X<2000);
+      const objeto = objetoR ? objetoR.text.trim() : '';
+      const fornR = block.find(r => r.Y===y0 && r.attr===190 && r.X>8000);
+      const forn = fornR ? fornR.text.trim() : '';
+      let fornecedorCodigo = '', fornecedorNome = forn;
+      const sep = forn.indexOf(' - ');
+      if(sep > -1){ fornecedorCodigo = forn.slice(0,sep).trim(); fornecedorNome = forn.slice(sep+3).trim(); }
+      const totIdx = block.findIndex(r => r.text === 'Total Contrato: ');
+      const vals = [null,null,null,null,null];
+      if(totIdx > -1){
+        const totY = block[totIdx].Y;
+        const found = block.slice(totIdx).filter(r => r.Y===totY && r.attr===190).sort((a,b)=>a.X-b.X);
+        found.forEach((v,k) => { if(k<5) vals[k]=v.text.trim(); });
+      }
+      if(!objeto && !fornecedorNome) return; // registro incompleto, ignora
+      items.push({ obra, objeto, fornecedorCodigo, fornecedorNome,
+        contratado: vals[0], anterior: vals[1], atual: vals[2], acumulado: vals[3], saldo: vals[4] });
+    });
+    return items;
+  }
+
+  function numeroBR(txt){
+    if(txt === null || txt === undefined) return null;
+    const n = parseFloat(String(txt).replace(/\./g,'').replace(',', '.'));
+    return isNaN(n) ? null : n;
+  }
+  function fmtBR(n){
+    if(n === null || n === undefined || isNaN(n)) return '—';
+    return n.toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  }
+
+  // acha o macro-serviço do BEE já vinculado (via tela de Contratos) pra esse fornecedor, se existir e for único
+  function macroServicoParaFornecedor(fornecedorNome){
+    if(!fornecedorNome) return null;
+    const nomeUp = fornecedorNome.toUpperCase();
+    const contrato = (contratosState.contratos||[]).find(c => {
+      const cUp = c.nome.toUpperCase();
+      return cUp.includes(nomeUp) || nomeUp.includes(cUp.replace(/^\d+\s*-\s*/,'').trim());
+    });
+    if(!contrato) return null;
+    const itens = (contratosState.itens||[]).filter(i => i.contratoId === contrato.id && i.macroCod);
+    if(!itens.length) return null;
+    const cods = [...new Set(itens.map(i => i.macroCod))];
+    return cods.length === 1 ? cods[0] : cods.join(', ');
+  }
+
+  async function processarArquivosUauBee(fileList){
+    const arquivos = Array.from(fileList || []).filter(f => /\.rdf$/i.test(f.name));
+    if(!arquivos.length){ alert('Selecione arquivo(s) .rdf exportados do UAU (Medição por Obra).'); return; }
+    let totalItens = 0, comFalha = [];
+    for(const file of arquivos){
+      try{
+        const buffer = await file.arrayBuffer();
+        const items = parseUauMedicoes(buffer);
+        if(!items.length){ comFalha.push(file.name); continue; }
+        const agora = new Date().toISOString();
+        items.forEach(it => {
+          const key = [it.obra, it.objeto, it.fornecedorCodigo].join('|');
+          const idx = uauBeeState.items.findIndex(x => x.key === key);
+          const registro = { key, ...it, atualizadoEm: agora, origemArquivo: file.name };
+          if(idx > -1) uauBeeState.items[idx] = registro;
+          else uauBeeState.items.push(registro);
+          totalItens++;
+        });
+      }catch(e){ comFalha.push(file.name); }
+    }
+    saveUauBeeState();
+    renderUauBee();
+    if(comFalha.length) alert('Não consegui ler: ' + comFalha.join(', ') + '\n(confira se é o relatório "Planilha de Medição por Obra" exportado em .rdf)');
+  }
+
+  function copiarTextoUauBee(texto, btnEl){
+    const feito = () => { if(btnEl){ const orig = btnEl.textContent; btnEl.textContent = '✓ copiado'; setTimeout(()=>{ btnEl.textContent = orig; }, 1200); } };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(texto).then(feito).catch(()=>{ window.prompt('Copie manualmente:', texto); });
+    } else {
+      window.prompt('Copie manualmente:', texto);
+    }
+  }
+
+  function renderUauBee(){
+    const container = document.getElementById('dob-uaubee-container');
+    if(!uauBeeAberto){ container.innerHTML = ''; return; }
+    const porObra = {};
+    uauBeeState.items.forEach(it => { (porObra[it.obra || 'Sem obra'] = porObra[it.obra || 'Sem obra'] || []).push(it); });
+    const obras = Object.keys(porObra).sort();
+    const totalRegistros = uauBeeState.items.length;
+
+    let html = `
+      <div class="dob-card" style="margin-top:16px;">
+        <h3 style="margin-top:0;">UAU → BEE — tradução dos contratos/medições</h3>
+        <p style="color:var(--muted); font-size:13px;">Suba aqui o(s) arquivo(s) <b>.rdf</b> exportados da tela "Planilha de Medição por Obra" do UAU (Contrato, Contratado, Anterior, Atual, Acumulada, Saldo). O app lê o arquivo no seu navegador (nada é enviado pra fora) e organiza tudo numa tabela fácil de copiar pra digitar no BEE. Cada novo envio complementa/atualiza os dados já salvos — nada é apagado automaticamente.</p>
+        <div id="dob-uaubee-drop" style="border:2px dashed var(--line); border-radius:var(--radius-sm); padding:24px; text-align:center; cursor:pointer; background:var(--paper);">
+          <div style="font-size:28px;">📂</div>
+          <div style="font-weight:600; margin-top:6px;">Arraste os arquivos .rdf aqui ou clique pra escolher</div>
+          <div style="color:var(--muted); font-size:12px; margin-top:4px;">Aceita vários arquivos de uma vez (ex: Medições 43 e 44)</div>
+          <input type="file" id="dob-uaubee-file-input" accept=".rdf" multiple style="display:none;" />
+        </div>
+    `;
+
+    if(!totalRegistros){
+      html += `<p style="color:var(--muted); margin-top:16px;">Nenhum dado importado ainda.</p>`;
+    } else {
+      html += `<div style="margin-top:8px; text-align:right;"><button type="button" class="dob-btn secundario pequeno" id="dob-uaubee-limpar">Limpar tudo</button></div>`;
+      obras.forEach(obra => {
+        const itens = porObra[obra].slice().sort((a,b) => (a.objeto||'').localeCompare(b.objeto||'', 'pt-BR', {numeric:true}));
+        const totContratado = itens.reduce((s,i) => s + (numeroBR(i.contratado)||0), 0);
+        const totAcumulado = itens.reduce((s,i) => s + (numeroBR(i.acumulado)||0), 0);
+        const totSaldo = itens.reduce((s,i) => s + (numeroBR(i.saldo)||0), 0);
+        html += `
+          <h4 style="margin:22px 0 8px;">${obra} <span style="font-weight:400; color:var(--muted); font-size:13px;">(${itens.length} contratos)</span></h4>
+          <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr style="text-align:left; border-bottom:2px solid var(--line);">
+                <th style="padding:6px 8px;">Contrato / Serviço</th>
+                <th style="padding:6px 8px;">Fornecedor</th>
+                <th style="padding:6px 8px;">Macro BEE</th>
+                <th style="padding:6px 8px; text-align:right;">Contratado</th>
+                <th style="padding:6px 8px; text-align:right;">Medido acum.</th>
+                <th style="padding:6px 8px; text-align:right;">Saldo</th>
+                <th style="padding:6px 8px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itens.map(it => {
+                const macro = macroServicoParaFornecedor(it.fornecedorNome);
+                const texto = `${it.objeto} | ${it.fornecedorCodigo ? it.fornecedorCodigo + ' - ' : ''}${it.fornecedorNome} | Contratado: ${it.contratado || '—'} | Medido acumulado: ${it.acumulado || '—'} | Saldo: ${it.saldo || '—'}`;
+                return `<tr style="border-bottom:1px solid var(--line);" data-key="${it.key}">
+                  <td style="padding:6px 8px;">${it.objeto}</td>
+                  <td style="padding:6px 8px;">${it.fornecedorCodigo ? it.fornecedorCodigo + ' - ' : ''}${it.fornecedorNome}</td>
+                  <td style="padding:6px 8px; color:var(--muted);">${macro || '—'}</td>
+                  <td style="padding:6px 8px; text-align:right;">${it.contratado || '—'}</td>
+                  <td style="padding:6px 8px; text-align:right;">${it.acumulado || '—'}</td>
+                  <td style="padding:6px 8px; text-align:right;">${it.saldo || '—'}</td>
+                  <td style="padding:6px 8px;"><button type="button" class="dob-btn secundario pequeno dob-uaubee-copiar" data-texto="${texto.replace(/"/g,'&quot;')}">Copiar</button></td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="font-weight:700; border-top:2px solid var(--line);">
+                <td style="padding:6px 8px;" colspan="3">Total ${obra}</td>
+                <td style="padding:6px 8px; text-align:right;">${fmtBR(totContratado)}</td>
+                <td style="padding:6px 8px; text-align:right;">${fmtBR(totAcumulado)}</td>
+                <td style="padding:6px 8px; text-align:right;">${fmtBR(totSaldo)}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+          </div>
+        `;
+      });
+    }
+    html += `</div>`;
+    container.innerHTML = html;
+
+    const drop = document.getElementById('dob-uaubee-drop');
+    const fileInput = document.getElementById('dob-uaubee-file-input');
+    if(drop && fileInput){
+      drop.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', () => processarArquivosUauBee(fileInput.files));
+      drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.style.background = '#eee'; });
+      drop.addEventListener('dragleave', () => { drop.style.background = 'var(--paper)'; });
+      drop.addEventListener('drop', (e) => {
+        e.preventDefault();
+        drop.style.background = 'var(--paper)';
+        processarArquivosUauBee(e.dataTransfer.files);
+      });
+    }
+    container.querySelectorAll('.dob-uaubee-copiar').forEach(btn => {
+      btn.addEventListener('click', () => copiarTextoUauBee(btn.dataset.texto, btn));
+    });
+    const limparBtn = document.getElementById('dob-uaubee-limpar');
+    if(limparBtn){
+      limparBtn.addEventListener('click', () => {
+        if(!confirm('Apagar todos os dados UAU → BEE importados? Isso não afeta os arquivos originais no seu computador.')) return;
+        uauBeeState = { items: [] };
+        saveUauBeeState();
+        renderUauBee();
+      });
+    }
   }
 
   // ---------- Gerar apresentação (PPTX) por período personalizado ----------
@@ -2452,6 +2710,46 @@
     }catch(e){ /* segue só com os dados locais se a sincronização falhar */ }
   }
 
+  let uauBeeFileId = localStorage.getItem('dob:uaubee_file_id') || null;
+  async function ensureUauBeeFile(){
+    if(uauBeeFileId) return uauBeeFileId;
+    let id = await driveFindNamedFile('diario_uaubee.json');
+    if(!id) id = await driveCreateNamedFile('diario_uaubee.json', JSON.stringify({ items: [] }));
+    uauBeeFileId = id;
+    localStorage.setItem('dob:uaubee_file_id', id);
+    return id;
+  }
+  let syncingUauBee = false;
+  async function syncUauBeeToDrive(){
+    if(syncingUauBee) return;
+    syncingUauBee = true;
+    try{
+      const id = await ensureUauBeeFile();
+      await driveWriteDataFile(id, JSON.stringify(uauBeeState));
+    }catch(e){ /* fica só local até a próxima tentativa */ }
+    syncingUauBee = false;
+  }
+  async function syncUauBeeFromDriveOnConnect(){
+    try{
+      const id = await ensureUauBeeFile();
+      const remoteText = await driveReadDataFile(id);
+      let remote = { items: [] };
+      try{ remote = JSON.parse(remoteText) || remote; }catch(e){ /* mantém vazio */ }
+
+      const itemByKey = {};
+      (remote.items||[]).forEach(i => { itemByKey[i.key] = i; });
+      // merge: mantém o mais recente entre local e remoto pra cada chave (contratos se complementam ao longo do tempo)
+      (uauBeeState.items||[]).forEach(i => {
+        const existente = itemByKey[i.key];
+        if(!existente || (i.atualizadoEm||'') > (existente.atualizadoEm||'')) itemByKey[i.key] = i;
+      });
+
+      uauBeeState = { items: Object.values(itemByKey) };
+      saveUauBeeState(false);
+      await driveWriteDataFile(id, JSON.stringify(uauBeeState));
+    }catch(e){ /* segue só com os dados locais se a sincronização falhar */ }
+  }
+
   // ---------- Configuração inicial (Client ID) ----------
   function renderSetup(){
     if(clientId){ setupContainer.innerHTML=''; statusBar.style.display='flex'; initGis(); return; }
@@ -2511,6 +2809,7 @@
             syncEquipFromDriveOnConnect();
             syncMaoObraFromDriveOnConnect();
             syncContratosFromDriveOnConnect();
+            syncUauBeeFromDriveOnConnect();
             syncMapaFromDriveOnConnect();
             updateStatus();
             await sincronizarFotosLocaisPendentes();
@@ -3915,6 +4214,12 @@
     renderResumoMacro();
     if(resumoMacroAberto) document.getElementById('dob-resumo-macro-container').scrollIntoView({behavior:'smooth', block:'start'});
   });
+  document.getElementById('dob-btn-uaubee').addEventListener('click', () => {
+    uauBeeAberto = !uauBeeAberto;
+    document.getElementById('dob-btn-uaubee').textContent = uauBeeAberto ? 'Fechar UAU → BEE' : 'UAU → BEE';
+    renderUauBee();
+    if(uauBeeAberto) document.getElementById('dob-uaubee-container').scrollIntoView({behavior:'smooth', block:'start'});
+  });
   document.getElementById('dob-btn-mapa').addEventListener('click', () => {
     mapaAberto = !mapaAberto;
     mapaModoEdicao = false;
@@ -4113,11 +4418,12 @@
       'producao-diaria': 'dob-btn-producao-diaria',
       relatorio: 'dob-btn-relatorio',
       gamma: 'dob-btn-gamma',
+      uaubee: 'dob-btn-uaubee',
       drive: 'dob-btn-conectar',
       config: 'dob-btn-config',
       novo: 'dob-novo'
     };
-    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-campo', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-producao-diaria', 'dob-btn-relatorio', 'dob-btn-gamma'];
+    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-campo', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-producao-diaria', 'dob-btn-relatorio', 'dob-btn-gamma', 'dob-btn-uaubee'];
     function sincronizarSidebar(){
       let algumAberto = false;
       Object.entries(mapaBotoes).forEach(([side, btnId]) => {
