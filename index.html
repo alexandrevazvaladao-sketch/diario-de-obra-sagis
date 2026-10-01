@@ -154,6 +154,20 @@
   .dob-dot.on{ background:var(--moss); box-shadow: 0 0 0 3px rgba(63,125,92,0.15); }
   .dob-dot.off{ background:var(--brick); box-shadow: 0 0 0 3px rgba(184,70,47,0.15); }
 
+  /* Botões de ação secundários da barra de status (conectar, recuperar, configurações...)
+     ficam atrás de um "⋯" — só o essencial (status do Drive) fica sempre visível. */
+  .dob-status-mais{ margin-left:auto; }
+  .dob-status-mais > summary{
+    list-style:none; cursor:pointer; font-size:12px; font-weight:600; color:var(--ink-soft);
+    padding:7px 14px; border:1px solid var(--line); border-radius:999px; white-space:nowrap;
+  }
+  .dob-status-mais > summary::-webkit-details-marker{ display:none; }
+  .dob-status-mais > summary:hover{ background:#f0ede4; }
+  .dob-status-mais[open]{ width:100%; }
+  .dob-status-mais[open] > summary{ background:#f0ede4; }
+  .dob-status-mais-botoes{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; width:100%; }
+  @media (max-width: 640px){ .dob-status-mais{ margin-left:0; width:100%; } .dob-status-mais > summary{ display:block; text-align:center; } }
+
   /* ---------- Botões ---------- */
   .dob-toolbar{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; align-items:center; }
   .dob-btn{
@@ -611,11 +625,16 @@
 
   <div class="dob-status-bar" id="dob-status-bar" style="display:none;">
     <span><span class="dob-dot off" id="dob-dot"></span><span id="dob-status-texto">Drive não conectado</span></span>
-    <button class="dob-btn secundario pequeno" id="dob-btn-conectar">Conectar ao Google Drive</button>
-    <button class="dob-btn secundario pequeno" id="dob-btn-sync-fotos" style="display:none;">📤 Sincronizar fotos locais</button>
-    <button class="dob-btn secundario pequeno" id="dob-btn-reparar-thumbs" style="display:none;">🔧 Reparar miniaturas</button>
-    <button class="dob-btn secundario pequeno" id="dob-btn-recuperar-fotos">🔄 Recuperar fotos do Drive</button>
-    <button class="dob-btn secundario pequeno" id="dob-btn-config">Configurações</button>
+    <details class="dob-status-mais" id="dob-status-mais">
+      <summary>⋯ Mais opções</summary>
+      <div class="dob-status-mais-botoes">
+        <button class="dob-btn secundario pequeno" id="dob-btn-conectar">Conectar ao Google Drive</button>
+        <button class="dob-btn secundario pequeno" id="dob-btn-sync-fotos" style="display:none;">📤 Sincronizar fotos locais</button>
+        <button class="dob-btn secundario pequeno" id="dob-btn-reparar-thumbs" style="display:none;">🔧 Reparar miniaturas</button>
+        <button class="dob-btn secundario pequeno" id="dob-btn-recuperar-fotos">🔄 Recuperar fotos do Drive</button>
+        <button class="dob-btn secundario pequeno" id="dob-btn-config">Configurações</button>
+      </div>
+    </details>
   </div>
 
   <div class="dob-stats dob-home-only" id="dob-stats"></div>
