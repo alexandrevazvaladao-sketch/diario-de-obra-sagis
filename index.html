@@ -339,6 +339,22 @@
   .dob-entry-secao{ margin-bottom:8px; }
   .dob-entry-secao-label{ font-size:10px; text-transform:uppercase; letter-spacing:0.8px; font-weight:700; color:var(--clay-dark); margin-bottom:2px; }
   .dob-entry-secao-texto{ font-size:13.5px; color:#3a4250; white-space:pre-wrap; }
+  /* Seção que começa fechada — resumo de uma linha, clique pra ver o conteúdo completo.
+     Usa <details>/<summary> nativo: sem JS, sem estado pra gerenciar entre re-renders. */
+  .dob-entry-secao-colapsavel{ margin-bottom:8px; }
+  .dob-entry-secao-colapsavel > summary{
+    list-style:none; cursor:pointer; font-size:12px; font-weight:700; color:var(--clay-dark);
+    padding:7px 10px; background:var(--paper); border:1px solid var(--line); border-radius:8px;
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+  }
+  .dob-entry-secao-colapsavel > summary::-webkit-details-marker{ display:none; }
+  .dob-entry-secao-colapsavel > summary::after{ content:"▸"; color:var(--muted); font-size:11px; flex-shrink:0; }
+  .dob-entry-secao-colapsavel[open] > summary::after{ content:"▾"; }
+  .dob-entry-secao-colapsavel[open] > summary{ border-radius:8px 8px 0 0; border-bottom:none; }
+  .dob-entry-secao-colapsavel > summary:hover{ background:#f4ede2; }
+  .dob-entry-secao-colapsavel > .dob-entry-secao-texto{
+    border:1px solid var(--line); border-top:none; border-radius:0 0 8px 8px; padding:10px 10px 4px;
+  }
 
   .dob-entry-presenca{ display:grid; grid-template-columns:1fr 1fr; gap:14px; background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin-bottom:10px; }
   .dob-entry-presenca-col .dob-entry-secao-label{ margin-bottom:8px; }
@@ -4825,7 +4841,10 @@
   function marcacoesMapaHtml(data){
     const linhas = marcacoesMapaDoDia(data);
     if(!linhas.length) return '';
-    return `<div class="dob-entry-secao"><div class="dob-entry-secao-label">📍 Marcações do mapa nesse dia</div><div class="dob-entry-secao-texto">${linhasMapaParaHtml(linhas, data)}</div></div>`;
+    const qtdItens = linhas.filter(l => l.tipo === 'item').length;
+    const obras = linhas.filter(l => l.tipo === 'obra').map(l => l.texto);
+    const resumoObras = obras.length ? ` (${obras.join(', ')})` : '';
+    return `<details class="dob-entry-secao-colapsavel"><summary>📍 ${qtdItens} ${qtdItens===1?'marcação':'marcações'} do mapa nesse dia${resumoObras}</summary><div class="dob-entry-secao-texto">${linhasMapaParaHtml(linhas, data)}</div></details>`;
   }
 
   function datasComMarcacaoSemRegistro(){
@@ -4857,17 +4876,25 @@
   function presencaHtml(data){
     const { equipComStatus, pessoasNomes } = presencaDoDia(data);
     if(equipComStatus.length === 0 && pessoasNomes.length === 0) return '';
+    const partesResumo = [];
+    if(equipComStatus.length) partesResumo.push(`🔧 ${equipComStatus.length} equipamento${equipComStatus.length===1?'':'s'}`);
+    if(pessoasNomes.length) partesResumo.push(`👷 ${pessoasNomes.length} pessoa${pessoasNomes.length===1?'':'s'}`);
     return `
-      <div class="dob-entry-presenca">
-        <div class="dob-entry-presenca-col">
-          <div class="dob-entry-secao-label">Equipamentos no dia</div>
-          ${equipComStatus.length ? `<div class="dob-chips">${equipComStatus.map(eq => `<span class="dob-chip equip" ${eq.status==='parado' ? 'style="background:#b8462f;"' : ''} title="${eq.status==='parado' && eq.motivo ? eq.motivo : ''}">${eq.nome}${eq.status==='parado' ? ' ⏸' : ''}</span>`).join('')}</div>` : '<div class="dob-dica" style="margin:0;">Nenhum</div>'}
+      <details class="dob-entry-secao-colapsavel">
+        <summary>${partesResumo.join(' · ')}</summary>
+        <div class="dob-entry-secao-texto">
+          <div class="dob-entry-presenca" style="border:none; padding:0; margin-bottom:0;">
+            <div class="dob-entry-presenca-col">
+              <div class="dob-entry-secao-label">Equipamentos no dia</div>
+              ${equipComStatus.length ? `<div class="dob-chips">${equipComStatus.map(eq => `<span class="dob-chip equip" ${eq.status==='parado' ? 'style="background:#b8462f;"' : ''} title="${eq.status==='parado' && eq.motivo ? eq.motivo : ''}">${eq.nome}${eq.status==='parado' ? ' ⏸' : ''}</span>`).join('')}</div>` : '<div class="dob-dica" style="margin:0;">Nenhum</div>'}
+            </div>
+            <div class="dob-entry-presenca-col">
+              <div class="dob-entry-secao-label">Mão de obra no dia</div>
+              ${pessoasNomes.length ? `<div class="dob-chips">${pessoasNomes.map(n => `<span class="dob-chip pessoa">${n}</span>`).join('')}</div>` : '<div class="dob-dica" style="margin:0;">Nenhum</div>'}
+            </div>
+          </div>
         </div>
-        <div class="dob-entry-presenca-col">
-          <div class="dob-entry-secao-label">Mão de obra no dia</div>
-          ${pessoasNomes.length ? `<div class="dob-chips">${pessoasNomes.map(n => `<span class="dob-chip pessoa">${n}</span>`).join('')}</div>` : '<div class="dob-dica" style="margin:0;">Nenhum</div>'}
-        </div>
-      </div>
+      </details>
     `;
   }
 
