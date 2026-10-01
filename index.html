@@ -584,6 +584,16 @@
     .dob-entry{ box-shadow:0 2px 8px -4px rgba(22,35,61,0.16), var(--shadow-sm); }
     .dob-lista{ gap:16px; }
   }
+
+  /* Tooltip de bloco no Mapa — só aparece passando o MOUSE (pointerType mouse) por cima, nunca
+     no toque, então no celular o toque continua marcando o bloco normalmente sem esse popup no
+     caminho. pointer-events:none pra nunca atrapalhar o clique mesmo se ficar por cima do bloco. */
+  .dob-mapa-tooltip{
+    display:none; position:fixed; z-index:9999; pointer-events:none; opacity:0;
+    transition:opacity .12s ease; max-width:240px; font-size:12px; line-height:1.5;
+    background:var(--ink); color:#fff; padding:9px 11px; border-radius:8px;
+    box-shadow:0 6px 18px -6px rgba(22,35,61,0.45);
+  }
 </style>
 </head>
 <body>
@@ -1935,8 +1945,9 @@
         if(responsavel !== undefined) mapaState.estados[idx].responsavel = responsavel;
       }
       if(nova === 'verde' && !mapaState.estados[idx].dataConclusao) mapaState.estados[idx].dataConclusao = hoje;
+      mapaState.estados[idx].atualizadoEm = Date.now();
     } else {
-      const novoEstado = { servico, obra, bloco, cor: nova };
+      const novoEstado = { servico, obra, bloco, cor: nova, atualizadoEm: Date.now() };
       if(nova === 'amarelo'){
         novoEstado.dataInicio = hoje;
         if(responsavel) novoEstado.responsavel = responsavel;
@@ -1953,6 +1964,90 @@
     if(e.dataConclusao) partes.push('Concluído em ' + fmtDate(e.dataConclusao));
     if(e.responsavel) partes.push('Responsável: ' + e.responsavel);
     return partes.join(' — ');
+  }
+
+  // ---------- Tooltip de "última alteração" ao passar o mouse num bloco do mapa. Só liga pra
+  // ponteiro tipo mouse (pointerType==='mouse'): no toque (celular/tablet) essa checagem falha
+  // e o listener não faz nada, então tocar num bloco continua indo direto pro clique de marcar,
+  // sem esse popup aparecendo no meio do caminho. ----------
+  function tempoRelativoCurto(ts){
+    if(!ts) return '';
+    const diffMs = Date.now() - ts;
+    const diffMin = Math.round(diffMs / 60000);
+    if(diffMin < 1) return 'agora mesmo';
+    if(diffMin < 60) return `há ${diffMin} min`;
+    const diffH = Math.round(diffMin / 60);
+    if(diffH < 24) return `há ${diffH}h`;
+    const d = new Date(ts);
+    const hoje = new Date();
+    const horaStr = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+    const ontem = new Date(hoje); ontem.setDate(hoje.getDate() - 1);
+    if(d.toDateString() === ontem.toDateString()) return `ontem às ${horaStr}`;
+    const diffDias = Math.round(diffMs / 86400000);
+    if(diffDias < 7) return `há ${diffDias} dias`;
+    return `em ${fmtDate(d.toISOString().slice(0,10))}`;
+  }
+  function tooltipBlocoHtml(servico, obra, bloco, tipo, bloqueios){
+    const e = mapaState.estados.find(x => x.servico === servico && x.obra === obra && x.bloco === bloco);
+    const nomeBonito = humanizarNomeBloco(bloco, tipo);
+    const statusLabel = !e ? 'Não iniciado' : e.cor === 'verde' ? 'Concluído' : 'Em andamento';
+    const statusCor = !e ? '#9aa3b2' : e.cor === 'verde' ? '#5fae85' : '#e0b35c';
+    const partes = [];
+    if(e && e.atualizadoEm) partes.push('Última alteração: ' + tempoRelativoCurto(e.atualizadoEm));
+    else if(e && e.dataInicio) partes.push('Iniciado em ' + fmtDate(e.dataInicio));
+    if(e && e.dataConclusao) partes.push('Concluído em ' + fmtDate(e.dataConclusao));
+    if(e && e.responsavel) partes.push('Responsável: ' + e.responsavel);
+    if(bloqueios && bloqueios.length) partes.push('🔒 Aguardando: ' + bloqueios.map(b => `"${b}"`).join(', '));
+    return `<div style="display:flex; align-items:center; gap:6px; font-weight:700;">
+        <span style="width:7px; height:7px; border-radius:50%; background:${statusCor}; flex-shrink:0;"></span>
+        <span>${nomeBonito} — ${statusLabel}</span>
+      </div>
+      ${partes.length ? `<div style="margin-top:4px; opacity:.85;">${partes.map(p => `<div>${p}</div>`).join('')}</div>` : ''}`;
+  }
+  let tooltipBlocoEl = null;
+  let tooltipBlocoTimer = null;
+  function obterTooltipBlocoEl(){
+    if(!tooltipBlocoEl){
+      tooltipBlocoEl = document.createElement('div');
+      tooltipBlocoEl.className = 'dob-mapa-tooltip';
+      document.body.appendChild(tooltipBlocoEl);
+    }
+    return tooltipBlocoEl;
+  }
+  function posicionarTooltipBloco(x, y){
+    const el = obterTooltipBlocoEl();
+    const margem = 14;
+    const rect = el.getBoundingClientRect();
+    let left = x + margem;
+    let top = y + margem;
+    if(left + rect.width > window.innerWidth - 8) left = x - rect.width - margem;
+    if(top + rect.height > window.innerHeight - 8) top = y - rect.height - margem;
+    el.style.left = Math.max(8, left) + 'px';
+    el.style.top = Math.max(8, top) + 'px';
+  }
+  function esconderTooltipBloco(){
+    if(tooltipBlocoTimer){ clearTimeout(tooltipBlocoTimer); tooltipBlocoTimer = null; }
+    if(tooltipBlocoEl){ tooltipBlocoEl.style.opacity = '0'; tooltipBlocoEl.style.display = 'none'; }
+  }
+  function ligarTooltipBloco(el, servico, obra, bloco, tipo, bloqueios){
+    el.addEventListener('pointerenter', (ev) => {
+      if(ev.pointerType !== 'mouse') return;
+      if(tooltipBlocoTimer) clearTimeout(tooltipBlocoTimer);
+      const x = ev.clientX, y = ev.clientY;
+      tooltipBlocoTimer = setTimeout(() => {
+        const tel = obterTooltipBlocoEl();
+        tel.innerHTML = tooltipBlocoHtml(servico, obra, bloco, tipo, bloqueios);
+        tel.style.display = 'block';
+        posicionarTooltipBloco(x, y);
+        requestAnimationFrame(() => { tel.style.opacity = '1'; });
+      }, 220);
+    });
+    el.addEventListener('pointermove', (ev) => {
+      if(ev.pointerType !== 'mouse') return;
+      if(tooltipBlocoEl && tooltipBlocoEl.style.display === 'block') posicionarTooltipBloco(ev.clientX, ev.clientY);
+    });
+    el.addEventListener('pointerleave', () => esconderTooltipBloco());
+    el.addEventListener('click', () => esconderTooltipBloco());
   }
 
   // ---------- Trava tipo Lean Construction: um serviço só avança se TODOS os pré-requisitos escolhidos manualmente
@@ -2285,6 +2380,7 @@
 
   function renderMapa(){
     const container = document.getElementById('dob-mapa-container');
+    esconderTooltipBloco();
     if(!mapaAberto){ container.innerHTML = ''; return; }
     container.innerHTML = `
       <div class="dob-card-form">
@@ -2548,6 +2644,7 @@
     }
 
     function renderGrid(){
+      esconderTooltipBloco();
       const scrollYAntes = window.scrollY;
       const scrollXAntes = window.scrollX;
       requestAnimationFrame(() => window.scrollTo(scrollXAntes, scrollYAntes));
@@ -2783,20 +2880,22 @@
         const overlaysVaga = VAGAS_ITENS.map(v => {
           const cor = corClasse(corDoBloco(servico, obraVaga, v.id));
           const bloqueios = bloqueiosDoBloco(servico, obraVaga, v.id);
-          const dica = (infoDataBloco(servico, obraVaga, v.id) + (bloqueios.length ? ` — Aguardando ${bloqueios.map(b => `"${b}"`).join(', ')}` : '')).trim();
-          return `<div class="dob-mapa-svg-bloco" data-bloco="${v.id}" title="Vaga ${v.num}${dica ? ' — ' + dica : ''}"
+          return `<div class="dob-mapa-svg-bloco" data-bloco="${v.id}"
             style="position:absolute; left:${v.x}%; top:${v.y}%; width:${v.w}%; height:${v.h}%; background:${cor}; border:0.5px solid rgba(39,75,116,0.6); cursor:pointer; display:flex; align-items:center; justify-content:center;">${bloqueios.length ? '<span style="font-size:8px; pointer-events:none;">🔒</span>' : ''}</div>`;
         }).join('');
         const conteudo = `<div style="position:relative; width:900px;">
           <img src="mapa-imgs/vagas.jpg" style="width:100%; display:block; border-radius:8px; border:1px solid var(--line);" />
           ${overlaysVaga}
         </div>`;
-        const aviso = `<p class="dob-dica" style="margin-top:10px;">${VAGAS_ITENS.length} vagas detectadas automaticamente (Pequis e Buritis juntos, sem separação por obra). Passe o mouse pra ver o número de referência de cada uma.</p>`;
+        const aviso = `<p class="dob-dica" style="margin-top:10px;">${VAGAS_ITENS.length} vagas detectadas automaticamente (Pequis e Buritis juntos, sem separação por obra). Passe o mouse pra ver o status de cada uma.</p>`;
         gridEl.innerHTML = montarComZoom(conteudo, { avisoExtra: aviso, rotKey: 'vaga:geral' });
-        gridEl.querySelectorAll('.dob-mapa-svg-bloco').forEach(el => el.addEventListener('click', async () => {
-          const mudou = await manipularCliqueBloco(servico, obraVaga, el.dataset.bloco);
-          if(mudou) renderGrid();
-        }));
+        gridEl.querySelectorAll('.dob-mapa-svg-bloco').forEach(el => {
+          ligarTooltipBloco(el, servico, obraVaga, el.dataset.bloco, tipoMapa, bloqueiosDoBloco(servico, obraVaga, el.dataset.bloco));
+          el.addEventListener('click', async () => {
+            const mudou = await manipularCliqueBloco(servico, obraVaga, el.dataset.bloco);
+            if(mudou) renderGrid();
+          });
+        });
         ligarControlesZoom(renderGrid, 'vaga:geral');
         return;
       }
@@ -2809,16 +2908,15 @@
           const overlaysArea = planta.itens.map(it => {
             const cor = corClasse(corDoBloco(servico, obra, it.id));
             const bloqueios = bloqueiosDoBloco(servico, obra, it.id);
-            const dica = (infoDataBloco(servico, obra, it.id) + (bloqueios.length ? (infoDataBloco(servico, obra, it.id) ? ' — ' : '') + `Aguardando ${bloqueios.map(b => `"${b}"`).join(', ')}` : '')).trim();
             const rotulo = bloqueios.length ? '🔒' : it.num;
             if(it.forma === 'circle'){
               const diam = it.r * 2;
-              return `<div class="dob-mapa-svg-bloco" data-bloco="${it.id}"${dica ? ` title="${dica}"` : ''}
+              return `<div class="dob-mapa-svg-bloco" data-bloco="${it.id}"
                 style="position:absolute; left:${it.cx - it.r}%; top:${it.cy - it.r}%; width:${diam}%; height:${diam}%; border-radius:50%; background:${cor}; border:1.5px solid rgba(39,75,116,0.8); cursor:pointer; display:flex; align-items:center; justify-content:center;">
                 <span style="font-size:9px; font-weight:700; color:${cor==='transparent' ? '#274b74' : '#fff'}; text-shadow:0 1px 2px rgba(0,0,0,0.3); pointer-events:none; text-align:center; line-height:1.1;">${rotulo}</span>
               </div>`;
             }
-            return `<div class="dob-mapa-svg-bloco" data-bloco="${it.id}"${dica ? ` title="${dica}"` : ''}
+            return `<div class="dob-mapa-svg-bloco" data-bloco="${it.id}"
               style="position:absolute; left:${it.x}%; top:${it.y}%; width:${it.w}%; height:${it.h}%; background:${cor}; border:1.5px solid rgba(39,75,116,0.8); cursor:pointer; display:flex; align-items:center; justify-content:center;">
               <span style="font-size:9px; font-weight:700; color:${cor==='transparent' ? '#274b74' : '#fff'}; text-shadow:0 1px 2px rgba(0,0,0,0.3); pointer-events:none; text-align:center; line-height:1.1;">${rotulo}</span>
             </div>`;
@@ -2833,10 +2931,13 @@
         }).join('');
 
         gridEl.innerHTML = montarComZoom(conteudo);
-        gridEl.querySelectorAll('.dob-mapa-svg-bloco').forEach(el => el.addEventListener('click', async () => {
-          const mudou = await manipularCliqueBloco(servico, obra, el.dataset.bloco);
-          if(mudou) renderGrid();
-        }));
+        gridEl.querySelectorAll('.dob-mapa-svg-bloco').forEach(el => {
+          ligarTooltipBloco(el, servico, obra, el.dataset.bloco, tipoMapa, bloqueiosDoBloco(servico, obra, el.dataset.bloco));
+          el.addEventListener('click', async () => {
+            const mudou = await manipularCliqueBloco(servico, obra, el.dataset.bloco);
+            if(mudou) renderGrid();
+          });
+        });
         ligarControlesZoom(renderGrid);
         return;
       }
@@ -2844,8 +2945,7 @@
       const overlays = blocosDaObra.map(b => {
         const cor = corClasse(corDoBloco(servico, obra, b.id));
         const bloqueios = bloqueiosDoBloco(servico, obra, b.id);
-        const dica = (infoDataBloco(servico, obra, b.id) + (bloqueios.length ? (infoDataBloco(servico, obra, b.id) ? ' — ' : '') + `Aguardando ${bloqueios.map(x => `"${x}"`).join(', ')}` : '')).trim();
-        return `<div class="dob-mapa-svg-bloco" data-bloco="${b.id}"${dica ? ` title="${dica}"` : ''}
+        return `<div class="dob-mapa-svg-bloco" data-bloco="${b.id}"
           style="position:absolute; left:${b.x}%; top:${b.y}%; width:${b.w}%; height:${b.h}%; background:${cor}; border:1.5px solid rgba(39,75,116,0.8); cursor:pointer; display:flex; align-items:center; justify-content:center;">
           <span style="font-size:9px; font-weight:700; color:${cor==='transparent' ? '#274b74' : '#fff'}; text-shadow:0 1px 2px rgba(0,0,0,0.3); pointer-events:none; text-align:center; line-height:1.1;">${bloqueios.length ? '🔒' : b.num}</span>
         </div>`;
@@ -2856,10 +2956,13 @@
         ${overlays}
       </div>`;
       gridEl.innerHTML = montarComZoom(conteudoBloco, { rotKey: 'bloco:' + obra });
-      gridEl.querySelectorAll('.dob-mapa-svg-bloco').forEach(el => el.addEventListener('click', async () => {
-        const mudou = await manipularCliqueBloco(servico, obra, el.dataset.bloco);
-        if(mudou) renderGrid();
-      }));
+      gridEl.querySelectorAll('.dob-mapa-svg-bloco').forEach(el => {
+        ligarTooltipBloco(el, servico, obra, el.dataset.bloco, tipoMapa, bloqueiosDoBloco(servico, obra, el.dataset.bloco));
+        el.addEventListener('click', async () => {
+          const mudou = await manipularCliqueBloco(servico, obra, el.dataset.bloco);
+          if(mudou) renderGrid();
+        });
+      });
       ligarControlesZoom(renderGrid, 'bloco:' + obra);
     }
     renderGrid();
