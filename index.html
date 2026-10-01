@@ -3034,6 +3034,10 @@
     render();
   }
   function saveEntry(entry){
+    // Carimba quando foi a última alteração local — usado na hora de mesclar com o Drive
+    // (syncFromDriveOnConnect) pra decidir qual versão é mais nova em vez de sempre usar a
+    // do Drive, o que podia descartar edições feitas localmente enquanto offline.
+    entry.atualizadoEm = Date.now();
     db.set('dob:entry:' + entry.id, JSON.stringify(entry));
     if(accessToken) syncEntriesToDrive();
   }
@@ -3128,10 +3132,16 @@
       let remoteEntries = [];
       try{ remoteEntries = JSON.parse(remoteText) || []; }catch(e){ remoteEntries = []; }
 
-      // Mescla: mantém tudo do Drive + qualquer registro local que ainda não tinha ido pra lá
+      // Mescla: mantém tudo do Drive + qualquer registro local que ainda não tinha ido pra lá.
+      // Quando o MESMO registro existe nos dois lados, usa o "atualizadoEm" pra decidir qual é
+      // mais recente — antes, o Drive sempre ganhava mesmo quando a versão local era mais nova
+      // (ex: fotos adicionadas offline), o que podia apagar edições locais na reconexão.
       const byId = {};
       remoteEntries.forEach(e => { byId[e.id] = e; });
-      entries.forEach(e => { if(!byId[e.id]) byId[e.id] = e; });
+      entries.forEach(e => {
+        const remoto = byId[e.id];
+        if(!remoto || (e.atualizadoEm || 0) > (remoto.atualizadoEm || 0)) byId[e.id] = e;
+      });
       const merged = Object.values(byId);
       merged.sort((a,b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt));
 
@@ -3420,7 +3430,7 @@
       }catch(e){ falhas++; }
       if(btn) btn.textContent = `📤 Sincronizando ${ok + falhas}/${pendentes.length}...`;
     }
-    entries.forEach(e => db.set('dob:entry:' + e.id, JSON.stringify(e)));
+    entries.forEach(e => { e.atualizadoEm = Date.now(); db.set('dob:entry:' + e.id, JSON.stringify(e)); });
     await syncEntriesToDrive();
     if(btn){ btn.disabled = false; }
     updateStatus();
@@ -3464,7 +3474,7 @@
       }catch(e){ falhas++; }
       if(btn) btn.textContent = `🔧 Reparando ${ok + falhas}/${pendentes.length}...`;
     }
-    entries.forEach(e => db.set('dob:entry:' + e.id, JSON.stringify(e)));
+    entries.forEach(e => { e.atualizadoEm = Date.now(); db.set('dob:entry:' + e.id, JSON.stringify(e)); });
     await syncEntriesToDrive();
     if(btn){ btn.disabled = false; }
     atualizarBotaoReparar();
@@ -3550,6 +3560,7 @@
         alvo.fotos.push({ type: 'drive', fileId: arq.id, thumb });
         ok++;
       }
+      alvo.atualizadoEm = Date.now();
       db.set('dob:entry:' + alvo.id, JSON.stringify(alvo));
       await syncEntriesToDrive();
       loadEntries();
