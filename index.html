@@ -449,6 +449,18 @@
   .dob-mapa-legenda i.branco{ background:#fff; }
   .dob-mapa-legenda i.amarelo{ background:var(--sand); border-color:#a97f2a; }
   .dob-mapa-legenda i.verde{ background:var(--moss); border-color:#2f5f45; }
+
+  /* ---------- Mapa: layout em 2 colunas na tela larga, pra não precisar rolar tudo de novo só pra
+     trocar de serviço, e pro mapa usar o espaço sobrando à direita em vez de ficar pequeno e
+     centralizado. A coluna de seleção fica "grudada" (sticky) pra ficar sempre à mão. No celular
+     (tela estreita) cai pra uma coluna só, empilhado, como já era. ---------- */
+  .dob-mapa-layout{ display:flex; align-items:flex-start; gap:22px; margin-top:14px; }
+  .dob-mapa-coluna-selecao{ width:340px; flex-shrink:0; position:sticky; top:14px; max-height:calc(100vh - 28px); overflow-y:auto; padding-right:2px; }
+  .dob-mapa-coluna-mapa{ flex:1; min-width:0; }
+  @media (max-width: 980px){
+    .dob-mapa-layout{ flex-direction:column; gap:14px; }
+    .dob-mapa-coluna-selecao{ width:100%; position:static; max-height:none; }
+  }
   .dob-mapa-svg-bloco path{ transition:opacity .1s ease; }
   .dob-mapa-svg-bloco:hover path{ opacity:0.75; }
   .dob-mapa-chip{
@@ -2404,6 +2416,8 @@
             <button type="button" id="dob-mapa-trocar-servico" class="dob-btn secundario pequeno" style="flex-shrink:0; background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.55);">Trocar serviço/obra</button>
           </div>
         ` : ''}
+        <div class="dob-mapa-layout">
+        <div class="dob-mapa-coluna-selecao">
         <div id="dob-mapa-selecao-wrap" style="${mapaModoEdicao && !mapaMostrarSeletorCompleto ? 'display:none;' : ''}">
           <div class="dob-campo">
             <label>Obra</label>
@@ -2445,11 +2459,15 @@
           <span><i class="amarelo"></i> Executando</span>
           <span><i class="verde"></i> Concluído</span>
         </div>
+        </div>
+        <div class="dob-mapa-coluna-mapa">
         <div id="dob-rede-seletor-wrap" style="display:none; margin-top:10px;">
           <label style="font-size:12px; font-weight:600; color:var(--muted);">Qual rede/planta</label>
           <select class="dob-select" id="dob-rede-seletor" style="max-width:420px;"></select>
         </div>
         <div id="dob-mapa-grid" style="overflow-x:auto; margin-top:14px;"></div>
+        </div>
+        </div>
       </div>
     `;
 
@@ -2883,7 +2901,7 @@
           return `<div class="dob-mapa-svg-bloco" data-bloco="${v.id}"
             style="position:absolute; left:${v.x}%; top:${v.y}%; width:${v.w}%; height:${v.h}%; background:${cor}; border:0.5px solid rgba(39,75,116,0.6); cursor:pointer; display:flex; align-items:center; justify-content:center;">${bloqueios.length ? '<span style="font-size:8px; pointer-events:none;">🔒</span>' : ''}</div>`;
         }).join('');
-        const conteudo = `<div style="position:relative; width:900px;">
+        const conteudo = `<div style="position:relative; width:1100px; max-width:100%;">
           <img src="mapa-imgs/vagas.jpg" style="width:100%; display:block; border-radius:8px; border:1px solid var(--line);" />
           ${overlaysVaga}
         </div>`;
@@ -2923,7 +2941,7 @@
           }).join('');
           return `<div style="margin-bottom:20px;">
             <div style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:8px;">${planta.label}</div>
-            <div style="position:relative; width:640px;">
+            <div style="position:relative; width:820px; max-width:100%;">
               <img src="mapa-imgs/area-comum/${chave}.jpg" style="width:100%; display:block; border-radius:8px; border:1px solid var(--line);" />
               ${overlaysArea}
             </div>
@@ -2951,7 +2969,7 @@
         </div>`;
       }).join('');
 
-      const conteudoBloco = `<div style="position:relative; width:640px;">
+      const conteudoBloco = `<div style="position:relative; width:820px; max-width:100%;">
         <img src="mapa-imgs/mapa-blocos.jpg" style="width:100%; display:block; border-radius:8px; border:1px solid var(--line);" />
         ${overlays}
       </div>`;
