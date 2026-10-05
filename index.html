@@ -462,6 +462,25 @@
   .dob-crono-status.naoiniciado{ background:#f0ede4; color:var(--muted); }
   .dob-crono-item.concluido .dob-crono-desc{ text-decoration:line-through; color:var(--muted); }
 
+  .dob-crono-ppc-card{ display:flex; align-items:center; gap:18px; background:#f7f4ec; border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin:14px 0; flex-wrap:wrap; }
+  .dob-crono-ppc-aro{ position:relative; width:72px; height:72px; flex-shrink:0; }
+  .dob-crono-ppc-aro svg{ width:72px; height:72px; transform:rotate(-90deg); }
+  .dob-crono-ppc-aro .fundo{ fill:none; stroke:#e9e4d6; stroke-width:7; }
+  .dob-crono-ppc-aro .frente{ fill:none; stroke:var(--clay, #d9662f); stroke-width:7; stroke-linecap:round; transition:stroke-dashoffset .3s ease; }
+  .dob-crono-ppc-aro.bom .frente{ stroke:#3f7d5c; }
+  .dob-crono-ppc-aro .valor{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; color:var(--ink); }
+  .dob-crono-ppc-txt{ flex:1; min-width:160px; }
+  .dob-crono-ppc-txt .titulo{ font-size:12.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--muted); margin-bottom:3px; }
+  .dob-crono-ppc-txt .sub{ font-size:12px; color:var(--ink-soft); }
+  .dob-crono-semana-nav{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .dob-crono-semana-label{ font-size:13px; font-weight:700; color:var(--ink); }
+  .dob-crono-causas-resumo{ display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 4px; }
+  .dob-crono-causas-resumo .pill{ font-size:11.5px; padding:4px 10px; border-radius:999px; background:#fbe9e4; color:var(--brick); border:1px solid #f2d2c7; }
+  .dob-crono-causa{ margin-top:6px; }
+  .dob-crono-causa select{ font-size:11.5px; padding:4px 8px; border-radius:6px; border:1px solid var(--line); background:#fff; color:var(--ink-soft); max-width:260px; }
+  .dob-crono-causa-label{ font-size:11px; color:var(--muted); margin-right:4px; }
+  .dob-crono-item.nao-cumprido{ background:#fdf7f3; border-radius:8px; }
+
   /* ---------- Mapa de Acompanhamento (blocos clicáveis) ---------- */
   .dob-mapa-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(64px, 1fr)); gap:8px; margin-top:14px; }
   .dob-mapa-bloco{
@@ -1706,40 +1725,45 @@
     });
   }
 
-  // ---------- Cronograma (planejado x executado, a partir da planilha de planejamento) ----------
+  // ---------- Cronograma (Last Planner System / Lean Construction — compromissos semanais e PPC) ----------
   let cronogramaAberto = false;
-  let cronogramaDados = null; // { Buritis: {obra,itens,meses}, Pequis: {...} }
+  let cronogramaDados = null; // { Buritis: {obra,itens,meses,semanas}, Pequis: {...} }
   let cronogramaCarregando = false;
   let cronogramaObraAtual = 'Buritis';
-  let cronogramaDiaAtual = null; // 'YYYY-MM-DD'
+  let cronogramaSemanaAtual = null; // 'YYYY-MM-DD' (início da semana, vem do array "semanas" da planilha)
 
-  function cronogramaConcluidosLer(){
-    try{ return JSON.parse(localStorage.getItem('dob:cronograma_concluidos') || '{}'); }catch(e){ return {}; }
-  }
-  function cronogramaConcluidosSalvar(obj){
-    try{ localStorage.setItem('dob:cronograma_concluidos', JSON.stringify(obj)); }catch(e){}
-  }
-  function cronogramaChaveItem(obra, cod){ return `${obra}|${cod}`; }
+  const CRONOGRAMA_CAUSAS = [
+    { v: 'mao_de_obra', t: 'Mão de obra' },
+    { v: 'material', t: 'Material' },
+    { v: 'equipamento', t: 'Equipamento' },
+    { v: 'clima', t: 'Clima' },
+    { v: 'projeto_info', t: 'Projeto/informação' },
+    { v: 'pre_requisito', t: 'Pré-requisito não concluído' },
+    { v: 'outro', t: 'Outro' },
+  ];
 
-  function cronogramaMesLabel(mesStr){
-    const [y,m] = mesStr.split('-');
-    const nomes = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-    return `${nomes[Number(m)-1]} de ${y}`;
+  function cronogramaSemanalLer(){
+    try{ return JSON.parse(localStorage.getItem('dob:cronograma_semanal') || '{}'); }catch(e){ return {}; }
   }
-
-  function cronogramaDiaLabel(diaStr){
-    const nomesDia = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
-    const [y,m,d] = diaStr.split('-').map(Number);
-    const dt = new Date(y, m-1, d);
-    return `${nomesDia[dt.getDay()]}, ${fmtDate(diaStr)}`;
+  function cronogramaSemanalSalvar(obj){
+    try{ localStorage.setItem('dob:cronograma_semanal', JSON.stringify(obj)); }catch(e){}
   }
+  function cronogramaChaveSemana(obra, cod, semana){ return `${obra}|${cod}|${semana}`; }
 
-  function cronogramaDiaSomar(diaStr, n){
-    const [y,m,d] = diaStr.split('-').map(Number);
-    const dt = new Date(y, m-1, d);
-    dt.setDate(dt.getDate() + n);
+  function cronogramaSemanaLabel(semanaStr){
+    const [y,m,d] = semanaStr.split('-').map(Number);
+    const fim = new Date(y, m-1, d);
+    fim.setDate(fim.getDate() + 6);
     const p = v => String(v).padStart(2,'0');
-    return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())}`;
+    const fimStr = `${fim.getFullYear()}-${p(fim.getMonth()+1)}-${p(fim.getDate())}`;
+    return `Semana de ${fmtDate(semanaStr)} a ${fmtDate(fimStr)}`;
+  }
+
+  function cronogramaSemanaDefaultAtual(semanas){
+    const hoje = todayStr();
+    let escolhida = semanas[0];
+    for(const s of semanas){ if(s <= hoje) escolhida = s; else break; }
+    return escolhida;
   }
 
   async function cronogramaGarantirDados(){
@@ -1769,22 +1793,35 @@
     }
 
     const dadosObra = cronogramaDados[cronogramaObraAtual];
-    const meses = dadosObra.meses;
-    if(!cronogramaDiaAtual) cronogramaDiaAtual = todayStr();
+    const semanas = dadosObra.semanas || [];
+    if(!semanas.length){
+      container.innerHTML = `<div class="dob-card-form"><div class="dob-status-msg erro">Este cronograma não tem dados semanais. Reimporte a planilha de planejamento.</div></div>`;
+      return;
+    }
+    if(!cronogramaSemanaAtual || !semanas.includes(cronogramaSemanaAtual)){
+      cronogramaSemanaAtual = cronogramaSemanaDefaultAtual(semanas);
+    }
 
-    const concluidos = cronogramaConcluidosLer();
+    const semanalFeitos = cronogramaSemanalLer();
+    const semanaAtual = cronogramaSemanaAtual;
+    const idxSemana = semanas.indexOf(semanaAtual);
     const hoje = todayStr();
-    const diaAtual = cronogramaDiaAtual;
-    const mesDoDia = diaAtual.slice(0,7);
-    const idxMesDoDia = meses.indexOf(mesDoDia);
+    // uma semana é considerada "fechada" (passado) quando seu fim já passou da data de hoje
+    const fimSemana = (() => {
+      const [y,m,d] = semanaAtual.split('-').map(Number);
+      const dt = new Date(y, m-1, d); dt.setDate(dt.getDate() + 6);
+      const p = v => String(v).padStart(2,'0');
+      return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())}`;
+    })();
+    const semanaFechada = fimSemana < hoje;
 
-    // monta grupos: nivel1 -> nivel2 -> [itens leaf cujo período (início→término) inclui o dia selecionado]
+    // monta grupos: nivel1 -> nivel2 -> [itens leaf comprometidos nesta semana (semanal[semanaAtual] > 0)]
     let g1atual = null, g2atual = null;
-    const grupos = []; // [{cod,desc, subgrupos:[{cod,desc,itens:[]}]}]
+    const grupos = [];
     dadosObra.itens.forEach(it => {
       if(it.nivel === 1){ g1atual = { cod: it.cod, desc: it.desc, subgrupos: [] }; grupos.push(g1atual); g2atual = null; return; }
       if(it.nivel === 2){ g2atual = { cod: it.cod, desc: it.desc, itens: [] }; if(g1atual) g1atual.subgrupos.push(g2atual); return; }
-      if(it.nivel === 3 && it.inicio && it.termino && it.inicio <= diaAtual && it.termino >= diaAtual && g2atual){
+      if(it.nivel === 3 && it.semanal && (it.semanal[semanaAtual] || 0) > 0 && g2atual){
         g2atual.itens.push(it);
       }
     });
@@ -1792,24 +1829,29 @@
       .map(g => ({ ...g, subgrupos: g.subgrupos.filter(sg => sg.itens.length > 0) }))
       .filter(g => g.subgrupos.length > 0);
 
-    // resumo do dia
-    let totalItens = 0, totalConcluidos = 0, totalAtrasados = 0;
+    // PPC da semana: compromissos cumpridos / compromissos totais
+    let totalCompromissos = 0, totalCumpridos = 0;
+    const causasContagem = {};
     gruposComItens.forEach(g => g.subgrupos.forEach(sg => sg.itens.forEach(it => {
-      totalItens++;
-      const chave = cronogramaChaveItem(cronogramaObraAtual, it.cod);
-      if(concluidos[chave]) totalConcluidos++;
-      else if(it.termino && it.termino < hoje) totalAtrasados++;
+      totalCompromissos++;
+      const chave = cronogramaChaveSemana(cronogramaObraAtual, it.cod, semanaAtual);
+      const reg = semanalFeitos[chave];
+      if(reg && reg.feito) totalCumpridos++;
+      else if(reg && reg.causa){ causasContagem[reg.causa] = (causasContagem[reg.causa]||0) + 1; }
     })));
+    const ppc = totalCompromissos > 0 ? Math.round((totalCumpridos / totalCompromissos) * 100) : 0;
+    const ppcBom = ppc >= 80;
+    const raio = 29.5, circ = 2 * Math.PI * raio;
+    const dashOffset = circ - (ppc/100) * circ;
 
-    function itemStatus(it, concluido){
-      if(concluido) return { classe:'concluido', label:'✅ Concluído' };
-      if(it.termino && it.termino < hoje) return { classe:'atrasado', label:'⚠️ Atrasado' };
-      if(it.inicio && it.inicio <= hoje && (!it.termino || it.termino >= hoje)) return { classe:'andamento', label:'🔧 Em andamento' };
-      return { classe:'naoiniciado', label:'⏳ Não iniciado' };
-    }
+    const causasResumoHtml = Object.keys(causasContagem).length ?
+      `<div class="dob-crono-causas-resumo">${Object.entries(causasContagem).map(([causa, n]) => {
+        const label = (CRONOGRAMA_CAUSAS.find(c => c.v === causa) || {t:causa}).t;
+        return `<span class="pill">${label}: ${n}</span>`;
+      }).join('')}</div>` : '';
 
     const corpoHtml = gruposComItens.length === 0 ?
-      `<p class="dob-dica">Nenhuma atividade programada pra ${cronogramaDiaLabel(diaAtual)} em ${cronogramaObraAtual === 'Buritis' ? 'Solar dos Buritis' : 'Solar dos Pequis'}.</p>` :
+      `<p class="dob-dica">Nenhum compromisso planejado pra ${cronogramaSemanaLabel(semanaAtual)} em ${cronogramaObraAtual === 'Buritis' ? 'Solar dos Buritis' : 'Solar dos Pequis'}.</p>` :
       gruposComItens.map(g => `
         <div class="dob-crono-grupo1">
           <h4>${g.cod} ${g.desc}</h4>
@@ -1817,26 +1859,36 @@
             <div class="dob-crono-grupo2">
               <h5>${sg.cod} ${sg.desc}</h5>
               ${sg.itens.map(it => {
-                const chave = cronogramaChaveItem(cronogramaObraAtual, it.cod);
-                const concluido = !!concluidos[chave];
-                const st = itemStatus(it, concluido);
+                const chave = cronogramaChaveSemana(cronogramaObraAtual, it.cod, semanaAtual);
+                const reg = semanalFeitos[chave] || {};
+                const cumprido = !!reg.feito;
                 const quant = it.quant || 1;
-                const qtdMes = (it.mensal && it.mensal[mesDoDia]) || 0;
-                const pct = Math.round((qtdMes / quant) * 100);
+                const qtdSemana = it.semanal[semanaAtual] || 0;
+                const pctSemana = Math.round((qtdSemana / quant) * 100);
                 const unidLabel = it.unid && it.unid !== '%' ? it.unid.toLowerCase() : '';
-                const qtdTxt = qtdMes ? (it.unid === '%' ? `${pct}% do item neste mês` : `${qtdMes} de ${quant} ${unidLabel} neste mês (${pct}%)`) : '';
-                const cumQtd = idxMesDoDia >= 0 ? meses.slice(0, idxMesDoDia + 1).reduce((s, m) => s + ((it.mensal && it.mensal[m]) || 0), 0) : 0;
+                const qtdTxt = it.unid === '%' ? `compromisso: ${pctSemana}% do item nesta semana` : `compromisso: ${qtdSemana} de ${quant} ${unidLabel} nesta semana (${pctSemana}%)`;
+                const cumQtd = idxSemana >= 0 ? semanas.slice(0, idxSemana + 1).reduce((s, sem) => s + ((it.semanal && it.semanal[sem]) || 0), 0) : 0;
                 const cumPct = Math.min(100, Math.round((cumQtd / quant) * 100));
-                const acumTxt = it.unid === '%' ? `acumulado até ${cronogramaMesLabel(mesDoDia)}: ${cumPct}%` : `acumulado até ${cronogramaMesLabel(mesDoDia)}: ${Math.round(cumQtd)} de ${quant} ${unidLabel} (${cumPct}%)`;
+                const acumTxt = `acumulado até esta semana: ${cumPct}%`;
                 const prazoTxt = it.inicio && it.termino ? `prazo total: ${fmtDate(it.inicio)} → ${fmtDate(it.termino)}` : '';
-                return `<div class="dob-crono-item ${concluido ? 'concluido' : ''}">
-                  <input type="checkbox" data-crono-chave="${chave}" ${concluido ? 'checked' : ''} />
+                const mostrarCausa = semanaFechada && !cumprido;
+                const causaHtml = mostrarCausa ? `
+                  <div class="dob-crono-causa">
+                    <span class="dob-crono-causa-label">Causa do não cumprimento:</span>
+                    <select data-crono-causa-chave="${chave}">
+                      <option value="">Selecionar…</option>
+                      ${CRONOGRAMA_CAUSAS.map(c => `<option value="${c.v}" ${reg.causa===c.v?'selected':''}>${c.t}</option>`).join('')}
+                    </select>
+                  </div>` : '';
+                return `<div class="dob-crono-item ${cumprido ? 'concluido' : ''} ${mostrarCausa && !reg.causa ? 'nao-cumprido' : ''}">
+                  <input type="checkbox" data-crono-chave="${chave}" ${cumprido ? 'checked' : ''} />
                   <div class="dob-crono-info">
                     <div class="dob-crono-desc"><b>${it.cod}</b> ${it.desc}</div>
-                    <div class="dob-crono-meta">${qtdTxt ? qtdTxt + ' · ' : ''}${acumTxt}${prazoTxt ? ' · ' + prazoTxt : ''}</div>
+                    <div class="dob-crono-meta">${qtdTxt} · ${acumTxt}${prazoTxt ? ' · ' + prazoTxt : ''}</div>
                     <div class="dob-crono-barra"><div class="dob-crono-barra-fill" style="width:${cumPct}%;"></div></div>
+                    ${causaHtml}
                   </div>
-                  <span class="dob-crono-status ${st.classe}">${st.label}</span>
+                  <span class="dob-crono-status ${cumprido ? 'concluido' : (semanaFechada ? 'atrasado' : 'andamento')}">${cumprido ? '✅ Cumprido' : (semanaFechada ? '⚠️ Não cumprido' : '🔧 Planejado')}</span>
                 </div>`;
               }).join('')}
             </div>
@@ -1846,7 +1898,7 @@
 
     container.innerHTML = `
       <div class="dob-card-form">
-        <h3>Cronograma <span style="font-weight:400; font-size:12px; color:var(--muted);">(planejado x executado — planilha de planejamento, dia a dia)</span></h3>
+        <h3>Cronograma <span style="font-weight:400; font-size:12px; color:var(--muted);">(Last Planner System — compromissos semanais e PPC)</span></h3>
         <div class="dob-linha">
           <div class="dob-campo"><label>Obra</label>
             <select class="dob-select" id="dob-crono-obra">
@@ -1854,50 +1906,68 @@
               <option value="Pequis" ${cronogramaObraAtual==='Pequis'?'selected':''}>Solar dos Pequis</option>
             </select>
           </div>
-          <div class="dob-campo"><label>Dia</label>
-            <div style="display:flex; gap:6px; align-items:center;">
-              <button type="button" class="dob-btn secundario pequeno" id="dob-crono-dia-prev">←</button>
-              <input class="dob-input" type="date" id="dob-crono-dia" value="${diaAtual}" />
-              <button type="button" class="dob-btn secundario pequeno" id="dob-crono-dia-next">→</button>
-              <button type="button" class="dob-btn secundario pequeno" id="dob-crono-dia-hoje">Hoje</button>
-            </div>
+        </div>
+        <div class="dob-crono-semana-nav">
+          <button type="button" class="dob-btn secundario pequeno" id="dob-crono-semana-prev">← Semana anterior</button>
+          <span class="dob-crono-semana-label">${cronogramaSemanaLabel(semanaAtual)}</span>
+          <button type="button" class="dob-btn secundario pequeno" id="dob-crono-semana-next">Próxima semana →</button>
+          <button type="button" class="dob-btn secundario pequeno" id="dob-crono-semana-atual">Semana atual</button>
+        </div>
+        <div class="dob-crono-ppc-card">
+          <div class="dob-crono-ppc-aro ${ppcBom ? 'bom' : ''}">
+            <svg viewBox="0 0 72 72">
+              <circle class="fundo" cx="36" cy="36" r="${raio}"></circle>
+              <circle class="frente" cx="36" cy="36" r="${raio}" stroke-dasharray="${circ}" stroke-dashoffset="${dashOffset}"></circle>
+            </svg>
+            <div class="valor">${ppc}%</div>
+          </div>
+          <div class="dob-crono-ppc-txt">
+            <div class="titulo">PPC — Percent Plan Complete</div>
+            <div class="sub">${totalCumpridos} de ${totalCompromissos} compromisso(s) cumprido(s) nesta semana${semanaFechada ? '' : ' (semana em andamento)'}.</div>
           </div>
         </div>
-        <div style="font-size:13px; color:var(--muted); margin-top:-6px;">${cronogramaDiaLabel(diaAtual)}</div>
-        <div class="dob-crono-resumo">
-          <span class="pill">${totalItens} atividade(s) no dia</span>
-          <span class="pill ok">${totalConcluidos} concluída(s)</span>
-          ${totalAtrasados > 0 ? `<span class="pill atraso">${totalAtrasados} atrasada(s)</span>` : ''}
-        </div>
+        ${causasResumoHtml}
         <div id="dob-crono-lista">${corpoHtml}</div>
       </div>
     `;
 
     document.getElementById('dob-crono-obra').addEventListener('change', (ev) => {
       cronogramaObraAtual = ev.target.value;
+      cronogramaSemanaAtual = null;
       renderCronograma();
     });
-    document.getElementById('dob-crono-dia').addEventListener('change', (ev) => {
-      if(ev.target.value){ cronogramaDiaAtual = ev.target.value; renderCronograma(); }
+    document.getElementById('dob-crono-semana-prev').addEventListener('click', () => {
+      const i = semanas.indexOf(cronogramaSemanaAtual);
+      if(i > 0){ cronogramaSemanaAtual = semanas[i-1]; renderCronograma(); }
     });
-    document.getElementById('dob-crono-dia-prev').addEventListener('click', () => {
-      cronogramaDiaAtual = cronogramaDiaSomar(cronogramaDiaAtual, -1);
-      renderCronograma();
+    document.getElementById('dob-crono-semana-next').addEventListener('click', () => {
+      const i = semanas.indexOf(cronogramaSemanaAtual);
+      if(i >= 0 && i < semanas.length - 1){ cronogramaSemanaAtual = semanas[i+1]; renderCronograma(); }
     });
-    document.getElementById('dob-crono-dia-next').addEventListener('click', () => {
-      cronogramaDiaAtual = cronogramaDiaSomar(cronogramaDiaAtual, 1);
-      renderCronograma();
-    });
-    document.getElementById('dob-crono-dia-hoje').addEventListener('click', () => {
-      cronogramaDiaAtual = todayStr();
+    document.getElementById('dob-crono-semana-atual').addEventListener('click', () => {
+      cronogramaSemanaAtual = cronogramaSemanaDefaultAtual(semanas);
       renderCronograma();
     });
     container.querySelectorAll('[data-crono-chave]').forEach(chk => {
       chk.addEventListener('change', (ev) => {
         const chave = ev.target.dataset.cronoChave;
-        const atuais = cronogramaConcluidosLer();
-        if(ev.target.checked) atuais[chave] = true; else delete atuais[chave];
-        cronogramaConcluidosSalvar(atuais);
+        const atuais = cronogramaSemanalLer();
+        const reg = atuais[chave] || {};
+        reg.feito = ev.target.checked;
+        if(reg.feito) delete reg.causa;
+        atuais[chave] = reg;
+        cronogramaSemanalSalvar(atuais);
+        renderCronograma();
+      });
+    });
+    container.querySelectorAll('[data-crono-causa-chave]').forEach(sel => {
+      sel.addEventListener('change', (ev) => {
+        const chave = ev.target.dataset.cronoCausaChave;
+        const atuais = cronogramaSemanalLer();
+        const reg = atuais[chave] || {};
+        reg.causa = ev.target.value || undefined;
+        atuais[chave] = reg;
+        cronogramaSemanalSalvar(atuais);
         renderCronograma();
       });
     });
