@@ -618,6 +618,7 @@
     <div class="dob-side-item active" data-side="home"><span class="ic">📋</span><span class="label">Diário</span></div>
     <div class="dob-side-item" data-side="novo"><span class="ic">📝</span><span class="label">Novo apontamento</span></div>
     <div class="dob-side-item" data-side="mapa"><span class="ic">🗺️</span><span class="label">Mapa</span></div>
+    <div class="dob-side-item" data-side="editor-mapas"><span class="ic">🛠️</span><span class="label">Editor de Mapas</span></div>
     <div class="dob-side-item" data-side="campo"><span class="ic">📷</span><span class="label">Modo Campo</span></div>
     <div class="dob-side-item" data-side="resumo-macro"><span class="ic">📊</span><span class="label">Resumo macro</span></div>
     <div class="dob-side-item" data-side="resumo-semana"><span class="ic">📅</span><span class="label">Resumo semana</span></div>
@@ -673,7 +674,6 @@
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-producao-diaria">Produção Diária</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-uaubee">UAU → BEE</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-mapa">Mapa de Acompanhamento</button>
-    <a class="dob-btn secundario dob-btn-oculto-lateral" href="editor-mapas.html" target="_blank" style="text-decoration:none; display:inline-flex; align-items:center;" title="Ajustar manualmente blocos, áreas comuns, vagas e redes dos mapas">🛠️ Editor de Mapas</a>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-campo">📷 Modo Campo</button>
     <button type="button" class="dob-btn secundario pequeno dob-filtros-toggle" id="dob-filtros-toggle">🔍 Filtros</button>
     <div class="dob-filtros" id="dob-filtros-painel">
@@ -5358,6 +5358,7 @@
     function sincronizarSidebar(){
       let algumAberto = false;
       Object.entries(mapaBotoes).forEach(([side, btnId]) => {
+        if(side === 'editor-mapas') return;
         const btn = document.getElementById(btnId);
         const item = document.querySelector(`.dob-side-item[data-side="${side}"]`);
         if(!btn || !item) return;
@@ -5416,6 +5417,13 @@
         if(side === 'drive' || side === 'config'){
           const btn = document.getElementById(mapaBotoes[side]);
           if(btn) btn.click();
+          return;
+        }
+        if(side === 'editor-mapas'){
+          window.open('editor-mapas.html', '_blank');
+          item.classList.remove('active');
+          const itemAtivo = document.querySelector('.dob-side-item.active') || document.querySelector('.dob-side-item[data-side="home"]');
+          if(itemAtivo) itemAtivo.classList.add('active');
           return;
         }
         const btnId = mapaBotoes[side];
