@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Editor de Mapas — Diário de Obra SAGIS</title>
+<style>
+  :root{
+    --paper:#faf6ee; --paper2:#f3ede1; --ink:#2a2a28; --muted:#7a7468;
+    --line:#ddd4c2; --accent:#274b74; --accent2:#3f7d5c; --perigo:#b5423a;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; background:var(--paper); color:var(--ink);}
+  header{padding:14px 18px; background:var(--accent); color:#fff; display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  header h1{font-size:16px; margin:0; font-weight:700;}
+  header .sub{font-size:12px; opacity:.85;}
+  .wrap{display:flex; gap:0; min-height:calc(100vh - 56px);}
+  .painel-topo{display:flex; gap:10px; flex-wrap:wrap; padding:12px 18px; background:var(--paper2); border-bottom:1px solid var(--line); align-items:center;}
+  select, button, input[type=number]{
+    font-family:inherit; font-size:13px; padding:7px 10px; border-radius:7px; border:1px solid var(--line);
+    background:#fff; color:var(--ink);
+  }
+  button{cursor:pointer; background:var(--accent); color:#fff; border:none; font-weight:600;}
+  button.secundario{background:#fff; color:var(--accent); border:1px solid var(--accent);}
+  button.perigo{background:var(--perigo); color:#fff;}
+  button.pequeno{padding:4px 8px; font-size:12px;}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+  main{flex:1; display:flex; min-width:0;}
+  .area-mapa{flex:1; padding:18px; overflow:auto; display:flex; flex-direction:column; align-items:flex-start; gap:10px;}
+  .zoom-bar{display:flex; gap:8px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:8px; padding:6px 10px;}
+  .mapa-box-scroll{overflow:auto; max-width:100%; border:1px solid var(--line); border-radius:8px; background:#fff;}
+  .mapa-box{position:relative; transform-origin: top left;}
+  .mapa-box img{display:block; width:100%; max-width:none; user-select:none; pointer-events:none;}
+  .shape{position:absolute; border:1.5px solid rgba(39,75,116,0.85); cursor:grab; display:flex; align-items:center; justify-content:center; background:rgba(39,75,116,0.18);}
+  .shape.circ{border-radius:50%;}
+  .shape .lbl{font-size:9px; font-weight:700; color:#274b74; text-shadow:0 1px 1px rgba(255,255,255,0.6); pointer-events:none; text-align:center; line-height:1.1;}
+  .shape.selected{border-color:#c99a3d; border-width:2px; background:rgba(201,154,61,0.3); z-index:5;}
+  .shape .handle{position:absolute; width:12px; height:12px; background:#c99a3d; border:1.5px solid #fff; border-radius:3px; right:-6px; bottom:-6px; cursor:nwse-resize;}
+  .shape.circ .handle{right:50%; bottom:-6px; transform:translateX(50%); border-radius:50%;}
+  svg.rede-overlay{position:absolute; top:0; left:0; width:100%; height:100%;}
+  svg.rede-overlay polyline.hit{cursor:grab;}
+  svg.rede-overlay polyline.hit.selected{stroke:#c99a3d !important; stroke-width:1.2 !important;}
+  aside{width:300px; flex-shrink:0; border-left:1px solid var(--line); background:var(--paper2); padding:14px; overflow-y:auto;}
+  aside h2{font-size:13px; margin:0 0 8px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em;}
+  .campo{margin-bottom:10px;}
+  .campo label{display:block; font-size:11px; color:var(--muted); margin-bottom:3px;}
+  .campo input{width:100%;}
+  .linha2{display:grid; grid-template-columns:1fr 1fr; gap:8px;}
+  .lista-itens{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; max-height:260px; overflow-y:auto; border:1px solid var(--line); border-radius:6px; background:#fff;}
+  .lista-itens li{padding:6px 8px; font-size:12px; display:flex; justify-content:space-between; align-items:center; cursor:pointer; border-bottom:1px solid #eee;}
+  .lista-itens li:last-child{border-bottom:none;}
+  .lista-itens li.sel{background:#fdf3e0;}
+  .lista-itens li button{padding:2px 6px; font-size:11px;}
+  .dica{font-size:11.5px; color:var(--muted); line-height:1.4; margin:0 0 10px;}
+  .bloco-acoes{display:flex; flex-direction:column; gap:8px; margin-top:16px; padding-top:14px; border-top:1px solid var(--line);}
+  .pill{display:inline-block; background:#fff; border:1px solid var(--line); border-radius:999px; padding:2px 9px; font-size:11px; color:var(--muted);}
+  textarea#saida{width:100%; height:140px; font-family:monospace; font-size:11px; border-radius:6px; border:1px solid var(--line); padding:8px;}
+  .overlay-msg{position:fixed; bottom:18px; right:18px; background:var(--accent2); color:#fff; padding:10px 16px; border-radius:8px; font-size:13px; box-shadow:0 4px 14px rgba(0,0,0,.2); opacity:0; transition:opacity .25s; pointer-events:none; z-index:50;}
+  .overlay-msg.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🗺️ Editor de Mapas</h1>
+  <span class="sub">Ajuste manual dos blocos, áreas comuns, vagas e redes — exclua o que não se aplica à sua obra</span>
+</header>
+
+<div class="painel-topo">
+  <select id="sel-categoria"></select>
+  <select id="sel-chave"></select>
+  <span class="pill" id="pill-info"></span>
+  <span style="flex:1"></span>
+  <button class="secundario pequeno" id="btn-restaurar-mapa">↩ Restaurar este mapa</button>
+</div>
+
+<main>
+  <div class="area-mapa">
+    <div class="zoom-bar">
+      <button class="secundario pequeno" id="btn-zoom-out">－</button>
+      <span id="zoom-label" style="font-size:12px; min-width:42px; text-align:center;">100%</span>
+      <button class="secundario pequeno" id="btn-zoom-in">＋</button>
+      <button class="secundario pequeno" id="btn-zoom-reset">Resetar zoom</button>
+      <span class="dica" style="margin:0 0 0 10px;">Clique numa forma pra selecionar · arraste pra mover · canto pra redimensionar · Delete remove</span>
+    </div>
+    <div class="mapa-box-scroll">
+      <div class="mapa-box" id="mapa-box">
+        <img id="mapa-img" src="" alt="" />
+        <div id="shapes-layer" style="position:absolute; top:0; left:0; width:100%; height:100%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <aside>
+    <h2>Item selecionado</h2>
+    <div id="sem-selecao" class="dica">Clique numa forma no mapa, ou na lista abaixo, para editar.</div>
+    <div id="campos-selecao" style="display:none;">
+      <div class="campo"><label>Num / rótulo</label><input type="text" id="f-num" /></div>
+      <div id="campos-rect">
+        <div class="linha2">
+          <div class="campo"><label>x (%)</label><input type="number" step="0.01" id="f-x" /></div>
+          <div class="campo"><label>y (%)</label><input type="number" step="0.01" id="f-y" /></div>
+        </div>
+        <div class="linha2">
+          <div class="campo"><label>w (%)</label><input type="number" step="0.01" id="f-w" /></div>
+          <div class="campo"><label>h (%)</label><input type="number" step="0.01" id="f-h" /></div>
+        </div>
+      </div>
+      <div id="campos-circ" style="display:none;">
+        <div class="linha2">
+          <div class="campo"><label>cx (%)</label><input type="number" step="0.01" id="f-cx" /></div>
+          <div class="campo"><label>cy (%)</label><input type="number" step="0.01" id="f-cy" /></div>
+        </div>
+        <div class="campo"><label>r (%)</label><input type="number" step="0.01" id="f-r" /></div>
+      </div>
+      <div id="campos-line" style="display:none;">
+        <p class="dica">Esta é uma linha/traçado (rede). Arraste no mapa pra mover tudo junto, ou exclua se essa rede não se aplica.</p>
+      </div>
+      <button class="perigo" id="btn-excluir-item" style="width:100%; margin-top:6px;">🗑️ Excluir este item</button>
+    </div>
+
+    <h2 style="margin-top:20px;">Itens deste mapa (<span id="contagem-itens">0</span>)</h2>
+    <ul class="lista-itens" id="lista-itens"></ul>
+
+    <div class="bloco-acoes">
+      <button class="secundario" id="btn-add-item">➕ Adicionar item novo</button>
+      <button id="btn-copiar-tudo">📋 Copiar TUDO (todos os mapas) pra enviar ao Claude</button>
+      <button class="secundario" id="btn-copiar-mapa">📋 Copiar só este mapa</button>
+      <button class="perigo secundario" id="btn-restaurar-tudo">↺ Restaurar tudo ao original</button>
+      <textarea id="saida" placeholder="O JSON copiado aparece aqui também, caso o clipboard não funcione no seu navegador." readonly></textarea>
+    </div>
+  </aside>
+</main>
+
+<div class="overlay-msg" id="msg"></div>
+
+<script>
+let DADOS_ORIGINAIS = null;
+let DADOS = null; // estado atual (editável), carregado do localStorage ou clonado do original
+const CHAVE_LS = 'dob:editor_mapas_state_v1';
+
+let categoriaAtual = 'blocos';
+let chaveAtual = null;
+let selecionado = null; // { kind:'rect'|'circle'|'line', ref: objeto do item, lista: array onde está, index }
+let zoom = 1;
+
+function mostrarMsg(txt){
+  const el = document.getElementById('msg');
+  el.textContent = txt;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function carregarEstado(){
+  try{
+    const salvo = localStorage.getItem(CHAVE_LS);
+    if(salvo) return JSON.parse(salvo);
+  }catch(e){}
+  return null;
+}
+function salvarEstado(){
+  try{ localStorage.setItem(CHAVE_LS, JSON.stringify(DADOS)); }catch(e){}
+}
+
+async function init(){
+  const resp = await fetch('mapa-editor-data.json');
+  DADOS_ORIGINAIS = await resp.json();
+  const salvo = carregarEstado();
+  DADOS = salvo || JSON.parse(JSON.stringify(DADOS_ORIGINAIS));
+  montarSeletorCategoria();
+  montarSeletorChave();
+  renderMapa();
+  ligarEventosGlobais();
+}
+
+function listaDeCategorias(){
+  return [
+    { id:'blocos', label:'Blocos residenciais' },
+    { id:'area_comum', label:'Área comum' },
+    { id:'vagas', label:'Vagas de garagem' },
+    { id:'redes', label:'Redes / plantas técnicas' },
+  ];
+}
+
+function montarSeletorCategoria(){
+  const sel = document.getElementById('sel-categoria');
+  sel.innerHTML = listaDeCategorias().map(c => `<option value="${c.id}">${c.label}</option>`).join('');
+  sel.value = categoriaAtual;
+  sel.onchange = () => { categoriaAtual = sel.value; montarSeletorChave(); renderMapa(); };
+}
+
+function chavesDaCategoria(cat){
+  if(cat === 'blocos') return [{ value:'__blocos__', label:'Mapa de blocos (Pequis + Buritis)' }];
+  if(cat === 'vagas') return [{ value:'__vagas__', label:'Mapa de vagas' }];
+  if(cat === 'area_comum') return Object.entries(DADOS.AREA_COMUM_PLANTAS).map(([k,p]) => ({ value:k, label:`${p.label} (${p.obra})` }));
+  if(cat === 'redes') return Object.entries(DADOS.REDES_PLANTAS).map(([k,p]) => ({ value:k, label:`${p.label} (${p.obra})` }));
+  return [];
+}
+
+function montarSeletorChave(){
+  const sel = document.getElementById('sel-chave');
+  const opcoes = chavesDaCategoria(categoriaAtual);
+  sel.innerHTML = opcoes.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+  chaveAtual = opcoes[0] ? opcoes[0].value : null;
+  sel.value = chaveAtual;
+  sel.onchange = () => { chaveAtual = sel.value; selecionado = null; renderMapa(); };
+}
+
+function imagemDoMapa(){
+  if(categoriaAtual === 'blocos') return 'mapa-imgs/mapa-blocos.jpg';
+  if(categoriaAtual === 'vagas') return 'mapa-imgs/vagas.jpg';
+  if(categoriaAtual === 'area_comum') return `mapa-imgs/area-comum/${chaveAtual}.jpg`;
+  if(categoriaAtual === 'redes') return `mapa-imgs/redes/${chaveAtual}.jpg`;
+  return '';
+}
+
+// devolve { lista: array de itens, tipoFixo: 'rect'|'circle'|'line'|null (null = misto, olhar item.forma) }
+function listaAtual(){
+  if(categoriaAtual === 'blocos') return DADOS.BLOCOS_MAPA;
+  if(categoriaAtual === 'vagas') return DADOS.VAGAS_ITENS;
+  if(categoriaAtual === 'area_comum') return DADOS.AREA_COMUM_PLANTAS[chaveAtual].itens;
+  if(categoriaAtual === 'redes') return DADOS.REDES_PLANTAS[chaveAtual].itens;
+  return [];
+}
+
+function formaDoItem(it){
+  if(it.forma) return it.forma;
+  return 'rect'; // BLOCOS_MAPA e VAGAS_ITENS não tem campo forma, são sempre rect
+}
+
+function renderMapa(){
+  document.getElementById('mapa-img').src = imagemDoMapa();
+  document.getElementById('pill-info').textContent = categoriaAtual === 'blocos' ? 'Pequis + Buritis (filtrados por obra no app)' :
+    categoriaAtual === 'vagas' ? 'Compartilhado entre obras' : chaveAtual;
+  renderShapes();
+  renderListaItens();
+  renderPainelSelecao();
+}
+
+function renderShapes(){
+  const layer = document.getElementById('shapes-layer');
+  const lista = listaAtual();
+  let html = '';
+  const linhasSvg = [];
+
+  lista.forEach((it, idx) => {
+    const forma = formaDoItem(it);
+    const isSel = selecionado && selecionado.index === idx;
+    if(forma === 'circle'){
+      const diam = it.r * 2;
+      html += `<div class="shape circ ${isSel ? 'selected' : ''}" data-idx="${idx}"
+        style="left:${it.cx - it.r}%; top:${it.cy - it.r}%; width:${diam}%; height:${diam}%;">
+        <span class="lbl">${it.num || ''}</span>
+        ${isSel ? '<div class="handle" data-resize="circle"></div>' : ''}
+      </div>`;
+    } else if(forma === 'line'){
+      // desenhado via svg, não div — só registra, svg vai depois
+    } else {
+      html += `<div class="shape ${isSel ? 'selected' : ''}" data-idx="${idx}"
+        style="left:${it.x}%; top:${it.y}%; width:${it.w}%; height:${it.h}%;">
+        <span class="lbl">${it.num || ''}</span>
+        ${isSel ? '<div class="handle" data-resize="rect"></div>' : ''}
+      </div>`;
+    }
+  });
+
+  // svg overlay pras linhas (sempre por cima, uma camada só)
+  const temLinha = lista.some(it => formaDoItem(it) === 'line');
+  if(temLinha){
+    let polys = '';
+    lista.forEach((it, idx) => {
+      if(formaDoItem(it) !== 'line') return;
+      const isSel = selecionado && selecionado.index === idx;
+      (it.segmentos || []).forEach(seg => {
+        const pts = seg.map(p => `${p.x},${p.y}`).join(' ');
+        polys += `<polyline points="${pts}" fill="none" stroke="${isSel ? '#c99a3d' : '#274b74'}" stroke-width="${isSel ? '1.2' : '0.6'}" vector-effect="non-scaling-stroke" />
+                  <polyline points="${pts}" fill="none" stroke="transparent" stroke-width="2.5" vector-effect="non-scaling-stroke" class="hit ${isSel ? 'selected' : ''}" data-idx="${idx}" />`;
+      });
+    });
+    html += `<svg class="rede-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">${polys}</svg>`;
+  }
+
+  layer.innerHTML = html;
+  ligarEventosShapes();
+}
+
+function renderListaItens(){
+  const lista = listaAtual();
+  document.getElementById('contagem-itens').textContent = lista.length;
+  const ul = document.getElementById('lista-itens');
+  ul.innerHTML = lista.map((it, idx) => {
+    const forma = formaDoItem(it);
+    const rotulo = it.num || it.id || (forma === 'line' ? 'traçado' : `item ${idx+1}`);
+    const isSel = selecionado && selecionado.index === idx;
+    return `<li class="${isSel ? 'sel' : ''}" data-idx="${idx}">
+      <span>${rotulo} <span style="color:var(--muted); font-size:10px;">(${forma})</span></span>
+      <button class="perigo pequeno" data-excluir="${idx}">excluir</button>
+    </li>`;
+  }).join('');
+  ul.querySelectorAll('li').forEach(li => {
+    li.addEventListener('click', (ev) => {
+      if(ev.target.closest('[data-excluir]')) return;
+      selecionarPorIndice(Number(li.dataset.idx));
+    });
+  });
+  ul.querySelectorAll('[data-excluir]').forEach(btn => {
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      excluirPorIndice(Number(btn.dataset.excluir));
+    });
+  });
+}
+
+function selecionarPorIndice(idx){
+  const lista = listaAtual();
+  const it = lista[idx];
+  if(!it) { selecionado = null; } else { selecionado = { index: idx, forma: formaDoItem(it) }; }
+  renderShapes();
+  renderListaItens();
+  renderPainelSelecao();
+}
+
+function excluirPorIndice(idx){
+  const lista = listaAtual();
+  if(!confirm('Excluir este item do mapa?')) return;
+  lista.splice(idx, 1);
+  selecionado = null;
+  salvarEstado();
+  renderMapa();
+  mostrarMsg('Item excluído');
+}
+
+function renderPainelSelecao(){
+  const semSel = document.getElementById('sem-selecao');
+  const campos = document.getElementById('campos-selecao');
+  if(!selecionado){
+    semSel.style.display = '';
+    campos.style.display = 'none';
+    return;
+  }
+  const lista = listaAtual();
+  const it = lista[selecionado.index];
+  if(!it){ selecionado = null; semSel.style.display=''; campos.style.display='none'; return; }
+  semSel.style.display = 'none';
+  campos.style.display = '';
+  document.getElementById('f-num').value = it.num || it.id || '';
+
+  const rectBox = document.getElementById('campos-rect');
+  const circBox = document.getElementById('campos-circ');
+  const lineBox = document.getElementById('campos-line');
+  rectBox.style.display = 'none'; circBox.style.display = 'none'; lineBox.style.display = 'none';
+
+  if(selecionado.forma === 'circle'){
+    circBox.style.display = '';
+    document.getElementById('f-cx').value = it.cx;
+    document.getElementById('f-cy').value = it.cy;
+    document.getElementById('f-r').value = it.r;
+  } else if(selecionado.forma === 'line'){
+    lineBox.style.display = '';
+  } else {
+    rectBox.style.display = '';
+    document.getElementById('f-x').value = it.x;
+    document.getElementById('f-y').value = it.y;
+    document.getElementById('f-w').value = it.w;
+    document.getElementById('f-h').value = it.h;
+  }
+}
+
+function aplicarCamposNoItem(){
+  if(!selecionado) return;
+  const lista = listaAtual();
+  const it = lista[selecionado.index];
+  if(!it) return;
+  const numVal = document.getElementById('f-num').value;
+  if('num' in it) it.num = numVal;
+  if(selecionado.forma === 'circle'){
+    it.cx = parseFloat(document.getElementById('f-cx').value) || 0;
+    it.cy = parseFloat(document.getElementById('f-cy').value) || 0;
+    it.r = parseFloat(document.getElementById('f-r').value) || 0;
+  } else if(selecionado.forma !== 'line'){
+    it.x = parseFloat(document.getElementById('f-x').value) || 0;
+    it.y = parseFloat(document.getElementById('f-y').value) || 0;
+    it.w = parseFloat(document.getElementById('f-w').value) || 0;
+    it.h = parseFloat(document.getElementById('f-h').value) || 0;
+  }
+  salvarEstado();
+  renderShapes();
+  renderListaItens();
+}
+
+// ---------- arrastar / redimensionar ----------
+let arrastando = null; // { idx, forma, modo:'mover'|'redim', inicioX, inicioY, itemInicio }
+
+function boxRect(){
+  return document.getElementById('mapa-box').getBoundingClientRect();
+}
+
+function pctFromClient(clientX, clientY){
+  const r = boxRect();
+  return { xp: ((clientX - r.left) / r.width) * 100, yp: ((clientY - r.top) / r.height) * 100 };
+}
+
+function ligarEventosShapes(){
+  const layer = document.getElementById('shapes-layer');
+  layer.querySelectorAll('.shape').forEach(el => {
+    el.addEventListener('mousedown', (ev) => {
+      if(ev.target.classList.contains('handle')) return; // tratado separadamente
+      ev.preventDefault();
+      const idx = Number(el.dataset.idx);
+      selecionarPorIndice(idx);
+      const it = listaAtual()[idx];
+      arrastando = { idx, forma: formaDoItem(it), modo:'mover', startClientX: ev.clientX, startClientY: ev.clientY, itemInicio: JSON.parse(JSON.stringify(it)) };
+    });
+  });
+  layer.querySelectorAll('.handle').forEach(h => {
+    h.addEventListener('mousedown', (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
+      const shapeEl = h.closest('.shape');
+      const idx = Number(shapeEl.dataset.idx);
+      const it = listaAtual()[idx];
+      arrastando = { idx, forma: formaDoItem(it), modo:'redim', startClientX: ev.clientX, startClientY: ev.clientY, itemInicio: JSON.parse(JSON.stringify(it)) };
+    });
+  });
+  layer.querySelectorAll('polyline.hit').forEach(p => {
+    p.addEventListener('mousedown', (ev) => {
+      ev.preventDefault();
+      const idx = Number(p.dataset.idx);
+      selecionarPorIndice(idx);
+      const it = listaAtual()[idx];
+      arrastando = { idx, forma:'line', modo:'mover', startClientX: ev.clientX, startClientY: ev.clientY, itemInicio: JSON.parse(JSON.stringify(it)) };
+    });
+  });
+}
+
+document.addEventListener('mousemove', (ev) => {
+  if(!arrastando) return;
+  const r = boxRect();
+  const dxp = ((ev.clientX - arrastando.startClientX) / r.width) * 100;
+  const dyp = ((ev.clientY - arrastando.startClientY) / r.height) * 100;
+  const lista = listaAtual();
+  const it = lista[arrastando.idx];
+  if(!it) return;
+  const base = arrastando.itemInicio;
+
+  if(arrastando.forma === 'circle'){
+    if(arrastando.modo === 'mover'){
+      it.cx = base.cx + dxp; it.cy = base.cy + dyp;
+    } else {
+      it.r = Math.max(0.3, base.r + Math.max(dxp, dyp));
+    }
+  } else if(arrastando.forma === 'line'){
+    it.segmentos = base.segmentos.map(seg => seg.map(p => ({ x: p.x + dxp, y: p.y + dyp })));
+  } else {
+    if(arrastando.modo === 'mover'){
+      it.x = base.x + dxp; it.y = base.y + dyp;
+    } else {
+      it.w = Math.max(0.3, base.w + dxp); it.h = Math.max(0.3, base.h + dyp);
+    }
+  }
+  renderShapes();
+});
+
+document.addEventListener('mouseup', () => {
+  if(arrastando){ arrastando = null; salvarEstado(); renderPainelSelecao(); }
+});
+
+// ---------- teclado ----------
+document.addEventListener('keydown', (ev) => {
+  if(ev.key === 'Delete' || ev.key === 'Backspace'){
+    if(document.activeElement && ['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+    if(selecionado) excluirPorIndice(selecionado.index);
+  }
+});
+
+// ---------- zoom ----------
+function aplicarZoom(){
+  document.getElementById('mapa-box').style.width = (zoom * 1000) + 'px';
+  document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
+}
+
+// ---------- adicionar item ----------
+function adicionarItem(){
+  const lista = listaAtual();
+  let novo;
+  if(categoriaAtual === 'redes'){
+    // pergunta forma
+    const tipo = prompt('Tipo do novo item: "rect" ou "line"?', 'rect');
+    if(tipo === 'line'){
+      novo = { forma:'line', segmentos:[[{x:40,y:40},{x:60,y:60}]], num:'novo', id:`novo_${Date.now()}` };
+    } else {
+      novo = { forma:'rect', x:40, y:40, w:8, h:5, num:'novo', id:`novo_${Date.now()}` };
+    }
+  } else if(categoriaAtual === 'area_comum'){
+    novo = { forma:'rect', x:40, y:40, w:8, h:5, num:'novo', planta:chaveAtual, id:`${chaveAtual}_novo_${Date.now()}` };
+  } else if(categoriaAtual === 'vagas'){
+    novo = { id:`vaga_novo_${Date.now()}`, num:'novo', x:40, y:40, w:3, h:3 };
+  } else {
+    novo = { num:'novo', obra:'Pequis', x:40, y:40, w:5, h:5, id:`novo_${Date.now()}`, cat:'bloco' };
+  }
+  lista.push(novo);
+  salvarEstado();
+  renderMapa();
+  selecionarPorIndice(lista.length - 1);
+  mostrarMsg('Item adicionado — ajuste a posição arrastando');
+}
+
+// ---------- exportar ----------
+async function copiarTexto(txt){
+  try{
+    await navigator.clipboard.writeText(txt);
+    mostrarMsg('Copiado pra área de transferência!');
+  }catch(e){
+    mostrarMsg('Não deu pra copiar automático — selecione o texto abaixo e copie manualmente.');
+  }
+  document.getElementById('saida').value = txt;
+}
+
+function copiarTudo(){
+  copiarTexto(JSON.stringify(DADOS, null, 2));
+}
+function copiarMapaAtual(){
+  let parte;
+  if(categoriaAtual === 'blocos') parte = DADOS.BLOCOS_MAPA;
+  else if(categoriaAtual === 'vagas') parte = DADOS.VAGAS_ITENS;
+  else if(categoriaAtual === 'area_comum') parte = { [chaveAtual]: DADOS.AREA_COMUM_PLANTAS[chaveAtual] };
+  else parte = { [chaveAtual]: DADOS.REDES_PLANTAS[chaveAtual] };
+  copiarTexto(JSON.stringify(parte, null, 2));
+}
+
+function restaurarMapaAtual(){
+  if(!confirm('Restaurar este mapa ao estado original (desfaz suas edições nele)?')) return;
+  if(categoriaAtual === 'blocos') DADOS.BLOCOS_MAPA = JSON.parse(JSON.stringify(DADOS_ORIGINAIS.BLOCOS_MAPA));
+  else if(categoriaAtual === 'vagas') DADOS.VAGAS_ITENS = JSON.parse(JSON.stringify(DADOS_ORIGINAIS.VAGAS_ITENS));
+  else if(categoriaAtual === 'area_comum') DADOS.AREA_COMUM_PLANTAS[chaveAtual] = JSON.parse(JSON.stringify(DADOS_ORIGINAIS.AREA_COMUM_PLANTAS[chaveAtual]));
+  else DADOS.REDES_PLANTAS[chaveAtual] = JSON.parse(JSON.stringify(DADOS_ORIGINAIS.REDES_PLANTAS[chaveAtual]));
+  selecionado = null;
+  salvarEstado();
+  renderMapa();
+  mostrarMsg('Mapa restaurado');
+}
+
+function restaurarTudo(){
+  if(!confirm('Restaurar TODOS os mapas ao original? Isso desfaz todas as edições feitas aqui.')) return;
+  DADOS = JSON.parse(JSON.stringify(DADOS_ORIGINAIS));
+  selecionado = null;
+  salvarEstado();
+  renderMapa();
+  mostrarMsg('Tudo restaurado ao original');
+}
+
+function ligarEventosGlobais(){
+  document.getElementById('btn-zoom-in').onclick = () => { zoom = Math.min(3, zoom + 0.25); aplicarZoom(); };
+  document.getElementById('btn-zoom-out').onclick = () => { zoom = Math.max(0.5, zoom - 0.25); aplicarZoom(); };
+  document.getElementById('btn-zoom-reset').onclick = () => { zoom = 1; aplicarZoom(); };
+  document.getElementById('btn-excluir-item').onclick = () => { if(selecionado) excluirPorIndice(selecionado.index); };
+  document.getElementById('btn-add-item').onclick = adicionarItem;
+  document.getElementById('btn-copiar-tudo').onclick = copiarTudo;
+  document.getElementById('btn-copiar-mapa').onclick = copiarMapaAtual;
+  document.getElementById('btn-restaurar-mapa').onclick = restaurarMapaAtual;
+  document.getElementById('btn-restaurar-tudo').onclick = restaurarTudo;
+  ['f-num','f-x','f-y','f-w','f-h','f-cx','f-cy','f-r'].forEach(id => {
+    document.getElementById(id).addEventListener('change', aplicarCamposNoItem);
+  });
+  aplicarZoom();
+}
+
+init();
+</script>
+</body>
+</html>
