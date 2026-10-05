@@ -433,6 +433,28 @@
   .dob-macro-registro{ display:flex; gap:10px; padding:6px 0; font-size:12.5px; color:#3a4250; border-bottom:1px dashed var(--line); }
   .dob-macro-data{ font-family:"SF Mono",ui-monospace,monospace; color:var(--muted); min-width:70px; flex-shrink:0; }
 
+  /* ---------- Cronograma ---------- */
+  .dob-crono-resumo{ display:flex; gap:10px; flex-wrap:wrap; margin:14px 0; }
+  .dob-crono-resumo .pill{ font-size:12.5px; padding:6px 12px; border-radius:999px; background:#f0ede4; color:var(--ink-soft); border:1px solid var(--line); }
+  .dob-crono-resumo .pill.ok{ background:#e6f2ea; color:#2f6b45; border-color:#cfe6d7; }
+  .dob-crono-resumo .pill.atraso{ background:#fbe9e4; color:var(--brick); border-color:#f2d2c7; }
+  .dob-crono-grupo1{ margin-top:22px; }
+  .dob-crono-grupo1 > h4{ font-family:Georgia,serif; color:var(--ink); font-size:16px; margin:0 0 4px; }
+  .dob-crono-grupo2{ margin:10px 0 14px; }
+  .dob-crono-grupo2 > h5{ font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin:0 0 8px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  .dob-crono-item{ display:flex; align-items:flex-start; gap:10px; padding:8px 6px; border-bottom:1px dashed var(--line); }
+  .dob-crono-item:last-child{ border-bottom:none; }
+  .dob-crono-item input[type=checkbox]{ width:17px; height:17px; margin-top:2px; flex-shrink:0; cursor:pointer; }
+  .dob-crono-info{ flex:1; min-width:0; }
+  .dob-crono-desc{ font-size:13px; color:var(--ink-text); }
+  .dob-crono-meta{ font-size:11.5px; color:var(--muted); margin-top:2px; }
+  .dob-crono-status{ font-size:10.5px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; padding:3px 9px; border-radius:999px; white-space:nowrap; flex-shrink:0; margin-top:1px; }
+  .dob-crono-status.concluido{ background:#e6f2ea; color:#2f6b45; }
+  .dob-crono-status.atrasado{ background:#fbe9e4; color:var(--brick); }
+  .dob-crono-status.andamento{ background:#eaf1f7; color:#2f5f8a; }
+  .dob-crono-status.naoiniciado{ background:#f0ede4; color:var(--muted); }
+  .dob-crono-item.concluido .dob-crono-desc{ text-decoration:line-through; color:var(--muted); }
+
   /* ---------- Mapa de Acompanhamento (blocos clicáveis) ---------- */
   .dob-mapa-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(64px, 1fr)); gap:8px; margin-top:14px; }
   .dob-mapa-bloco{
@@ -619,6 +641,7 @@
     <div class="dob-side-item" data-side="novo"><span class="ic">📝</span><span class="label">Novo apontamento</span></div>
     <div class="dob-side-item" data-side="mapa"><span class="ic">🗺️</span><span class="label">Mapa</span></div>
     <div class="dob-side-item" data-side="editor-mapas"><span class="ic">🛠️</span><span class="label">Editor de Mapas</span></div>
+    <div class="dob-side-item" data-side="cronograma"><span class="ic">📅</span><span class="label">Cronograma</span></div>
     <div class="dob-side-item" data-side="campo"><span class="ic">📷</span><span class="label">Modo Campo</span></div>
     <div class="dob-side-item" data-side="resumo-macro"><span class="ic">📊</span><span class="label">Resumo macro</span></div>
     <div class="dob-side-item" data-side="resumo-semana"><span class="ic">📅</span><span class="label">Resumo semana</span></div>
@@ -674,6 +697,7 @@
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-producao-diaria">Produção Diária</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-uaubee">UAU → BEE</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-mapa">Mapa de Acompanhamento</button>
+    <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-cronograma">Cronograma</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-campo">📷 Modo Campo</button>
     <button type="button" class="dob-btn secundario pequeno dob-filtros-toggle" id="dob-filtros-toggle">🔍 Filtros</button>
     <div class="dob-filtros" id="dob-filtros-painel">
@@ -692,6 +716,7 @@
 
   <div id="dob-relatorio-container"></div>
   <div id="dob-gamma-container"></div>
+  <div id="dob-cronograma-container"></div>
   <div id="dob-resumo-macro-container"></div>
   <div id="dob-resumo-semana-container"></div>
   <div id="dob-producao-diaria-container"></div>
@@ -1670,6 +1695,187 @@
           ${g.registros.map(r => `<div class="dob-macro-registro"><span class="dob-macro-data">${fmtDate(r.date)}</span><span>${r.contratoItem} — ${r.atividade.slice(0,120)}</span></div>`).join('')}
         </div>
       `).join('');
+    });
+  }
+
+  // ---------- Cronograma (planejado x executado, a partir da planilha de planejamento) ----------
+  let cronogramaAberto = false;
+  let cronogramaDados = null; // { Buritis: {obra,itens,meses}, Pequis: {...} }
+  let cronogramaCarregando = false;
+  let cronogramaObraAtual = 'Buritis';
+  let cronogramaMesAtual = null; // 'YYYY-MM'
+
+  function cronogramaConcluidosLer(){
+    try{ return JSON.parse(localStorage.getItem('dob:cronograma_concluidos') || '{}'); }catch(e){ return {}; }
+  }
+  function cronogramaConcluidosSalvar(obj){
+    try{ localStorage.setItem('dob:cronograma_concluidos', JSON.stringify(obj)); }catch(e){}
+  }
+  function cronogramaChaveItem(obra, cod){ return `${obra}|${cod}`; }
+
+  function cronogramaMesLabel(mesStr){
+    const [y,m] = mesStr.split('-');
+    const nomes = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    return `${nomes[Number(m)-1]} de ${y}`;
+  }
+
+  function cronogramaMesPadrao(meses){
+    const hojeMes = todayStr().slice(0,7);
+    if(meses.includes(hojeMes)) return hojeMes;
+    const proximo = meses.find(m => m > hojeMes);
+    return proximo || meses[meses.length - 1] || meses[0];
+  }
+
+  async function cronogramaGarantirDados(){
+    if(cronogramaDados || cronogramaCarregando) return;
+    cronogramaCarregando = true;
+    try{
+      const resp = await fetch('cronograma-data.json');
+      cronogramaDados = await resp.json();
+    }catch(e){
+      cronogramaDados = null;
+    }
+    cronogramaCarregando = false;
+  }
+
+  function renderCronograma(){
+    const container = document.getElementById('dob-cronograma-container');
+    if(!cronogramaAberto){ container.innerHTML = ''; return; }
+
+    if(!cronogramaDados){
+      container.innerHTML = `<div class="dob-card-form"><p class="dob-dica">Carregando cronograma…</p></div>`;
+      cronogramaGarantirDados().then(() => { if(cronogramaAberto) renderCronograma(); });
+      return;
+    }
+    if(!cronogramaDados[cronogramaObraAtual]){
+      container.innerHTML = `<div class="dob-card-form"><div class="dob-status-msg erro">Não consegui carregar os dados do cronograma (cronograma-data.json). Tente recarregar a página.</div></div>`;
+      return;
+    }
+
+    const dadosObra = cronogramaDados[cronogramaObraAtual];
+    const meses = dadosObra.meses;
+    if(!cronogramaMesAtual || !meses.includes(cronogramaMesAtual)) cronogramaMesAtual = cronogramaMesPadrao(meses);
+
+    const concluidos = cronogramaConcluidosLer();
+    const hoje = todayStr();
+    const idxMes = meses.indexOf(cronogramaMesAtual);
+
+    // monta grupos: nivel1 -> nivel2 -> [itens leaf visíveis nesse mês]
+    let g1atual = null, g2atual = null;
+    const grupos = []; // [{cod,desc, subgrupos:[{cod,desc,itens:[]}]}]
+    dadosObra.itens.forEach(it => {
+      if(it.nivel === 1){ g1atual = { cod: it.cod, desc: it.desc, subgrupos: [] }; grupos.push(g1atual); g2atual = null; return; }
+      if(it.nivel === 2){ g2atual = { cod: it.cod, desc: it.desc, itens: [] }; if(g1atual) g1atual.subgrupos.push(g2atual); return; }
+      if(it.nivel === 3 && it.mensal && it.mensal[cronogramaMesAtual] && g2atual){
+        g2atual.itens.push(it);
+      }
+    });
+    const gruposComItens = grupos
+      .map(g => ({ ...g, subgrupos: g.subgrupos.filter(sg => sg.itens.length > 0) }))
+      .filter(g => g.subgrupos.length > 0);
+
+    // resumo do mês
+    let totalItens = 0, totalConcluidos = 0, totalAtrasados = 0;
+    gruposComItens.forEach(g => g.subgrupos.forEach(sg => sg.itens.forEach(it => {
+      totalItens++;
+      const chave = cronogramaChaveItem(cronogramaObraAtual, it.cod);
+      if(concluidos[chave]) totalConcluidos++;
+      else if(it.termino && it.termino < hoje) totalAtrasados++;
+    })));
+
+    function itemStatus(it, concluido){
+      if(concluido) return { classe:'concluido', label:'✅ Concluído' };
+      if(it.termino && it.termino < hoje) return { classe:'atrasado', label:'⚠️ Atrasado' };
+      if(it.inicio && it.inicio <= hoje && (!it.termino || it.termino >= hoje)) return { classe:'andamento', label:'🔧 Em andamento' };
+      return { classe:'naoiniciado', label:'⏳ Não iniciado' };
+    }
+
+    const corpoHtml = gruposComItens.length === 0 ?
+      `<p class="dob-dica">Nenhuma atividade planejada para ${cronogramaMesLabel(cronogramaMesAtual)} em ${cronogramaObraAtual === 'Buritis' ? 'Solar dos Buritis' : 'Solar dos Pequis'}.</p>` :
+      gruposComItens.map(g => `
+        <div class="dob-crono-grupo1">
+          <h4>${g.cod} ${g.desc}</h4>
+          ${g.subgrupos.map(sg => `
+            <div class="dob-crono-grupo2">
+              <h5>${sg.cod} ${sg.desc}</h5>
+              ${sg.itens.map(it => {
+                const chave = cronogramaChaveItem(cronogramaObraAtual, it.cod);
+                const concluido = !!concluidos[chave];
+                const st = itemStatus(it, concluido);
+                const qtdMes = it.mensal[cronogramaMesAtual];
+                const quant = it.quant || 1;
+                const pct = Math.round((qtdMes / quant) * 100);
+                const unidLabel = it.unid && it.unid !== '%' ? it.unid.toLowerCase() : '';
+                const qtdTxt = it.unid === '%' ? `${pct}% do item neste mês` : `${qtdMes} de ${quant} ${unidLabel} neste mês (${pct}%)`;
+                const prazoTxt = it.inicio && it.termino ? `prazo total: ${fmtDate(it.inicio)} → ${fmtDate(it.termino)}` : '';
+                return `<div class="dob-crono-item ${concluido ? 'concluido' : ''}">
+                  <input type="checkbox" data-crono-chave="${chave}" ${concluido ? 'checked' : ''} />
+                  <div class="dob-crono-info">
+                    <div class="dob-crono-desc"><b>${it.cod}</b> ${it.desc}</div>
+                    <div class="dob-crono-meta">${qtdTxt}${prazoTxt ? ' · ' + prazoTxt : ''}</div>
+                  </div>
+                  <span class="dob-crono-status ${st.classe}">${st.label}</span>
+                </div>`;
+              }).join('')}
+            </div>
+          `).join('')}
+        </div>
+      `).join('');
+
+    container.innerHTML = `
+      <div class="dob-card-form">
+        <h3>Cronograma <span style="font-weight:400; font-size:12px; color:var(--muted);">(planejado x executado — planilha de planejamento)</span></h3>
+        <div class="dob-linha">
+          <div class="dob-campo"><label>Obra</label>
+            <select class="dob-select" id="dob-crono-obra">
+              <option value="Buritis" ${cronogramaObraAtual==='Buritis'?'selected':''}>Solar dos Buritis</option>
+              <option value="Pequis" ${cronogramaObraAtual==='Pequis'?'selected':''}>Solar dos Pequis</option>
+            </select>
+          </div>
+          <div class="dob-campo"><label>Mês</label>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button type="button" class="dob-btn secundario pequeno" id="dob-crono-mes-prev" ${idxMes<=0?'disabled':''}>←</button>
+              <select class="dob-select" id="dob-crono-mes">
+                ${meses.map(m => `<option value="${m}" ${m===cronogramaMesAtual?'selected':''}>${cronogramaMesLabel(m)}</option>`).join('')}
+              </select>
+              <button type="button" class="dob-btn secundario pequeno" id="dob-crono-mes-next" ${idxMes>=meses.length-1?'disabled':''}>→</button>
+            </div>
+          </div>
+        </div>
+        <div class="dob-crono-resumo">
+          <span class="pill">${totalItens} atividade(s) no mês</span>
+          <span class="pill ok">${totalConcluidos} concluída(s)</span>
+          ${totalAtrasados > 0 ? `<span class="pill atraso">${totalAtrasados} atrasada(s)</span>` : ''}
+        </div>
+        <div id="dob-crono-lista">${corpoHtml}</div>
+      </div>
+    `;
+
+    document.getElementById('dob-crono-obra').addEventListener('change', (ev) => {
+      cronogramaObraAtual = ev.target.value;
+      cronogramaMesAtual = null;
+      renderCronograma();
+    });
+    document.getElementById('dob-crono-mes').addEventListener('change', (ev) => {
+      cronogramaMesAtual = ev.target.value;
+      renderCronograma();
+    });
+    document.getElementById('dob-crono-mes-prev').addEventListener('click', () => {
+      const i = meses.indexOf(cronogramaMesAtual);
+      if(i > 0){ cronogramaMesAtual = meses[i-1]; renderCronograma(); }
+    });
+    document.getElementById('dob-crono-mes-next').addEventListener('click', () => {
+      const i = meses.indexOf(cronogramaMesAtual);
+      if(i < meses.length - 1){ cronogramaMesAtual = meses[i+1]; renderCronograma(); }
+    });
+    container.querySelectorAll('[data-crono-chave]').forEach(chk => {
+      chk.addEventListener('change', (ev) => {
+        const chave = ev.target.dataset.cronoChave;
+        const atuais = cronogramaConcluidosLer();
+        if(ev.target.checked) atuais[chave] = true; else delete atuais[chave];
+        cronogramaConcluidosSalvar(atuais);
+        renderCronograma();
+      });
     });
   }
 
@@ -5139,6 +5345,12 @@
     renderGammaComando();
     if(gammaAberto) document.getElementById('dob-gamma-container').scrollIntoView({behavior:'smooth', block:'start'});
   });
+  document.getElementById('dob-btn-cronograma').addEventListener('click', () => {
+    cronogramaAberto = !cronogramaAberto;
+    document.getElementById('dob-btn-cronograma').textContent = cronogramaAberto ? 'Fechar cronograma' : 'Cronograma';
+    renderCronograma();
+    if(cronogramaAberto) document.getElementById('dob-cronograma-container').scrollIntoView({behavior:'smooth', block:'start'});
+  });
   document.getElementById('dob-btn-resumo-macro').addEventListener('click', () => {
     resumoMacroAberto = !resumoMacroAberto;
     document.getElementById('dob-btn-resumo-macro').textContent = resumoMacroAberto ? 'Fechar resumo' : 'Resumo por macro-serviço';
@@ -5343,6 +5555,7 @@
     recolherLink.addEventListener('click', () => aplicarEstadoRecolhido(!sidebarEl.classList.contains('recolhida')));
     const mapaBotoes = {
       mapa: 'dob-btn-mapa',
+      cronograma: 'dob-btn-cronograma',
       campo: 'dob-btn-campo',
       'resumo-macro': 'dob-btn-resumo-macro',
       'resumo-semana': 'dob-btn-resumo-semana',
@@ -5354,7 +5567,7 @@
       config: 'dob-btn-config',
       novo: 'dob-novo'
     };
-    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-campo', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-producao-diaria', 'dob-btn-relatorio', 'dob-btn-gamma', 'dob-btn-uaubee'];
+    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-cronograma', 'dob-btn-campo', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-producao-diaria', 'dob-btn-relatorio', 'dob-btn-gamma', 'dob-btn-uaubee'];
     function sincronizarSidebar(){
       let algumAberto = false;
       Object.entries(mapaBotoes).forEach(([side, btnId]) => {
