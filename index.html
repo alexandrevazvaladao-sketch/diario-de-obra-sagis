@@ -2136,12 +2136,13 @@
     }
     return null;
   }
-  function abrirNoMapa(obra, servico, planta){
+  function abrirNoMapa(obra, servico, planta, dataApontamento){
     mapaAberto = true;
     mapaModoEdicao = true;
     mapaMostrarSeletorCompleto = false;
     mapaObraAtual = obra;
     mapaServicoAtual = servico;
+    dataForcadaMapa = dataApontamento || null;
     const btnMapa = document.getElementById('dob-btn-mapa');
     if(btnMapa) btnMapa.textContent = 'Fechar mapa';
     renderMapa();
@@ -2159,8 +2160,8 @@
   document.addEventListener('click', (ev) => {
     const alvo = ev.target.closest('[data-ir-mapa]');
     if(!alvo) return;
-    const [obra, servico, planta] = alvo.dataset.irMapa.split('|||');
-    abrirNoMapa(obra, servico, planta || null);
+    const [obra, servico, planta, dataApontamento] = alvo.dataset.irMapa.split('|||');
+    abrirNoMapa(obra, servico, planta || null, dataApontamento || null);
   });
   function baixarImagemMapa(servico, obra, planta){
     const imgEl = document.getElementById('dob-mapa-rede-img');
@@ -2589,8 +2590,8 @@
       const ferramentasExtras = opcoes.ferramentasExtras || '';
       const temGiro = !!rotKey;
       return `
-        <div style="display:flex; flex-wrap:wrap; align-items:flex-start; gap:16px; margin-top:14px;">
-          <div style="display:flex; flex-direction:column; gap:8px; min-width:170px; max-width:210px; flex-shrink:0;">
+        <div style="margin-top:14px; min-width:0;">
+          <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:10px;">
             <div style="display:flex; align-items:center; gap:6px;">
               <button type="button" class="dob-btn secundario pequeno" id="dob-mapa-zoom-out" title="Diminuir">－</button>
               <span style="font-size:12px; color:var(--muted); min-width:40px; text-align:center; display:inline-block;">${Math.round(mapaZoomAtual*100)}%</span>
@@ -2599,14 +2600,16 @@
             <button type="button" class="dob-btn secundario pequeno" id="dob-mapa-zoom-reset" title="Redefinir zoom">Redefinir zoom</button>
             ${temGiro ? `<button type="button" class="dob-btn secundario pequeno" id="dob-mapa-girar" title="Girar 90°">⟳ Girar 90° (${grauAtual(rotKey)}°)</button>` : ''}
             ${ferramentasExtras}
-            <span class="dob-dica" style="margin:0;">arraste a imagem pra navegar quando der zoom</span>
+            <span class="dob-dica" style="margin:0 0 0 auto;">arraste a imagem pra navegar quando der zoom</span>
           </div>
+          <div style="overflow-x:auto; max-width:100%;">
           <div id="dob-mapa-zoomwrap" style="transform:scale(${mapaZoomAtual}); transform-origin:top left; display:inline-block;">
             <div id="dob-mapa-girowrap" style="position:relative;">
               <div id="dob-mapa-rot-inner">
                 ${conteudoInterno}
               </div>
             </div>
+          </div>
           </div>
         </div>
         ${avisoExtra || ''}
@@ -2994,7 +2997,8 @@
       const prereqs = prereqsDoServico(servicoSelAtual.value);
       const predTxt = prereqs.length ? ` · depende de ${prereqs.map(p => `"${p}"`).join(', ')}` : '';
       const escopoTxt = escopoDoServico(servicoSelAtual.value, obraSelAtual.value) ? ` · só alguns blocos` : '';
-      span.innerHTML = `${servicoSelAtual.value || '—'} · ${obraLabel}${predTxt || escopoTxt ? `<span style="opacity:.9; font-weight:500; font-size:12.5px;">${predTxt}${escopoTxt}</span>` : ''}`;
+      const dataTxt = dataForcadaMapa ? ` · 📍 ${fmtDate(dataForcadaMapa)}` : '';
+      span.innerHTML = `${servicoSelAtual.value || '—'} · ${obraLabel}${dataTxt}${predTxt || escopoTxt ? `<span style="opacity:.9; font-weight:500; font-size:12.5px;">${predTxt}${escopoTxt}</span>` : ''}`;
       const btnEscopo = document.getElementById('dob-mapa-escopo-servico');
       if(btnEscopo) btnEscopo.textContent = temAlgumEscopo(servicoSelAtual.value) ? '🎯 Escopo ✓' : '🎯 Escopo';
       const btnPrereq = document.getElementById('dob-mapa-prereq-servico');
@@ -4869,7 +4873,7 @@
           mapaItemContador++;
           const itemId = `dob-mapa-item-${data || 'x'}-${mapaItemContador}`;
           const itemKey = `${data || 'x'}|||${b.raw}|||${l.servico}|||${st}`;
-          const irMapaAttr = `data-ir-mapa="${b.raw}|||${l.servico}|||${l.planta || ''}"`;
+          const irMapaAttr = `data-ir-mapa="${b.raw}|||${l.servico}|||${l.planta || ''}|||${data || ''}"`;
           const desdeTxt = l.desde ? ` · desde ${fmtDate(l.desde)}` : '';
           const qtdTxt = l.trecho ? `${l.qtd} trecho${l.qtd === 1 ? '' : 's'}` : `${l.qtd} bloco${l.qtd === 1 ? '' : 's'}`;
           const blocosChipsHtml = (l.itens && l.itens.length)
