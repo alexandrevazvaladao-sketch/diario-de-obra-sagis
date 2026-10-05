@@ -770,7 +770,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.05.1';
+  const APP_VERSION = 'v2026.10.05.2';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -5612,13 +5612,26 @@
   }
 
   async function processarFotosCampo(fileList){
+    // converte pra array logo de cara, desgrudando da FileList "ao vivo" do <input> — em alguns
+    // navegadores mobile, mexer no input (como resetar o value) depois de ler .files pode invalidar
+    // a referência original se ela ainda estiver "viva"
     const files = Array.from(fileList || []);
-    if(files.length === 0) return;
-    const entry = acharOuCriarEntradaHoje();
+    if(files.length === 0){
+      mostrarToastSalvo('Nenhuma foto foi recebida do seletor — tenta de novo', { erro: true });
+      return;
+    }
+    let entry;
+    try{
+      entry = acharOuCriarEntradaHoje();
+    }catch(e){
+      mostrarToastSalvo('Não consegui preparar o apontamento de hoje pra receber as fotos — tenta de novo', { erro: true });
+      return;
+    }
     let falhas = 0;
     let semEspaco = false;
     campoEnviando = { total: files.length, atual: 0 };
     renderModoCampo();
+    try{
     for(const file of files){
       try{
         const [fullRes, thumbRes] = await Promise.all([ compressImage(file, 1600, 0.82), compressImage(file, 180, 0.5) ]);
@@ -5657,6 +5670,15 @@
       campoEnviando.atual++;
       renderModoCampo();
     }
+    }catch(eGeral){
+      // rede inesperada: garante que a tela nunca fique travada no "Enviando..." sem explicação
+      falhas = files.length;
+      campoEnviando = null;
+      renderModoCampo();
+      render();
+      mostrarToastSalvo('Algo deu errado enviando as fotos — tenta de novo', { erro: true });
+      return;
+    }
     campoEnviando = null;
     renderModoCampo();
     render();
@@ -5666,14 +5688,14 @@
     else if(falhas > 0) mostrarToastSalvo(`${falhas} foto${falhas === 1 ? '' : 's'} não processada${falhas === 1 ? '' : 's'} — tenta de novo`, { erro: true });
   }
   document.getElementById('dob-campo-file-input').addEventListener('change', async (ev) => {
-    const files = ev.target.files;
-    ev.target.value = '';
+    const files = Array.from(ev.target.files || []);
     await processarFotosCampo(files);
+    ev.target.value = '';
   });
   document.getElementById('dob-campo-file-input-upload').addEventListener('change', async (ev) => {
-    const files = ev.target.files;
-    ev.target.value = '';
+    const files = Array.from(ev.target.files || []);
     await processarFotosCampo(files);
+    ev.target.value = '';
   });
 
   (function renderSaudacao(){
