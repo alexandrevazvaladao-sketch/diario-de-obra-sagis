@@ -57,6 +57,12 @@
   textarea#saida{width:100%; height:140px; font-family:monospace; font-size:11px; border-radius:6px; border:1px solid var(--line); padding:8px;}
   .overlay-msg{position:fixed; bottom:18px; right:18px; background:var(--accent2); color:#fff; padding:10px 16px; border-radius:8px; font-size:13px; box-shadow:0 4px 14px rgba(0,0,0,.2); opacity:0; transition:opacity .25s; pointer-events:none; z-index:50;}
   .overlay-msg.show{opacity:1;}
+  .modal-fundo{position:fixed; inset:0; background:rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; z-index:100;}
+  .modal-caixa{background:#fff; border-radius:10px; padding:20px; max-width:360px; width:90%; box-shadow:0 10px 30px rgba(0,0,0,.25);}
+  .modal-caixa p{margin:0 0 16px; font-size:14px; line-height:1.4;}
+  .modal-botoes{display:flex; gap:8px; justify-content:flex-end;}
+  .modal-opcoes{display:flex; flex-direction:column; gap:8px; margin-bottom:16px;}
+  .modal-opcoes button{width:100%;}
 </style>
 </head>
 <body>
@@ -135,6 +141,45 @@
 <div class="overlay-msg" id="msg"></div>
 
 <script>
+// ---------- modais não-bloqueantes (substituem confirm()/prompt() nativos) ----------
+function confirmarAcao(msg){
+  return new Promise((resolve) => {
+    const fundo = document.createElement('div');
+    fundo.className = 'modal-fundo';
+    fundo.innerHTML = `<div class="modal-caixa">
+      <p>${msg}</p>
+      <div class="modal-botoes">
+        <button class="secundario" data-r="0">Cancelar</button>
+        <button class="perigo" data-r="1">Confirmar</button>
+      </div>
+    </div>`;
+    document.body.appendChild(fundo);
+    fundo.addEventListener('click', (ev) => {
+      if(ev.target === fundo){ fundo.remove(); resolve(false); return; }
+      const r = ev.target.dataset.r;
+      if(r !== undefined){ fundo.remove(); resolve(r === '1'); }
+    });
+  });
+}
+function escolherOpcao(msg, opcoes){
+  // opcoes: [{label, value}]
+  return new Promise((resolve) => {
+    const fundo = document.createElement('div');
+    fundo.className = 'modal-fundo';
+    fundo.innerHTML = `<div class="modal-caixa">
+      <p>${msg}</p>
+      <div class="modal-opcoes">${opcoes.map(o => `<button data-v="${o.value}">${o.label}</button>`).join('')}</div>
+      <div class="modal-botoes"><button class="secundario" data-v="">Cancelar</button></div>
+    </div>`;
+    document.body.appendChild(fundo);
+    fundo.addEventListener('click', (ev) => {
+      if(ev.target === fundo){ fundo.remove(); resolve(null); return; }
+      const v = ev.target.dataset.v;
+      if(v !== undefined){ fundo.remove(); resolve(v || null); }
+    });
+  });
+}
+
 let DADOS_ORIGINAIS = null;
 let DADOS = null; // estado atual (editável), carregado do localStorage ou clonado do original
 const CHAVE_LS = 'dob:editor_mapas_state_v1';
@@ -321,9 +366,9 @@ function selecionarPorIndice(idx){
   renderPainelSelecao();
 }
 
-function excluirPorIndice(idx){
+async function excluirPorIndice(idx){
   const lista = listaAtual();
-  if(!confirm('Excluir este item do mapa?')) return;
+  if(!await confirmarAcao('Excluir este item do mapa?')) return;
   lista.splice(idx, 1);
   selecionado = null;
   salvarEstado();
@@ -480,12 +525,16 @@ function aplicarZoom(){
 }
 
 // ---------- adicionar item ----------
-function adicionarItem(){
+async function adicionarItem(){
   const lista = listaAtual();
   let novo;
   if(categoriaAtual === 'redes'){
     // pergunta forma
-    const tipo = prompt('Tipo do novo item: "rect" ou "line"?', 'rect');
+    const tipo = await escolherOpcao('Tipo do novo item:', [
+      { label:'Retângulo (rect)', value:'rect' },
+      { label:'Linha / traçado (line)', value:'line' },
+    ]);
+    if(!tipo) return;
     if(tipo === 'line'){
       novo = { forma:'line', segmentos:[[{x:40,y:40},{x:60,y:60}]], num:'novo', id:`novo_${Date.now()}` };
     } else {
@@ -528,8 +577,8 @@ function copiarMapaAtual(){
   copiarTexto(JSON.stringify(parte, null, 2));
 }
 
-function restaurarMapaAtual(){
-  if(!confirm('Restaurar este mapa ao estado original (desfaz suas edições nele)?')) return;
+async function restaurarMapaAtual(){
+  if(!await confirmarAcao('Restaurar este mapa ao estado original (desfaz suas edições nele)?')) return;
   if(categoriaAtual === 'blocos') DADOS.BLOCOS_MAPA = JSON.parse(JSON.stringify(DADOS_ORIGINAIS.BLOCOS_MAPA));
   else if(categoriaAtual === 'vagas') DADOS.VAGAS_ITENS = JSON.parse(JSON.stringify(DADOS_ORIGINAIS.VAGAS_ITENS));
   else if(categoriaAtual === 'area_comum') DADOS.AREA_COMUM_PLANTAS[chaveAtual] = JSON.parse(JSON.stringify(DADOS_ORIGINAIS.AREA_COMUM_PLANTAS[chaveAtual]));
@@ -540,8 +589,8 @@ function restaurarMapaAtual(){
   mostrarMsg('Mapa restaurado');
 }
 
-function restaurarTudo(){
-  if(!confirm('Restaurar TODOS os mapas ao original? Isso desfaz todas as edições feitas aqui.')) return;
+async function restaurarTudo(){
+  if(!await confirmarAcao('Restaurar TODOS os mapas ao original? Isso desfaz todas as edições feitas aqui.')) return;
   DADOS = JSON.parse(JSON.stringify(DADOS_ORIGINAIS));
   selecionado = null;
   salvarEstado();
