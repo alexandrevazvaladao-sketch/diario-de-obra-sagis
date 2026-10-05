@@ -727,6 +727,7 @@
   <div id="dob-mapa-container"></div>
   <div id="dob-campo-container"></div>
   <input type="file" id="dob-campo-file-input" accept="image/*" capture="environment" style="display:none;" />
+  <input type="file" id="dob-campo-file-input-upload" accept="image/*" multiple style="display:none;" />
   <div id="dob-form-container"></div>
   <div id="dob-lista" class="dob-lista dob-home-only"><div class="dob-loading">Carregando apontamentos...</div></div>
 </div>
@@ -5471,7 +5472,8 @@
       <div class="dob-card-form" style="margin-top:14px; max-width:520px;">
         <h3 style="margin:0 0 6px; font-size:19px; text-align:center;">📷 Modo Campo</h3>
         <p class="dob-dica" style="margin:0 0 16px; text-align:center;">Toque no botão pra tirar foto. Toque numa foto aí embaixo pra vincular à atividade.</p>
-        <button type="button" id="dob-campo-tirar-foto" class="dob-btn" style="width:100%; padding:18px; font-size:17px; font-weight:700; margin-bottom:16px;">📸 Tirar Foto</button>
+        <button type="button" id="dob-campo-tirar-foto" class="dob-btn" style="width:100%; padding:18px; font-size:17px; font-weight:700; margin-bottom:10px;">📸 Tirar Foto</button>
+        <button type="button" id="dob-campo-enviar-foto" class="dob-btn secundario" style="width:100%; padding:14px; font-size:14.5px; font-weight:700; margin-bottom:16px;">🖼️ Enviar fotos da galeria</button>
         <div style="font-size:13px; font-weight:700; color:var(--clay-dark,#c2551f); margin-bottom:10px;">${fotos.length} foto${fotos.length === 1 ? '' : 's'} hoje</div>
         ${fotos.length === 0 ? '<p class="dob-dica">Nenhuma foto ainda hoje.</p>' : `<div id="dob-campo-galeria" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:8px;">${fotos.map((f, i) => fotoCampoThumbHtml(f, i)).join('')}</div>`}
       </div>
@@ -5479,6 +5481,10 @@
     const btnTirar = document.getElementById('dob-campo-tirar-foto');
     if(btnTirar) btnTirar.addEventListener('click', () => {
       document.getElementById('dob-campo-file-input').click();
+    });
+    const btnEnviar = document.getElementById('dob-campo-enviar-foto');
+    if(btnEnviar) btnEnviar.addEventListener('click', () => {
+      document.getElementById('dob-campo-file-input-upload').click();
     });
     container.querySelectorAll('.dob-campo-thumb').forEach(el => {
       el.addEventListener('click', async () => {
@@ -5496,33 +5502,47 @@
     });
   }
 
-  document.getElementById('dob-campo-file-input').addEventListener('change', async (ev) => {
-    const file = (ev.target.files || [])[0];
-    ev.target.value = '';
-    if(!file) return;
-    try{
-      const entry = acharOuCriarEntradaHoje();
-      const [fullRes, thumbRes] = await Promise.all([ compressImage(file, 1600, 0.82), compressImage(file, 180, 0.5) ]);
-      const filename = `diario_${entry.date}_${fmtTimestamp()}.jpg`;
-      if(accessToken){
-        try{
-          const fileId = await uploadToDrive(fullRes, filename);
-          entry.fotos.push({ type: 'drive', fileId, thumb: thumbRes });
-        }catch(driveErr){
+  async function processarFotosCampo(fileList){
+    const files = Array.from(fileList || []);
+    if(files.length === 0) return;
+    const entry = acharOuCriarEntradaHoje();
+    let falhas = 0;
+    for(const file of files){
+      try{
+        const [fullRes, thumbRes] = await Promise.all([ compressImage(file, 1600, 0.82), compressImage(file, 180, 0.5) ]);
+        const filename = `diario_${entry.date}_${fmtTimestamp()}.jpg`;
+        if(accessToken){
+          try{
+            const fileId = await uploadToDrive(fullRes, filename);
+            entry.fotos.push({ type: 'drive', fileId, thumb: thumbRes });
+          }catch(driveErr){
+            const localRes = await compressImage(file, 1100, 0.6);
+            entry.fotos.push({ type: 'local', data: localRes });
+          }
+        }else{
           const localRes = await compressImage(file, 1100, 0.6);
           entry.fotos.push({ type: 'local', data: localRes });
         }
-      }else{
-        const localRes = await compressImage(file, 1100, 0.6);
-        entry.fotos.push({ type: 'local', data: localRes });
+      }catch(e){
+        falhas++;
       }
-      saveEntry(entry);
-      renderModoCampo();
-      render();
-      mostrarToastSalvo('Foto salva no apontamento de hoje');
-    }catch(e){
-      alert('Falha ao processar a foto. Tenta de novo.');
     }
+    saveEntry(entry);
+    renderModoCampo();
+    render();
+    const sucesso = files.length - falhas;
+    if(sucesso > 0) mostrarToastSalvo(sucesso === 1 ? 'Foto salva no apontamento de hoje' : `${sucesso} fotos salvas no apontamento de hoje`);
+    if(falhas > 0) mostrarToastSalvo(`${falhas} foto${falhas === 1 ? '' : 's'} não processada${falhas === 1 ? '' : 's'} — tenta de novo`);
+  }
+  document.getElementById('dob-campo-file-input').addEventListener('change', async (ev) => {
+    const files = ev.target.files;
+    ev.target.value = '';
+    await processarFotosCampo(files);
+  });
+  document.getElementById('dob-campo-file-input-upload').addEventListener('change', async (ev) => {
+    const files = ev.target.files;
+    ev.target.value = '';
+    await processarFotosCampo(files);
   });
 
   (function renderSaudacao(){
