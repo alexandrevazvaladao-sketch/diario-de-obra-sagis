@@ -1707,7 +1707,7 @@
   let cronogramaDados = null; // { Buritis: {obra,itens,meses}, Pequis: {...} }
   let cronogramaCarregando = false;
   let cronogramaObraAtual = 'Buritis';
-  let cronogramaMesAtual = null; // 'YYYY-MM'
+  let cronogramaDiaAtual = null; // 'YYYY-MM-DD'
 
   function cronogramaConcluidosLer(){
     try{ return JSON.parse(localStorage.getItem('dob:cronograma_concluidos') || '{}'); }catch(e){ return {}; }
@@ -1723,11 +1723,19 @@
     return `${nomes[Number(m)-1]} de ${y}`;
   }
 
-  function cronogramaMesPadrao(meses){
-    const hojeMes = todayStr().slice(0,7);
-    if(meses.includes(hojeMes)) return hojeMes;
-    const proximo = meses.find(m => m > hojeMes);
-    return proximo || meses[meses.length - 1] || meses[0];
+  function cronogramaDiaLabel(diaStr){
+    const nomesDia = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+    const [y,m,d] = diaStr.split('-').map(Number);
+    const dt = new Date(y, m-1, d);
+    return `${nomesDia[dt.getDay()]}, ${fmtDate(diaStr)}`;
+  }
+
+  function cronogramaDiaSomar(diaStr, n){
+    const [y,m,d] = diaStr.split('-').map(Number);
+    const dt = new Date(y, m-1, d);
+    dt.setDate(dt.getDate() + n);
+    const p = v => String(v).padStart(2,'0');
+    return `${dt.getFullYear()}-${p(dt.getMonth()+1)}-${p(dt.getDate())}`;
   }
 
   async function cronogramaGarantirDados(){
@@ -1758,19 +1766,21 @@
 
     const dadosObra = cronogramaDados[cronogramaObraAtual];
     const meses = dadosObra.meses;
-    if(!cronogramaMesAtual || !meses.includes(cronogramaMesAtual)) cronogramaMesAtual = cronogramaMesPadrao(meses);
+    if(!cronogramaDiaAtual) cronogramaDiaAtual = todayStr();
 
     const concluidos = cronogramaConcluidosLer();
     const hoje = todayStr();
-    const idxMes = meses.indexOf(cronogramaMesAtual);
+    const diaAtual = cronogramaDiaAtual;
+    const mesDoDia = diaAtual.slice(0,7);
+    const idxMesDoDia = meses.indexOf(mesDoDia);
 
-    // monta grupos: nivel1 -> nivel2 -> [itens leaf visíveis nesse mês]
+    // monta grupos: nivel1 -> nivel2 -> [itens leaf cujo período (início→término) inclui o dia selecionado]
     let g1atual = null, g2atual = null;
     const grupos = []; // [{cod,desc, subgrupos:[{cod,desc,itens:[]}]}]
     dadosObra.itens.forEach(it => {
       if(it.nivel === 1){ g1atual = { cod: it.cod, desc: it.desc, subgrupos: [] }; grupos.push(g1atual); g2atual = null; return; }
       if(it.nivel === 2){ g2atual = { cod: it.cod, desc: it.desc, itens: [] }; if(g1atual) g1atual.subgrupos.push(g2atual); return; }
-      if(it.nivel === 3 && it.mensal && it.mensal[cronogramaMesAtual] && g2atual){
+      if(it.nivel === 3 && it.inicio && it.termino && it.inicio <= diaAtual && it.termino >= diaAtual && g2atual){
         g2atual.itens.push(it);
       }
     });
@@ -1778,7 +1788,7 @@
       .map(g => ({ ...g, subgrupos: g.subgrupos.filter(sg => sg.itens.length > 0) }))
       .filter(g => g.subgrupos.length > 0);
 
-    // resumo do mês
+    // resumo do dia
     let totalItens = 0, totalConcluidos = 0, totalAtrasados = 0;
     gruposComItens.forEach(g => g.subgrupos.forEach(sg => sg.itens.forEach(it => {
       totalItens++;
@@ -1795,7 +1805,7 @@
     }
 
     const corpoHtml = gruposComItens.length === 0 ?
-      `<p class="dob-dica">Nenhuma atividade planejada para ${cronogramaMesLabel(cronogramaMesAtual)} em ${cronogramaObraAtual === 'Buritis' ? 'Solar dos Buritis' : 'Solar dos Pequis'}.</p>` :
+      `<p class="dob-dica">Nenhuma atividade programada pra ${cronogramaDiaLabel(diaAtual)} em ${cronogramaObraAtual === 'Buritis' ? 'Solar dos Buritis' : 'Solar dos Pequis'}.</p>` :
       gruposComItens.map(g => `
         <div class="dob-crono-grupo1">
           <h4>${g.cod} ${g.desc}</h4>
@@ -1806,20 +1816,20 @@
                 const chave = cronogramaChaveItem(cronogramaObraAtual, it.cod);
                 const concluido = !!concluidos[chave];
                 const st = itemStatus(it, concluido);
-                const qtdMes = it.mensal[cronogramaMesAtual];
                 const quant = it.quant || 1;
+                const qtdMes = (it.mensal && it.mensal[mesDoDia]) || 0;
                 const pct = Math.round((qtdMes / quant) * 100);
                 const unidLabel = it.unid && it.unid !== '%' ? it.unid.toLowerCase() : '';
-                const qtdTxt = it.unid === '%' ? `${pct}% do item neste mês` : `${qtdMes} de ${quant} ${unidLabel} neste mês (${pct}%)`;
-                const cumQtd = meses.slice(0, idxMes + 1).reduce((s, m) => s + (it.mensal[m] || 0), 0);
+                const qtdTxt = qtdMes ? (it.unid === '%' ? `${pct}% do item neste mês` : `${qtdMes} de ${quant} ${unidLabel} neste mês (${pct}%)`) : '';
+                const cumQtd = idxMesDoDia >= 0 ? meses.slice(0, idxMesDoDia + 1).reduce((s, m) => s + ((it.mensal && it.mensal[m]) || 0), 0) : 0;
                 const cumPct = Math.min(100, Math.round((cumQtd / quant) * 100));
-                const acumTxt = it.unid === '%' ? `acumulado até ${cronogramaMesLabel(cronogramaMesAtual)}: ${cumPct}%` : `acumulado até ${cronogramaMesLabel(cronogramaMesAtual)}: ${Math.round(cumQtd)} de ${quant} ${unidLabel} (${cumPct}%)`;
+                const acumTxt = it.unid === '%' ? `acumulado até ${cronogramaMesLabel(mesDoDia)}: ${cumPct}%` : `acumulado até ${cronogramaMesLabel(mesDoDia)}: ${Math.round(cumQtd)} de ${quant} ${unidLabel} (${cumPct}%)`;
                 const prazoTxt = it.inicio && it.termino ? `prazo total: ${fmtDate(it.inicio)} → ${fmtDate(it.termino)}` : '';
                 return `<div class="dob-crono-item ${concluido ? 'concluido' : ''}">
                   <input type="checkbox" data-crono-chave="${chave}" ${concluido ? 'checked' : ''} />
                   <div class="dob-crono-info">
                     <div class="dob-crono-desc"><b>${it.cod}</b> ${it.desc}</div>
-                    <div class="dob-crono-meta">${qtdTxt} · ${acumTxt}${prazoTxt ? ' · ' + prazoTxt : ''}</div>
+                    <div class="dob-crono-meta">${qtdTxt ? qtdTxt + ' · ' : ''}${acumTxt}${prazoTxt ? ' · ' + prazoTxt : ''}</div>
                     <div class="dob-crono-barra"><div class="dob-crono-barra-fill" style="width:${cumPct}%;"></div></div>
                   </div>
                   <span class="dob-crono-status ${st.classe}">${st.label}</span>
@@ -1832,7 +1842,7 @@
 
     container.innerHTML = `
       <div class="dob-card-form">
-        <h3>Cronograma <span style="font-weight:400; font-size:12px; color:var(--muted);">(planejado x executado — planilha de planejamento)</span></h3>
+        <h3>Cronograma <span style="font-weight:400; font-size:12px; color:var(--muted);">(planejado x executado — planilha de planejamento, dia a dia)</span></h3>
         <div class="dob-linha">
           <div class="dob-campo"><label>Obra</label>
             <select class="dob-select" id="dob-crono-obra">
@@ -1840,18 +1850,18 @@
               <option value="Pequis" ${cronogramaObraAtual==='Pequis'?'selected':''}>Solar dos Pequis</option>
             </select>
           </div>
-          <div class="dob-campo"><label>Mês</label>
+          <div class="dob-campo"><label>Dia</label>
             <div style="display:flex; gap:6px; align-items:center;">
-              <button type="button" class="dob-btn secundario pequeno" id="dob-crono-mes-prev" ${idxMes<=0?'disabled':''}>←</button>
-              <select class="dob-select" id="dob-crono-mes">
-                ${meses.map(m => `<option value="${m}" ${m===cronogramaMesAtual?'selected':''}>${cronogramaMesLabel(m)}</option>`).join('')}
-              </select>
-              <button type="button" class="dob-btn secundario pequeno" id="dob-crono-mes-next" ${idxMes>=meses.length-1?'disabled':''}>→</button>
+              <button type="button" class="dob-btn secundario pequeno" id="dob-crono-dia-prev">←</button>
+              <input class="dob-input" type="date" id="dob-crono-dia" value="${diaAtual}" />
+              <button type="button" class="dob-btn secundario pequeno" id="dob-crono-dia-next">→</button>
+              <button type="button" class="dob-btn secundario pequeno" id="dob-crono-dia-hoje">Hoje</button>
             </div>
           </div>
         </div>
+        <div style="font-size:13px; color:var(--muted); margin-top:-6px;">${cronogramaDiaLabel(diaAtual)}</div>
         <div class="dob-crono-resumo">
-          <span class="pill">${totalItens} atividade(s) no mês</span>
+          <span class="pill">${totalItens} atividade(s) no dia</span>
           <span class="pill ok">${totalConcluidos} concluída(s)</span>
           ${totalAtrasados > 0 ? `<span class="pill atraso">${totalAtrasados} atrasada(s)</span>` : ''}
         </div>
@@ -1861,20 +1871,22 @@
 
     document.getElementById('dob-crono-obra').addEventListener('change', (ev) => {
       cronogramaObraAtual = ev.target.value;
-      cronogramaMesAtual = null;
       renderCronograma();
     });
-    document.getElementById('dob-crono-mes').addEventListener('change', (ev) => {
-      cronogramaMesAtual = ev.target.value;
+    document.getElementById('dob-crono-dia').addEventListener('change', (ev) => {
+      if(ev.target.value){ cronogramaDiaAtual = ev.target.value; renderCronograma(); }
+    });
+    document.getElementById('dob-crono-dia-prev').addEventListener('click', () => {
+      cronogramaDiaAtual = cronogramaDiaSomar(cronogramaDiaAtual, -1);
       renderCronograma();
     });
-    document.getElementById('dob-crono-mes-prev').addEventListener('click', () => {
-      const i = meses.indexOf(cronogramaMesAtual);
-      if(i > 0){ cronogramaMesAtual = meses[i-1]; renderCronograma(); }
+    document.getElementById('dob-crono-dia-next').addEventListener('click', () => {
+      cronogramaDiaAtual = cronogramaDiaSomar(cronogramaDiaAtual, 1);
+      renderCronograma();
     });
-    document.getElementById('dob-crono-mes-next').addEventListener('click', () => {
-      const i = meses.indexOf(cronogramaMesAtual);
-      if(i < meses.length - 1){ cronogramaMesAtual = meses[i+1]; renderCronograma(); }
+    document.getElementById('dob-crono-dia-hoje').addEventListener('click', () => {
+      cronogramaDiaAtual = todayStr();
+      renderCronograma();
     });
     container.querySelectorAll('[data-crono-chave]').forEach(chk => {
       chk.addEventListener('change', (ev) => {
