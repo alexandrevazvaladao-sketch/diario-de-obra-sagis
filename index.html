@@ -770,7 +770,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.05.4';
+  const APP_VERSION = 'v2026.10.05.5';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -4681,20 +4681,34 @@
       });
     })();
 
-    document.getElementById('dob-f-salvar').addEventListener('click', () => {
+    document.getElementById('dob-f-salvar').addEventListener('click', async () => {
       draft.date = document.getElementById('dob-f-data').value || todayStr();
       draft.clima = document.getElementById('dob-f-clima').value;
       draft.ocorrencia = document.getElementById('dob-f-ocorrencia').checked;
       draft.texto = document.getElementById('dob-f-texto').value.trim();
       const temConteudo = draft.texto || draft.equipamentos || draft.maodeobra || draft.fotos.length > 0;
       if(!temConteudo){ alert('Preencha ao menos um campo ou adicione uma foto antes de salvar.'); return; }
+      // Espera a sincronização com o Drive terminar de verdade antes de avisar "salvo" e fechar
+      // o formulário — antes disso aqui era "dispara e esquece", e o apontamento podia nunca
+      // chegar no Drive (nem aparecer em outro aparelho) se a pessoa saísse da tela logo depois
+      // de salvar, mesmo com a mensagem de sucesso já tendo aparecido.
+      const btnSalvar = document.getElementById('dob-f-salvar');
+      const textoOriginalBtn = btnSalvar.textContent;
+      btnSalvar.disabled = true;
+      btnSalvar.textContent = 'Salvando…';
       try{
-        saveEntry(draft);
+        const syncOk = await saveEntry(draft);
         formularioSujo = false;
         formContainer.innerHTML = '';
         loadEntries();
-        mostrarToastSalvo('Apontamento salvo');
+        if(accessToken && syncOk === false){
+          mostrarToastSalvo('Apontamento salvo neste aparelho, mas sem internet pra sincronizar com o Drive agora — não vai aparecer em outro aparelho até sincronizar', { erro: true });
+        }else{
+          mostrarToastSalvo('Apontamento salvo');
+        }
       }catch(e){
+        btnSalvar.disabled = false;
+        btnSalvar.textContent = textoOriginalBtn;
         alert('Erro ao salvar o apontamento (espaço local pode estar cheio).');
       }
     });
