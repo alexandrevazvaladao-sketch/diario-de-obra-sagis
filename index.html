@@ -770,7 +770,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.05.3';
+  const APP_VERSION = 'v2026.10.05.4';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -3521,7 +3521,11 @@
     // do Drive, o que podia descartar edições feitas localmente enquanto offline.
     entry.atualizadoEm = Date.now();
     db.set('dob:entry:' + entry.id, JSON.stringify(entry)); // lança erro se o armazenamento local estiver cheio
-    if(accessToken) syncEntriesToDrive();
+    // Devolve a Promise da sincronização (ou null se não tem Drive conectado) pra quem
+    // precisar ter certeza de que terminou de verdade antes de avisar o usuário — quem não
+    // precisar disso continua podendo só chamar saveEntry(entry) sem se preocupar com isso.
+    if(accessToken) return syncEntriesToDrive();
+    return null;
   }
   function deleteEntryLocal(id){
     db.remove('dob:entry:' + id);
@@ -3596,15 +3600,28 @@
     return id;
   }
 
-  let syncing = false;
-  async function syncEntriesToDrive(){
-    if(syncing) return;
-    syncing = true;
-    try{
-      const id = await ensureDataFile();
-      await driveWriteDataFile(id, JSON.stringify(entries));
-    }catch(e){ /* fica só local até a próxima tentativa */ }
-    syncing = false;
+  // Antes isso era "dispara e esquece" (chamado sem await lá no saveEntry): o app já avisava
+  // "salvo" pro usuário mesmo que o envio pro Drive ainda não tivesse terminado de verdade.
+  // Se o app fosse fechado logo em seguida (bem comum no celular, depois de tirar uma foto),
+  // esse envio em segundo plano podia ser interrompido e a foto nunca chegava no Drive — e
+  // por isso nunca aparecia em outro aparelho, mesmo achando que "já tinha subido".
+  // Agora devolve uma Promise que quem chamar pode esperar (await) de verdade, e chamadas
+  // simultâneas compartilham a mesma Promise em vez de pular uma à outra.
+  let syncEntriesPromise = null;
+  function syncEntriesToDrive(){
+    if(syncEntriesPromise) return syncEntriesPromise;
+    syncEntriesPromise = (async () => {
+      try{
+        const id = await ensureDataFile();
+        await driveWriteDataFile(id, JSON.stringify(entries));
+        return true;
+      }catch(e){
+        return false; // fica só local até a próxima tentativa
+      }finally{
+        syncEntriesPromise = null;
+      }
+    })();
+    return syncEntriesPromise;
   }
 
   async function syncFromDriveOnConnect(){
@@ -5575,7 +5592,7 @@
     if(!confirm('Excluir esta foto? Essa ação não pode ser desfeita.')) return;
     const foto = normalizeFoto(entry.fotos[idx]);
     entry.fotos.splice(idx, 1);
-    saveEntry(entry);
+    await saveEntry(entry);
     renderModoCampo();
     render();
     mostrarToastSalvo('Foto excluída');
@@ -5635,7 +5652,7 @@
         if(escolha === undefined) return;
         entryHoje.fotos[idx] = { ...fotoAtual, legenda: escolha || undefined };
         if(!escolha) delete entryHoje.fotos[idx].legenda;
-        saveEntry(entryHoje);
+        await saveEntry(entryHoje);
         renderModoCampo();
         mostrarToastSalvo(escolha ? `Foto vinculada a "${escolha}"` : 'Vínculo removido');
       });
@@ -5660,6 +5677,7 @@
     }
     let falhas = 0;
     let semEspaco = false;
+    let naoSincronizadas = 0;
     campoEnviando = { total: files.length, atual: 0 };
     renderModoCampo();
     try{
@@ -5686,7 +5704,12 @@
         // se uma foto posterior não couber no armazenamento local do navegador
         entry.fotos.push(fotoNova);
         try{
-          saveEntry(entry);
+          // espera a sincronização com o Drive terminar de verdade antes de seguir pra próxima
+          // foto — antes isso era "dispara e esquece", então o app podia avisar "salvo" e o
+          // usuário fechar a tela antes do envio em segundo plano terminar, e a foto nunca
+          // chegava no Drive (nem aparecia em outro aparelho) mesmo parecendo tudo certo aqui.
+          const syncOk = await saveEntry(entry);
+          if(accessToken && syncOk === false) naoSincronizadas++;
         }catch(saveErr){
           entry.fotos.pop(); // não coube — desfaz essa foto específica
           falhas++;
@@ -5717,6 +5740,7 @@
     if(sucesso > 0) mostrarToastSalvo(sucesso === 1 ? 'Foto salva no apontamento de hoje' : `${sucesso} fotos salvas no apontamento de hoje`);
     if(semEspaco) mostrarToastSalvo('Armazenamento local do navegador está cheio — conecte o Google Drive em "Mais opções" pra liberar espaço e continuar salvando fotos', { erro: true });
     else if(falhas > 0) mostrarToastSalvo(`${falhas} foto${falhas === 1 ? '' : 's'} não processada${falhas === 1 ? '' : 's'} — tenta de novo`, { erro: true });
+    if(naoSincronizadas > 0) mostrarToastSalvo(`${naoSincronizadas === files.length ? 'As fotos ficaram' : naoSincronizadas + ' foto(s) ficaram'} salvas só neste aparelho — sem internet pra sincronizar com o Drive agora. Não vão aparecer em outro aparelho até sincronizar; tenta de novo com internet`, { erro: true });
   }
   document.getElementById('dob-campo-file-input').addEventListener('change', async (ev) => {
     const files = Array.from(ev.target.files || []);
