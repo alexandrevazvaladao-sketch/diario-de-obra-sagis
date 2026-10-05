@@ -770,7 +770,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.05.5';
+  const APP_VERSION = 'v2026.10.05.6';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -873,7 +873,8 @@
   })();
   function saveEquipState(sincronizar){
     localStorage.setItem('dob:equip_state', JSON.stringify(equipState));
-    if(sincronizar !== false && accessToken) syncEquipToDrive();
+    if(sincronizar !== false && accessToken) return syncEquipToDrive();
+    return null;
   }
   function estaPresenteNaData(equipId, data){
     return equipState.presencas.some(p => p.equipamentoId === equipId && p.date === data);
@@ -906,7 +907,8 @@
   })();
   function saveMaoObraState(sincronizar){
     localStorage.setItem('dob:maoobra_state', JSON.stringify(maoObraState));
-    if(sincronizar !== false && accessToken) syncMaoObraToDrive();
+    if(sincronizar !== false && accessToken) return syncMaoObraToDrive();
+    return null;
   }
   function estaPresenteMaoObraNaData(pessoaId, data){
     return maoObraState.presencas.some(p => p.pessoaId === pessoaId && p.date === data);
@@ -930,7 +932,8 @@
   })();
   function saveContratosState(sincronizar){
     localStorage.setItem('dob:contratos_state', JSON.stringify(contratosState));
-    if(sincronizar !== false && accessToken) syncContratosToDrive();
+    if(sincronizar !== false && accessToken) return syncContratosToDrive();
+    return null;
   }
 
   // ---------- UAU → BEE: leitura dos relatórios .rdf do UAU (Medição por Obra) pra facilitar a "tradução" manual pro BEE ----------
@@ -948,7 +951,8 @@
   })();
   function saveUauBeeState(sincronizar){
     localStorage.setItem('dob:uaubee_state', JSON.stringify(uauBeeState));
-    if(sincronizar !== false && accessToken) syncUauBeeToDrive();
+    if(sincronizar !== false && accessToken) return syncUauBeeToDrive();
+    return null;
   }
 
   // Lê o binário .rdf do UAU: cada campo de texto do relatório é gravado como um "registro"
@@ -2199,7 +2203,8 @@
   })();
   function saveMapaState(sincronizar){
     localStorage.setItem('dob:mapa_state', JSON.stringify(mapaState));
-    if(sincronizar !== false && accessToken) syncMapaToDrive();
+    if(sincronizar !== false && accessToken) return syncMapaToDrive();
+    return null;
   }
 
   let mapaFileId = localStorage.getItem('dob:mapa_file_id') || null;
@@ -2211,15 +2216,21 @@
     localStorage.setItem('dob:mapa_file_id', id);
     return id;
   }
-  let syncingMapa = false;
-  async function syncMapaToDrive(){
-    if(syncingMapa) return;
-    syncingMapa = true;
-    try{
-      const id = await ensureMapaFile();
-      await driveWriteDataFile(id, JSON.stringify(mapaState));
-    }catch(e){ /* fica só local até a próxima tentativa */ }
-    syncingMapa = false;
+  let syncMapaPromise = null;
+  function syncMapaToDrive(){
+    if(syncMapaPromise) return syncMapaPromise;
+    syncMapaPromise = (async () => {
+      try{
+        const id = await ensureMapaFile();
+        await driveWriteDataFile(id, JSON.stringify(mapaState));
+        return true;
+      }catch(e){ /* fica só local até a próxima tentativa */
+        return false;
+      }finally{
+        syncMapaPromise = null;
+      }
+    })();
+    return syncMapaPromise;
   }
   async function syncMapaFromDriveOnConnect(){
     try{
@@ -3651,15 +3662,21 @@
     }catch(e){ /* segue só com os dados locais se a sincronização falhar */ }
   }
 
-  let syncingEquip = false;
-  async function syncEquipToDrive(){
-    if(syncingEquip) return;
-    syncingEquip = true;
-    try{
-      const id = await ensureEquipFile();
-      await driveWriteDataFile(id, JSON.stringify(equipState));
-    }catch(e){ /* fica só local até a próxima tentativa */ }
-    syncingEquip = false;
+  let syncEquipPromise = null;
+  function syncEquipToDrive(){
+    if(syncEquipPromise) return syncEquipPromise;
+    syncEquipPromise = (async () => {
+      try{
+        const id = await ensureEquipFile();
+        await driveWriteDataFile(id, JSON.stringify(equipState));
+        return true;
+      }catch(e){ /* fica só local até a próxima tentativa */
+        return false;
+      }finally{
+        syncEquipPromise = null;
+      }
+    })();
+    return syncEquipPromise;
   }
 
   async function syncEquipFromDriveOnConnect(){
@@ -3696,15 +3713,21 @@
     localStorage.setItem('dob:maoobra_file_id', id);
     return id;
   }
-  let syncingMaoObra = false;
-  async function syncMaoObraToDrive(){
-    if(syncingMaoObra) return;
-    syncingMaoObra = true;
-    try{
-      const id = await ensureMaoObraFile();
-      await driveWriteDataFile(id, JSON.stringify(maoObraState));
-    }catch(e){ /* fica só local até a próxima tentativa */ }
-    syncingMaoObra = false;
+  let syncMaoObraPromise = null;
+  function syncMaoObraToDrive(){
+    if(syncMaoObraPromise) return syncMaoObraPromise;
+    syncMaoObraPromise = (async () => {
+      try{
+        const id = await ensureMaoObraFile();
+        await driveWriteDataFile(id, JSON.stringify(maoObraState));
+        return true;
+      }catch(e){ /* fica só local até a próxima tentativa */
+        return false;
+      }finally{
+        syncMaoObraPromise = null;
+      }
+    })();
+    return syncMaoObraPromise;
   }
   async function syncMaoObraFromDriveOnConnect(){
     try{
@@ -3739,15 +3762,21 @@
     localStorage.setItem('dob:contratos_file_id', id);
     return id;
   }
-  let syncingContratos = false;
-  async function syncContratosToDrive(){
-    if(syncingContratos) return;
-    syncingContratos = true;
-    try{
-      const id = await ensureContratosFile();
-      await driveWriteDataFile(id, JSON.stringify(contratosState));
-    }catch(e){ /* fica só local até a próxima tentativa */ }
-    syncingContratos = false;
+  let syncContratosPromise = null;
+  function syncContratosToDrive(){
+    if(syncContratosPromise) return syncContratosPromise;
+    syncContratosPromise = (async () => {
+      try{
+        const id = await ensureContratosFile();
+        await driveWriteDataFile(id, JSON.stringify(contratosState));
+        return true;
+      }catch(e){ /* fica só local até a próxima tentativa */
+        return false;
+      }finally{
+        syncContratosPromise = null;
+      }
+    })();
+    return syncContratosPromise;
   }
   async function syncContratosFromDriveOnConnect(){
     try{
@@ -3779,15 +3808,21 @@
     localStorage.setItem('dob:uaubee_file_id', id);
     return id;
   }
-  let syncingUauBee = false;
-  async function syncUauBeeToDrive(){
-    if(syncingUauBee) return;
-    syncingUauBee = true;
-    try{
-      const id = await ensureUauBeeFile();
-      await driveWriteDataFile(id, JSON.stringify(uauBeeState));
-    }catch(e){ /* fica só local até a próxima tentativa */ }
-    syncingUauBee = false;
+  let syncUauBeePromise = null;
+  function syncUauBeeToDrive(){
+    if(syncUauBeePromise) return syncUauBeePromise;
+    syncUauBeePromise = (async () => {
+      try{
+        const id = await ensureUauBeeFile();
+        await driveWriteDataFile(id, JSON.stringify(uauBeeState));
+        return true;
+      }catch(e){ /* fica só local até a próxima tentativa */
+        return false;
+      }finally{
+        syncUauBeePromise = null;
+      }
+    })();
+    return syncUauBeePromise;
   }
   async function syncUauBeeFromDriveOnConnect(){
     try{
