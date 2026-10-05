@@ -770,7 +770,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.05.6';
+  const APP_VERSION = 'v2026.10.05.7';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2224,8 +2224,9 @@
         const id = await ensureMapaFile();
         await driveWriteDataFile(id, JSON.stringify(mapaState));
         return true;
-      }catch(e){ /* fica só local até a próxima tentativa */
-        return false;
+      }catch(e){
+        agendarRetentativaSyncGeral();
+        return false; // fica só local até a próxima tentativa automática
       }finally{
         syncMapaPromise = null;
       }
@@ -3611,6 +3612,31 @@
     return id;
   }
 
+  // ---------- Retentativa automática de sincronização ----------
+  // Se uma sincronização falhar (ex: sem internet no momento), antes isso ficava
+  // só local até o usuário fechar e abrir o app de novo (ou mudar algo e salvar outra
+  // vez). Agora agenda uma nova tentativa automaticamente — e também tenta de novo na
+  // hora em que o navegador detectar que a internet voltou. Como cada syncXToDrive só
+  // reenvia o estado atual (sobrescreve), chamar de novo não tem risco de duplicar nada.
+  let syncRetryTimer = null;
+  function agendarRetentativaSyncGeral(delayMs){
+    if(!accessToken) return;
+    if(syncRetryTimer) clearTimeout(syncRetryTimer);
+    syncRetryTimer = setTimeout(() => {
+      syncRetryTimer = null;
+      if(!accessToken) return;
+      Promise.all([
+        syncEntriesToDrive(),
+        syncEquipToDrive(),
+        syncMaoObraToDrive(),
+        syncContratosToDrive(),
+        syncUauBeeToDrive(),
+        syncMapaToDrive()
+      ]).then(() => updateStatus());
+    }, delayMs || 20000);
+  }
+  window.addEventListener('online', () => agendarRetentativaSyncGeral(1500));
+
   // Antes isso era "dispara e esquece" (chamado sem await lá no saveEntry): o app já avisava
   // "salvo" pro usuário mesmo que o envio pro Drive ainda não tivesse terminado de verdade.
   // Se o app fosse fechado logo em seguida (bem comum no celular, depois de tirar uma foto),
@@ -3627,7 +3653,8 @@
         await driveWriteDataFile(id, JSON.stringify(entries));
         return true;
       }catch(e){
-        return false; // fica só local até a próxima tentativa
+        agendarRetentativaSyncGeral();
+        return false; // fica só local até a próxima tentativa automática
       }finally{
         syncEntriesPromise = null;
       }
@@ -3670,8 +3697,9 @@
         const id = await ensureEquipFile();
         await driveWriteDataFile(id, JSON.stringify(equipState));
         return true;
-      }catch(e){ /* fica só local até a próxima tentativa */
-        return false;
+      }catch(e){
+        agendarRetentativaSyncGeral();
+        return false; // fica só local até a próxima tentativa automática
       }finally{
         syncEquipPromise = null;
       }
@@ -3721,8 +3749,9 @@
         const id = await ensureMaoObraFile();
         await driveWriteDataFile(id, JSON.stringify(maoObraState));
         return true;
-      }catch(e){ /* fica só local até a próxima tentativa */
-        return false;
+      }catch(e){
+        agendarRetentativaSyncGeral();
+        return false; // fica só local até a próxima tentativa automática
       }finally{
         syncMaoObraPromise = null;
       }
@@ -3770,8 +3799,9 @@
         const id = await ensureContratosFile();
         await driveWriteDataFile(id, JSON.stringify(contratosState));
         return true;
-      }catch(e){ /* fica só local até a próxima tentativa */
-        return false;
+      }catch(e){
+        agendarRetentativaSyncGeral();
+        return false; // fica só local até a próxima tentativa automática
       }finally{
         syncContratosPromise = null;
       }
@@ -3816,8 +3846,9 @@
         const id = await ensureUauBeeFile();
         await driveWriteDataFile(id, JSON.stringify(uauBeeState));
         return true;
-      }catch(e){ /* fica só local até a próxima tentativa */
-        return false;
+      }catch(e){
+        agendarRetentativaSyncGeral();
+        return false; // fica só local até a próxima tentativa automática
       }finally{
         syncUauBeePromise = null;
       }
@@ -5181,7 +5212,7 @@
             </div>`).join('')}</div>`
         : `<p class="dob-dica" style="margin:0;">Nenhuma foto vinculada a "${servico}" ainda.</p>`;
       corpo.querySelectorAll('[data-ger-desvincular]').forEach(el => {
-        el.addEventListener('click', (ev) => {
+        el.addEventListener('click', async (ev) => {
           ev.stopPropagation();
           const [entryId, idxStr] = el.dataset.gerDesvincular.split('|||');
           const idx = Number(idxStr);
@@ -5190,8 +5221,10 @@
           const fotoAtual = normalizeFoto(entry.fotos[idx]);
           delete fotoAtual.legenda;
           entry.fotos[idx] = fotoAtual;
-          saveEntry(entry);
-          mostrarToastSalvo('Vínculo removido');
+          const syncOk = await saveEntry(entry);
+          mostrarToastSalvo((accessToken && syncOk === false)
+            ? 'Vínculo removido neste aparelho, mas sem internet pra sincronizar agora'
+            : 'Vínculo removido', (accessToken && syncOk === false) ? { erro: true } : undefined);
           render();
           atualizarBotaoMapa();
         });
@@ -5229,8 +5262,14 @@
         entry.fotos[escolha.idx] = { ...fotoAtual, legenda: servico };
         entriesAtualizados.add(entry);
       });
-      entriesAtualizados.forEach(entry => saveEntry(entry));
-      mostrarToastSalvo(escolhas.length > 1 ? `${escolhas.length} fotos vinculadas a "${servico}"` : `Foto vinculada a "${servico}"`);
+      const resultados = await Promise.all(Array.from(entriesAtualizados).map(entry => saveEntry(entry)));
+      const falhouSync = accessToken && resultados.some(r => r === false);
+      mostrarToastSalvo(
+        falhouSync
+          ? 'Vínculo salvo neste aparelho, mas sem internet pra sincronizar agora'
+          : (escolhas.length > 1 ? `${escolhas.length} fotos vinculadas a "${servico}"` : `Foto vinculada a "${servico}"`),
+        falhouSync ? { erro: true } : undefined
+      );
       render();
       atualizarBotaoMapa();
     });
@@ -5341,11 +5380,17 @@
       entry.fotos[escolha.idx] = { ...fotoAtual, legenda: servico };
       entriesAtualizados.add(entry);
     });
-    entriesAtualizados.forEach(entry => saveEntry(entry));
+    const resultados = await Promise.all(Array.from(entriesAtualizados).map(entry => saveEntry(entry)));
+    const falhouSync = accessToken && resultados.some(r => r === false);
     preservarEstadoAoRenderizar();
-    mostrarToastSalvo(escolhas.length > 1 ? `${escolhas.length} fotos vinculadas a "${servico}"` : `Foto vinculada a "${servico}"`);
+    mostrarToastSalvo(
+      falhouSync
+        ? 'Vínculo salvo neste aparelho, mas sem internet pra sincronizar agora'
+        : (escolhas.length > 1 ? `${escolhas.length} fotos vinculadas a "${servico}"` : `Foto vinculada a "${servico}"`),
+      falhouSync ? { erro: true } : undefined
+    );
   });
-  document.addEventListener('click', (ev) => {
+  document.addEventListener('click', async (ev) => {
     const alvo = ev.target.closest('.dob-mapa-foto-desvincular');
     if(!alvo) return;
     ev.stopPropagation();
@@ -5355,9 +5400,12 @@
     const fotoAtual = normalizeFoto(entry.fotos[idx]);
     delete fotoAtual.legenda;
     entry.fotos[idx] = fotoAtual;
-    saveEntry(entry);
+    const syncOk = await saveEntry(entry);
     preservarEstadoAoRenderizar();
-    mostrarToastSalvo('Vínculo removido');
+    mostrarToastSalvo(
+      (accessToken && syncOk === false) ? 'Vínculo removido neste aparelho, mas sem internet pra sincronizar agora' : 'Vínculo removido',
+      (accessToken && syncOk === false) ? { erro: true } : undefined
+    );
   });
   document.addEventListener('click', (ev) => {
     const alvo = ev.target.closest('.dob-mapa-foto-abrir');
