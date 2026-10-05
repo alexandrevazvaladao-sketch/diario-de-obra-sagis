@@ -117,6 +117,14 @@
     margin-top:3px;
     position:relative;
   }
+  .dob-versao{
+    font-family: "SF Mono", ui-monospace, monospace;
+    font-size:9.5px;
+    letter-spacing:0.6px;
+    color:#6c7891;
+    margin:4px 0 0;
+    position:relative;
+  }
   .dob-stamp{
     font-family: "SF Mono", ui-monospace, monospace;
     font-size:10.5px;
@@ -685,6 +693,7 @@
     <div>
       <p class="dob-title">Diário de Obra</p>
       <p class="dob-sub">Solar dos Pequis &amp; Solar dos Buritis — Anápolis/GO</p>
+      <p class="dob-versao" id="dob-versao" title="Versão do app carregada neste aparelho"></p>
     </div>
     <div class="dob-header-right" style="display:flex; align-items:center; gap:10px;">
       <a class="dob-drive-link" id="dob-link-pasta" href="#" target="_blank" style="display:none;">Abrir pasta no Drive →</a>
@@ -758,6 +767,13 @@
 
 <script>
 (function(){
+  // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
+  // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
+  // (útil pra saber se um celular/PWA ainda está com algo em cache).
+  const APP_VERSION = 'v2026.10.05.1';
+  const versaoEl = document.getElementById('dob-versao');
+  if(versaoEl) versaoEl.textContent = APP_VERSION;
+
   const listaEl = document.getElementById('dob-lista');
   const formContainer = document.getElementById('dob-form-container');
   const contadorEl = document.getElementById('dob-contador');
