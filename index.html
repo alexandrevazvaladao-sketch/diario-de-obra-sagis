@@ -770,7 +770,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.05.2';
+  const APP_VERSION = 'v2026.10.05.3';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -5563,10 +5563,33 @@
     const src = nf.thumb || nf.data || '';
     const legenda = nf.legenda;
     return `
-      <div class="dob-campo-thumb" data-idx="${i}" style="cursor:pointer; border-radius:8px; overflow:hidden; border:1px solid var(--line); background:#fff;">
+      <div class="dob-campo-thumb" data-idx="${i}" style="position:relative; cursor:pointer; border-radius:8px; overflow:hidden; border:1px solid var(--line); background:#fff;">
+        <button type="button" class="dob-mapa-foto-desvincular dob-campo-foto-excluir" data-idx="${i}" title="Excluir esta foto">✕</button>
         <img src="${src}" style="width:100%; height:90px; object-fit:cover; display:block; background:#eee;" />
         <div style="padding:4px 6px; font-size:10px; line-height:1.3; ${legenda ? 'color:var(--clay-dark,#c2551f); font-weight:600;' : 'color:#8a8272;'} white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${legenda ? '🔗 ' + legenda : 'Toque pra vincular'}</div>
       </div>`;
+  }
+
+  async function excluirFotoCampo(entry, idx){
+    if(!entry || !entry.fotos || !entry.fotos[idx]) return;
+    if(!confirm('Excluir esta foto? Essa ação não pode ser desfeita.')) return;
+    const foto = normalizeFoto(entry.fotos[idx]);
+    entry.fotos.splice(idx, 1);
+    saveEntry(entry);
+    renderModoCampo();
+    render();
+    mostrarToastSalvo('Foto excluída');
+    if(foto.type === 'drive' && foto.fileId && accessToken){
+      try{
+        await fetch(`https://www.googleapis.com/drive/v3/files/${foto.fileId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + accessToken }
+        });
+      }catch(e){
+        // a foto já saiu da lista aqui no app; se a remoção no Drive falhar (ex: sem internet),
+        // o arquivo original fica órfão lá, mas não afeta mais o apontamento
+      }
+    }
   }
 
   let campoEnviando = null; // { total, atual } enquanto processa/envia fotos, null quando ocioso
@@ -5595,8 +5618,16 @@
         ${fotos.length === 0 ? '<p class="dob-dica">Nenhuma foto ainda hoje.</p>' : `<div id="dob-campo-galeria" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:8px;">${fotos.map((f, i) => fotoCampoThumbHtml(f, i)).join('')}</div>`}
       </div>
     `;
+    container.querySelectorAll('.dob-campo-foto-excluir').forEach(btn => {
+      btn.addEventListener('click', async (ev) => {
+        ev.stopPropagation();
+        const idx = Number(btn.dataset.idx);
+        await excluirFotoCampo(entryHoje, idx);
+      });
+    });
     container.querySelectorAll('.dob-campo-thumb').forEach(el => {
-      el.addEventListener('click', async () => {
+      el.addEventListener('click', async (ev) => {
+        if(ev.target.closest('.dob-campo-foto-excluir')) return;
         const idx = Number(el.dataset.idx);
         const fotoAtual = normalizeFoto(entryHoje.fotos[idx]);
         const atividades = listaAtividadesParaVincular();
