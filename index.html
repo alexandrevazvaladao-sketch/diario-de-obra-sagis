@@ -3494,12 +3494,16 @@
     updateStatus();
     render();
   }
+  function isErroDeEspaco(e){
+    return !!e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014 || /quota/i.test(e.message || ''));
+  }
+
   function saveEntry(entry){
     // Carimba quando foi a última alteração local — usado na hora de mesclar com o Drive
     // (syncFromDriveOnConnect) pra decidir qual versão é mais nova em vez de sempre usar a
     // do Drive, o que podia descartar edições feitas localmente enquanto offline.
     entry.atualizadoEm = Date.now();
-    db.set('dob:entry:' + entry.id, JSON.stringify(entry));
+    db.set('dob:entry:' + entry.id, JSON.stringify(entry)); // lança erro se o armazenamento local estiver cheio
     if(accessToken) syncEntriesToDrive();
   }
   function deleteEntryLocal(id){
@@ -5603,23 +5607,40 @@
     if(files.length === 0) return;
     const entry = acharOuCriarEntradaHoje();
     let falhas = 0;
+    let semEspaco = false;
     campoEnviando = { total: files.length, atual: 0 };
     renderModoCampo();
     for(const file of files){
       try{
         const [fullRes, thumbRes] = await Promise.all([ compressImage(file, 1600, 0.82), compressImage(file, 180, 0.5) ]);
         const filename = `diario_${entry.date}_${fmtTimestamp()}.jpg`;
+        let fotoNova;
+        let salvouNoDrive = false;
         if(accessToken){
           try{
             const fileId = await uploadToDrive(fullRes, filename);
-            entry.fotos.push({ type: 'drive', fileId, thumb: thumbRes });
+            fotoNova = { type: 'drive', fileId, thumb: thumbRes };
+            salvouNoDrive = true;
           }catch(driveErr){
             const localRes = await compressImage(file, 1100, 0.6);
-            entry.fotos.push({ type: 'local', data: localRes });
+            fotoNova = { type: 'local', data: localRes };
           }
         }else{
           const localRes = await compressImage(file, 1100, 0.6);
-          entry.fotos.push({ type: 'local', data: localRes });
+          fotoNova = { type: 'local', data: localRes };
+        }
+        // salva a cada foto (não só no final) pra não travar nem perder as fotos já processadas
+        // se uma foto posterior não couber no armazenamento local do navegador
+        entry.fotos.push(fotoNova);
+        try{
+          saveEntry(entry);
+        }catch(saveErr){
+          entry.fotos.pop(); // não coube — desfaz essa foto específica
+          falhas++;
+          if(isErroDeEspaco(saveErr)){
+            semEspaco = true;
+            if(!salvouNoDrive) break; // sem espaço local e sem Drive: as próximas também vão falhar, para por aqui
+          }
         }
       }catch(e){
         falhas++;
@@ -5628,12 +5649,12 @@
       renderModoCampo();
     }
     campoEnviando = null;
-    saveEntry(entry);
     renderModoCampo();
     render();
     const sucesso = files.length - falhas;
     if(sucesso > 0) mostrarToastSalvo(sucesso === 1 ? 'Foto salva no apontamento de hoje' : `${sucesso} fotos salvas no apontamento de hoje`);
-    if(falhas > 0) mostrarToastSalvo(`${falhas} foto${falhas === 1 ? '' : 's'} não processada${falhas === 1 ? '' : 's'} — tenta de novo`);
+    if(semEspaco) mostrarToastSalvo('Armazenamento local do navegador está cheio — conecte o Google Drive em "Mais opções" pra liberar espaço e continuar salvando fotos');
+    else if(falhas > 0) mostrarToastSalvo(`${falhas} foto${falhas === 1 ? '' : 's'} não processada${falhas === 1 ? '' : 's'} — tenta de novo`);
   }
   document.getElementById('dob-campo-file-input').addEventListener('change', async (ev) => {
     const files = ev.target.files;
