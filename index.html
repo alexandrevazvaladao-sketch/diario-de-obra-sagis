@@ -770,7 +770,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.05.7';
+  const APP_VERSION = 'v2026.10.06.1';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -5531,7 +5531,7 @@
         ${secaoHtml('Equipamentos', e.equipamentos)}
         ${secaoHtml('Mão de obra', e.maodeobra)}
         ${e.texto ? `<div class="dob-entry-secao"><div class="dob-entry-secao-label">Observações</div><div class="dob-entry-secao-texto">${e.texto.replace(/</g,'&lt;')}</div></div>` : ''}
-        ${e.fotos && e.fotos.length ? `<div class="dob-entry-fotos">${e.fotos.map((f,i) => { const nf=normalizeFoto(f); return `<img src="${nf.thumb || nf.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" data-eid="${e.id}" data-fidx="${i}" />`; }).join('')}</div>` : ''}
+        ${e.fotos && e.fotos.length ? `<div class="dob-entry-fotos">${e.fotos.map((f,i) => { const nf=normalizeFoto(f); return `<span class="dob-foto-item"><img src="${nf.thumb || nf.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" data-eid="${e.id}" data-fidx="${i}" /><button type="button" class="dob-thumb-del dob-lista-foto-excluir" data-eid="${e.id}" data-fidx="${i}" title="Excluir esta foto">×</button></span>`; }).join('')}</div>` : ''}
         <div class="dob-entry-acoes">
           <button class="dob-btn secundario pequeno dob-editar" data-id="${e.id}">Editar</button>
           <button class="dob-btn perigo pequeno dob-excluir" data-id="${e.id}">Excluir</button>
@@ -5543,6 +5543,11 @@
     listaEl.querySelectorAll('.dob-entry-fotos img').forEach(img => img.addEventListener('click', () => {
       const entry = entries.find(x => x.id === img.dataset.eid);
       if(entry) openLightbox(entry.fotos, parseInt(img.dataset.fidx), () => { saveEntry(entry); render(); });
+    }));
+    listaEl.querySelectorAll('.dob-lista-foto-excluir').forEach(btn => btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const entry = entries.find(x => x.id === btn.dataset.eid);
+      if(entry) excluirFotoCampo(entry, parseInt(btn.dataset.fidx));
     }));
     listaEl.querySelectorAll('.dob-editar').forEach(btn => btn.addEventListener('click', () => { const entry = entries.find(x => x.id === btn.dataset.id); if(entry) openForm(entry); }));
     listaEl.querySelectorAll('.dob-excluir').forEach(btn => btn.addEventListener('click', () => {
