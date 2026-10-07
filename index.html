@@ -219,6 +219,17 @@
   .dob-campo label{ font-size:10.5px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); font-weight:700; }
   .dob-dica{ font-size:12px; color:var(--muted); margin-top:6px; line-height:1.5; }
 
+  .dob-custo-sugestoes{ display:flex; flex-direction:column; gap:4px; margin-bottom:8px; }
+  .dob-custo-sug{ text-align:left; background:var(--paper2,#f3ede1); border:1px solid var(--line); border-radius:8px; padding:7px 10px; font-size:12.5px; cursor:pointer; }
+  .dob-custo-sug .cat{ color:var(--muted); font-size:10.5px; text-transform:uppercase; margin-right:6px; }
+  .dob-custo-empresas{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:10px; }
+  .dob-custo-emp{ border:1px solid var(--line); border-radius:10px; padding:12px; background:#fff; }
+  .dob-custo-emp.melhor{ border-color:var(--moss,#3f7d5c); box-shadow:0 0 0 1px var(--moss,#3f7d5c) inset; }
+  .dob-custo-emp .nome{ font-weight:800; margin-bottom:8px; }
+  .dob-custo-emp .linha{ display:flex; justify-content:space-between; gap:8px; font-size:12.5px; padding:3px 0; border-bottom:1px dashed var(--line); }
+  .dob-custo-emp .linha.total{ border-bottom:none; border-top:1px solid var(--line); margin-top:4px; padding-top:6px; font-size:14px; }
+  .dob-custo-emp .add{ display:flex; gap:6px; margin-top:8px; }
+  .dob-custo-adic-del{ background:none; border:none; color:var(--brick,#b4472e); cursor:pointer; font-size:12px; }
   .dob-custo-resumo{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:10px 0; }
   .dob-custo-resumo > div{ background:var(--paper2,#f3ede1); border:1px solid var(--line); border-radius:10px; padding:10px 12px; display:flex; flex-direction:column; gap:2px; }
   .dob-custo-resumo .rot{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
@@ -797,7 +808,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.07.1';
+  const APP_VERSION = 'v2026.10.07.2';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2335,6 +2346,67 @@
     return { pct: Math.min(100, concl.length / base.length * 100), concluidos: concl.length, total: base.length,
              andamento: estados.length - concl.length, inicio: inicios[0] || null, fim: fins[fins.length-1] || null, dias };
   }
+  // ---------- Comparar empresas: preço de cada empresa pelo mesmo serviço (contratos do UAU) ----------
+  let custoEtapaAba = 'orcado';
+  function custoNorm(s){ return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim(); }
+  function custoComparativoEmpresasHtml(){
+    const contratos = (uauBeeState && uauBeeState.contratos) || [];
+    const grupos = {};
+    contratos.forEach(c => {
+      const obra = /PEQUIS/i.test(c.obra) ? 'Pequis' : /BURITIS/i.test(c.obra) ? 'Buritis' : (c.obra || '');
+      (c.itens || []).forEach(it => {
+        if(!it.precoUnitario) return;
+        const limpo = String(it.descricao || '').replace(/^SERVI[CÇ]O DE M[AÃ]O DE OBRA\s*-\s*/i, '').trim();
+        const chave = custoNorm(limpo).slice(0, 40);
+        const g = grupos[chave] = grupos[chave] || { desc: limpo, un: it.unidade, porEmpresa: {} };
+        const e = g.porEmpresa[c.fornecedorNome] = g.porEmpresa[c.fornecedorNome] || { precos: [], qtd: 0, total: 0, obras: new Set() };
+        e.precos.push(it.precoUnitario); e.qtd += it.quantidade || 0; e.total += it.total || 0; e.obras.add(obra);
+      });
+    });
+    const comparaveis = Object.values(grupos).filter(g => Object.keys(g.porEmpresa).length >= 2);
+    if(!comparaveis.length){
+      return `<p class="dob-dica">Ainda não há serviço com preço de duas ou mais empresas nos contratos do UAU. Importe o relatório "Contratos por Obra" no painel UAU → BEE.</p>`;
+    }
+    const faixa = (arr) => { const mn = Math.min(...arr), mx = Math.max(...arr); return mn === mx ? custoMoeda(mn) : `${custoMoeda(mn)} a ${custoMoeda(mx)}`; };
+    // Pacote por bloco: soma do preço dos serviços cobrados "por bloco" (BL), por empresa
+    const pacote = {};
+    comparaveis.filter(g => /^BL/i.test(g.un || '')).forEach(g => {
+      Object.entries(g.porEmpresa).forEach(([emp, e]) => { pacote[emp] = (pacote[emp] || 0) + Math.min(...e.precos); });
+    });
+    const empresasPacote = Object.keys(pacote);
+    if(!mapaState.custoEtapa) mapaState.custoEtapa = {};
+    let pacoteHtml = '';
+    if(empresasPacote.length >= 2){
+      const totais = {};
+      empresasPacote.forEach(emp => { totais[emp] = pacote[emp] + ((mapaState.custoEtapa['adic|' + emp] || []).reduce((s, a) => s + (a.v || 0), 0)); });
+      const menor = Math.min(...Object.values(totais));
+      pacoteHtml = `
+        <h4 style="margin:14px 0 6px;">Pacote por bloco (bloco de coroamento + fiada zero + lajão + aterro + impermeabilização + contrapiso)</h4>
+        <p class="dob-dica">Soma dos serviços cobrados por bloco no contrato de cada empresa. Em "Adicionais por bloco" lance o que a empresa NÃO inclui no preço e a obra paga por fora (madeira de forma, máquina de apoio, recompactação do solo, ferro, concreto a mais...). Assim a comparação fica pelo custo real do bloco.</p>
+        <div class="dob-custo-empresas">${empresasPacote.map(emp => {
+          const adic = mapaState.custoEtapa['adic|' + emp] || [];
+          const somaAdic = adic.reduce((s, a) => s + (a.v || 0), 0);
+          const delta = menor > 0 ? (totais[emp] / menor - 1) * 100 : 0;
+          return `<div class="dob-custo-emp ${totais[emp] === menor ? 'melhor' : ''}">
+            <div class="nome">${custoEsc(emp)}${totais[emp] === menor ? ' <span class="dob-custo-chip">mais barato</span>' : ''}</div>
+            <div class="linha"><span>Contrato (por bloco)</span><b>${custoMoeda(pacote[emp])}</b></div>
+            ${adic.map((a, i) => `<div class="linha"><span>+ ${custoEsc(a.d)} <button type="button" class="dob-custo-adic-del" data-emp="${custoEsc(emp)}" data-i="${i}" title="Remover">✕</button></span><b>${custoMoeda(a.v)}</b></div>`).join('')}
+            <div class="linha total"><span>Total por bloco</span><b>${custoMoeda(totais[emp])}${delta > 0.05 ? ` <small>(+${delta.toFixed(0)}%)</small>` : ''}</b></div>
+            <div class="add"><input class="dob-input dob-custo-adic-d" data-emp="${custoEsc(emp)}" placeholder="Adicional (ex.: madeira de forma)" style="flex:1; min-width:120px;"><input type="number" min="0" step="0.01" class="dob-input dob-custo-adic-v" data-emp="${custoEsc(emp)}" placeholder="R$/bloco" style="width:100px;"><button type="button" class="dob-btn pequeno dob-custo-adic-add" data-emp="${custoEsc(emp)}">+</button></div>
+          </div>`;
+        }).join('')}</div>`;
+    }
+    const tabelas = comparaveis.map(g => {
+      const lin = Object.entries(g.porEmpresa).map(([emp, e]) => ({ emp, min: Math.min(...e.precos), txt: faixa(e.precos), qtd: e.qtd, total: e.total, obras: [...e.obras].join(' + ') }));
+      const menor = Math.min(...lin.map(l => l.min));
+      return `<tr class="comp"><td colspan="5">${custoEsc(g.desc)} <span class="cat">(${custoEsc(g.un || '')})</span></td></tr>` +
+        lin.sort((a, b) => a.min - b.min).map(l => `<tr><td>${custoEsc(l.emp)} <span class="cat">· ${custoEsc(l.obras)}</span></td><td class="num">${l.txt}</td><td class="num">${custoNum(l.qtd)}</td><td class="num">${custoMoeda(l.total)}</td><td class="num">${l.min === menor ? '<b style="color:var(--moss,#3f7d5c)">menor</b>' : '+' + ((l.min / menor - 1) * 100).toFixed(0) + '%'}</td></tr>`).join('');
+    }).join('');
+    return `${pacoteHtml}
+      <h4 style="margin:16px 0 6px;">Serviço a serviço (mesmo serviço, empresas diferentes)</h4>
+      <div class="dob-pd-wrap"><table class="dob-custo-tab"><thead><tr><th>Serviço / empresa</th><th class="num">Preço unitário</th><th class="num">Qtde contratada</th><th class="num">Valor contratado</th><th class="num">vs. menor</th></tr></thead><tbody>${tabelas}</tbody></table></div>`;
+  }
+
   function renderCustoEtapa(){
     const container = document.getElementById('dob-custo-etapa-container');
     if(!custoEtapaAberto){ container.innerHTML = ''; return; }
@@ -2409,10 +2481,8 @@
     }).join('');
 
     const chipsMacro = CUSTO_CATS.filter(c => porCatMacro[c] > 0).map(c => `<span class="dob-custo-chip">${c}: <b>${custoMoeda(porCatMacro[c])}</b></span>`).join('');
-    container.innerHTML = `
-      <div class="dob-card-form">
+    const corpoOrcado = `
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-          <h3 style="margin:0;">Custo por etapa</h3>
           <select class="dob-select" id="dob-custo-macro" style="width:auto; max-width:100%;">
             ${macros.map((m, i) => `<option value="${i}" ${i === custoEtapaMacro ? 'selected' : ''}>${custoEsc(m.desc)}</option>`).join('')}
           </select>
@@ -2424,10 +2494,66 @@
           <div><span class="rot">Avanço financeiro</span><span class="val">${macro.total ? Math.round(totExec / macro.total * 100) : 0}%</span></div>
         </div>
         <div class="dob-custo-chips" style="margin-bottom:12px;">${chipsMacro}</div>
-        ${cards || '<p class="dob-dica">Esta macro não tem etapas com valor.</p>'}
+        ${cards || '<p class="dob-dica">Esta macro não tem etapas com valor.</p>'}`;
+    container.innerHTML = `
+      <div class="dob-card-form">
+        <h3 style="margin:0 0 8px;">Custo por etapa</h3>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+          <button type="button" class="dob-btn pequeno ${custoEtapaAba === 'orcado' ? '' : 'secundario'}" data-custo-aba="orcado">Orçado × avanço</button>
+          <button type="button" class="dob-btn pequeno ${custoEtapaAba === 'empresas' ? '' : 'secundario'}" data-custo-aba="empresas">Comparar empresas</button>
+        </div>
+        <input class="dob-input" id="dob-custo-busca" placeholder="🔍 Buscar macro-serviço ou etapa pelo nome (ex.: fundação, arrasamento, lajão)…" autocomplete="off" style="width:100%; margin-bottom:6px;">
+        <div id="dob-custo-sugestoes" class="dob-custo-sugestoes"></div>
+        ${custoEtapaAba === 'empresas' ? custoComparativoEmpresasHtml() : corpoOrcado}
       </div>`;
 
-    document.getElementById('dob-custo-macro').addEventListener('change', (e) => { custoEtapaMacro = parseInt(e.target.value); renderCustoEtapa(); });
+    container.querySelectorAll('[data-custo-aba]').forEach(b => b.addEventListener('click', () => { custoEtapaAba = b.dataset.custoAba; renderCustoEtapa(); }));
+    const buscaEl = document.getElementById('dob-custo-busca');
+    const sugEl = document.getElementById('dob-custo-sugestoes');
+    const achar = (termo) => {
+      const t = custoNorm(termo);
+      if(t.length < 2) return [];
+      const out = [];
+      macros.forEach((m, mi) => {
+        if(custoNorm(m.desc).includes(t)) out.push({ mi, cod: null, rot: m.desc, tipo: 'macro' });
+        m.itens.forEach(it => {
+          if(custoNorm(it.desc).includes(t)) out.push({ mi, cod: it.cod, rot: `${m.desc} › ${it.cod} ${it.desc}`, tipo: 'etapa' });
+          else it.compos.forEach(c => { if(custoNorm(c.desc).includes(t)) out.push({ mi, cod: it.cod, rot: `${m.desc} › ${it.desc} › ${c.desc}`, tipo: 'composição' }); });
+        });
+      });
+      return out.slice(0, 12);
+    };
+    const irPara = (r) => {
+      custoEtapaAba = 'orcado';
+      custoEtapaMacro = r.mi;
+      if(r.cod) custoEtapaDetalhesAbertos.add(r.cod);
+      renderCustoEtapa();
+      const alvo = r.cod ? container.querySelector(`.dob-custo-card[data-cod="${r.cod}"]`) : null;
+      if(alvo) alvo.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    buscaEl.addEventListener('input', () => {
+      const rs = achar(buscaEl.value);
+      sugEl.innerHTML = rs.map((r, i) => `<button type="button" class="dob-custo-sug" data-i="${i}"><span class="cat">${r.tipo}</span> ${custoEsc(r.rot)}</button>`).join('');
+      sugEl.querySelectorAll('.dob-custo-sug').forEach(b => b.addEventListener('click', () => irPara(rs[parseInt(b.dataset.i)])));
+    });
+    buscaEl.addEventListener('keydown', (ev) => { if(ev.key === 'Enter'){ const r = achar(buscaEl.value)[0]; if(r) irPara(r); } });
+    container.querySelectorAll('.dob-custo-adic-add').forEach(b => b.addEventListener('click', () => {
+      const emp = b.dataset.emp;
+      const d = container.querySelector(`.dob-custo-adic-d[data-emp="${CSS.escape(emp)}"]`).value.trim();
+      const v = Number(container.querySelector(`.dob-custo-adic-v[data-emp="${CSS.escape(emp)}"]`).value);
+      if(!d || !(v > 0)) return;
+      const k = 'adic|' + emp;
+      mapaState.custoEtapa[k] = (mapaState.custoEtapa[k] || []).concat([{ d, v }]);
+      saveMapaState(); renderCustoEtapa();
+    }));
+    container.querySelectorAll('.dob-custo-adic-del').forEach(b => b.addEventListener('click', () => {
+      const k = 'adic|' + b.dataset.emp;
+      const arr = (mapaState.custoEtapa[k] || []).slice(); arr.splice(parseInt(b.dataset.i), 1);
+      mapaState.custoEtapa[k] = arr;
+      saveMapaState(); renderCustoEtapa();
+    }));
+    const macroSel = document.getElementById('dob-custo-macro');
+    if(macroSel) macroSel.addEventListener('change', (e) => { custoEtapaMacro = parseInt(e.target.value); renderCustoEtapa(); });
     container.querySelectorAll('.dob-custo-card').forEach(d => d.addEventListener('toggle', () => {
       if(d.open) custoEtapaDetalhesAbertos.add(d.dataset.cod); else custoEtapaDetalhesAbertos.delete(d.dataset.cod);
     }));
