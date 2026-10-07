@@ -838,7 +838,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.07.7';
+  const APP_VERSION = 'v2026.10.07.8';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2309,7 +2309,7 @@
 
       const desenhoPorId = {};
       (remote.desenhos||[]).forEach(d => { if(!servicosExcluidos.includes(d.servico)) desenhoPorId[d.id] = d; });
-      (mapaState.desenhos||[]).forEach(d => { if(!servicosExcluidos.includes(d.servico) && !desenhoPorId[d.id]) desenhoPorId[d.id] = d; });
+      (mapaState.desenhos||[]).forEach(d => { if(servicosExcluidos.includes(d.servico)) return; const r = desenhoPorId[d.id]; if(!r || (d.atualizadoEm || '') >= (r.atualizadoEm || '')) desenhoPorId[d.id] = d; });
 
       const rotacoes = Object.assign({}, remote.rotacoes, mapaState.rotacoes);
       const escopoPorServico = Object.assign({}, remote.escopoPorServico, mapaState.escopoPorServico);
@@ -2862,6 +2862,60 @@
     const [obra, servico, planta, dataApontamento] = alvo.dataset.irMapa.split('|||');
     abrirNoMapa(obra, servico, planta || null, dataApontamento || null);
   });
+  const CORES_TRACO = { amarelo: '#c99a3d', verde: '#3f7d5c' };
+  function fmtCurto(iso){ if(!iso) return ''; const [y,m,d] = iso.split('-'); return `${d}/${m}`; }
+  function pontosDoTraco(d){
+    const p = d.pontos || [];
+    const forma = d.forma || 'livre';
+    if(forma === 'livre' || forma === 'linha') return p;
+    if(p.length < 2) return p;
+    const a = p[0], b = p[p.length - 1];
+    if(forma === 'quadrado') return [a, {x:b.x,y:a.y}, b, {x:a.x,y:b.y}, a];
+    if(forma === 'circulo'){
+      const cx = (a.x+b.x)/2, cy = (a.y+b.y)/2, rx = Math.abs(b.x-a.x)/2, ry = Math.abs(b.y-a.y)/2;
+      const out = [];
+      for(let i = 0; i <= 72; i++){ const t = (i/72) * Math.PI * 2; out.push({ x: cx + rx*Math.cos(t), y: cy + ry*Math.sin(t) }); }
+      return out;
+    }
+    return p;
+  }
+  function rotuloTraco(d){
+    const ini = d.dataInicio || d.data || '';
+    let t;
+    if(d.cor === 'verde') t = d.dataConclusao ? `${fmtCurto(ini)} → ${fmtCurto(d.dataConclusao)}` : fmtCurto(ini);
+    else t = 'desde ' + fmtCurto(ini);
+    if(d.empresa) t += ' · ' + (d.empresa.length > 22 ? d.empresa.slice(0, 21) + '…' : d.empresa);
+    return t;
+  }
+  function desenharTraco(ctx, d, w, h, comRotulo){
+    const pts = pontosDoTraco(d);
+    if(!pts || pts.length < 2) return;
+    ctx.save();
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.strokeStyle = CORES_TRACO[d.cor] || CORES_TRACO.amarelo;
+    ctx.lineWidth = Math.max(3, w * 0.006);
+    ctx.beginPath();
+    pts.forEach((p, i) => { const px = (p.x/100)*w, py = (p.y/100)*h; if(i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
+    ctx.stroke();
+    if(comRotulo){
+      const txt = rotuloTraco(d);
+      if(txt){
+        let topo = pts[0];
+        pts.forEach(p => { if(p.y < topo.y) topo = p; });
+        const fs = Math.max(10, Math.round(w * 0.011));
+        ctx.font = `600 ${fs}px sans-serif`;
+        ctx.textBaseline = 'bottom';
+        const tw = ctx.measureText(txt).width;
+        let tx = (topo.x/100)*w - tw/2; tx = Math.max(2, Math.min(w - tw - 2, tx));
+        let ty = (topo.y/100)*h - 4; if(ty - fs < 0) ty = (topo.y/100)*h + fs + 8;
+        ctx.fillStyle = 'rgba(255,255,255,0.88)';
+        ctx.fillRect(tx - 3, ty - fs - 1, tw + 6, fs + 4);
+        ctx.fillStyle = d.cor === 'verde' ? '#2f5f45' : '#8a6414';
+        ctx.fillText(txt, tx, ty);
+      }
+    }
+    ctx.restore();
+  }
   function baixarImagemMapa(servico, obra, planta){
     const imgEl = document.getElementById('dob-mapa-rede-img');
     if(!imgEl){ alert('Não achei a imagem do mapa pra baixar.'); return; }
@@ -2872,20 +2926,7 @@
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(imgEl, 0, 0, w, h);
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      const CORES = { amarelo: '#c99a3d', verde: '#3f7d5c' };
-      desenhosPara(servico, obra, planta).forEach(d => {
-        if(!d.pontos || d.pontos.length < 2) return;
-        ctx.strokeStyle = CORES[d.cor] || CORES.amarelo;
-        ctx.lineWidth = Math.max(4, w * 0.006);
-        ctx.beginPath();
-        d.pontos.forEach((p, i) => {
-          const px = (p.x / 100) * w, py = (p.y / 100) * h;
-          if(i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-        });
-        ctx.stroke();
-      });
+      desenhosPara(servico, obra, planta).forEach(d => desenharTraco(ctx, d, w, h, mapaMostrarRotulos));
       const link = document.createElement('a');
       link.download = `${planta}_${todayStr().replace(/-/g, '')}.png`;
       link.href = canvas.toDataURL('image/png');
@@ -2893,11 +2934,91 @@
     };
     if(imgEl.complete) gerar(); else imgEl.addEventListener('load', gerar, { once: true });
   }
-  function addDesenho(servico, obra, planta, pontos, cor, data){
+  let mapaMostrarRotulos = true;
+  function addDesenho(servico, obra, planta, dados){
     const id = 'd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    mapaState.desenhos.push({ id, servico, obra, planta, pontos, cor, data: data || todayStr() });
+    const ini = dados.dataInicio || todayStr();
+    mapaState.desenhos.push({ id, servico, obra, planta, forma: dados.forma || 'livre', pontos: dados.pontos, cor: dados.cor, data: ini, dataInicio: ini, dataConclusao: dados.dataConclusao || '', empresa: dados.empresa || '', atualizadoEm: new Date().toISOString() });
     saveMapaState();
     return id;
+  }
+  function atualizarDesenho(id, dados){
+    const d = mapaState.desenhos.find(x => x.id === id);
+    if(!d) return;
+    d.cor = dados.cor; d.dataInicio = dados.dataInicio; d.data = dados.dataInicio;
+    d.dataConclusao = dados.cor === 'verde' ? (dados.dataConclusao || '') : '';
+    d.empresa = dados.empresa || '';
+    d.atualizadoEm = new Date().toISOString();
+    saveMapaState();
+  }
+  function cardTrechoCustom({ servico, obra, d, corInicial, forma }){
+    return new Promise(resolve => {
+      const novo = !d;
+      const cor = d ? d.cor : corInicial;
+      const ini = d ? (d.dataInicio || d.data || todayStr()) : (dataForcadaMapa || todayStr());
+      const conc = d && d.dataConclusao ? d.dataConclusao : (dataForcadaMapa || todayStr());
+      const empresaInicial = d ? (d.empresa || '') : (empresaPadraoLer()[servico + '|' + obra] || '');
+      const empresas = empresasDaObra(obra);
+      if(empresaInicial && !empresas.includes(empresaInicial)) empresas.push(empresaInicial);
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed; inset:0; background:rgba(20,20,20,0.45); z-index:99999; display:flex; align-items:center; justify-content:center; padding:16px;';
+      overlay.innerHTML = `
+        <div style="background:#fff; border-radius:14px; width:380px; max-width:100%; box-shadow:0 16px 40px rgba(0,0,0,0.25); overflow:hidden; font-family:inherit;">
+          <div style="padding:14px 18px; background:linear-gradient(155deg,#d8ab4c 0%,#a97e2c 100%); color:#fff;" id="dob-tr-head">
+            <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; opacity:.9;">${novo ? 'Novo trecho' : 'Editar trecho'}${forma ? ' · ' + forma : ''}</div>
+            <div style="font-size:15px; font-weight:700;">${servico}</div>
+          </div>
+          <div style="padding:14px 18px; display:flex; flex-direction:column; gap:10px;">
+            <div>
+              <label style="font-size:12px; color:#8a8272; display:block; margin-bottom:4px;">Status</label>
+              <div style="display:flex; gap:8px;">
+                <button type="button" data-st="amarelo" class="dob-tr-st" style="flex:1; padding:8px; border-radius:8px; border:2px solid #a97f2a; font-size:13px; cursor:pointer;">🟡 Em execução</button>
+                <button type="button" data-st="verde" class="dob-tr-st" style="flex:1; padding:8px; border-radius:8px; border:2px solid #2f5f45; font-size:13px; cursor:pointer;">🟢 Concluído</button>
+              </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <div style="flex:1;"><label style="font-size:12px; color:#8a8272; display:block; margin-bottom:4px;">Data de início</label><input type="date" id="dob-tr-ini" class="dob-input" value="${ini}" style="width:100%;" /></div>
+              <div style="flex:1;" id="dob-tr-conc-wrap"><label style="font-size:12px; color:#8a8272; display:block; margin-bottom:4px;">Data de conclusão</label><input type="date" id="dob-tr-conc" class="dob-input" value="${conc}" style="width:100%;" /></div>
+            </div>
+            <div>
+              <label style="font-size:12px; color:#8a8272; display:block; margin-bottom:4px;">Empreiteira</label>
+              <select id="dob-tr-emp" class="dob-select" style="width:100%;">
+                <option value="">— não informada —</option>
+                ${empresas.map(n => `<option value="${n.replace(/"/g,'&quot;')}" ${n === empresaInicial ? 'selected' : ''}>${n}</option>`).join('')}
+              </select>
+              <input id="dob-tr-emp-outra" class="dob-input" placeholder="ou digite outra empresa" style="width:100%; margin-top:6px; font-size:12.5px;" />
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; padding:12px 18px; background:#f3ede1; border-top:1px solid #e7e3d8;">
+            <button type="button" id="dob-tr-cancelar" style="flex:1; padding:9px; border-radius:8px; border:1px solid #ccc; background:#fff; font-size:13px; cursor:pointer;">Cancelar</button>
+            ${novo ? '' : '<button type="button" id="dob-tr-apagar" style="flex:1; padding:9px; border-radius:8px; border:1px solid #c0522f; background:#fff; color:#c0522f; font-weight:600; font-size:13px; cursor:pointer;">Apagar</button>'}
+            <button type="button" id="dob-tr-salvar" style="flex:1; padding:9px; border-radius:8px; border:none; background:#c0522f; color:#fff; font-weight:600; font-size:13px; cursor:pointer;">Salvar</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      let corSel = cor;
+      const pintar = () => {
+        overlay.querySelectorAll('.dob-tr-st').forEach(b => {
+          const ativo = b.dataset.st === corSel;
+          b.style.background = ativo ? (b.dataset.st === 'verde' ? '#3f7d5c' : '#c99a3d') : '#fff';
+          b.style.color = ativo ? '#fff' : '#222';
+        });
+        overlay.querySelector('#dob-tr-conc-wrap').style.display = corSel === 'verde' ? 'block' : 'none';
+        overlay.querySelector('#dob-tr-head').style.background = corSel === 'verde' ? 'linear-gradient(155deg,#4c8f6a 0%,#2f5f45 100%)' : 'linear-gradient(155deg,#d8ab4c 0%,#a97e2c 100%)';
+      };
+      overlay.querySelectorAll('.dob-tr-st').forEach(b => b.addEventListener('click', () => { corSel = b.dataset.st; pintar(); }));
+      pintar();
+      const finalizar = (v) => { overlay.remove(); resolve(v); };
+      overlay.querySelector('#dob-tr-cancelar').addEventListener('click', () => finalizar(null));
+      overlay.addEventListener('click', (ev) => { if(ev.target === overlay) finalizar(null); });
+      const ap = overlay.querySelector('#dob-tr-apagar');
+      if(ap) ap.addEventListener('click', () => finalizar({ apagar: true }));
+      overlay.querySelector('#dob-tr-salvar').addEventListener('click', () => {
+        const outra = (overlay.querySelector('#dob-tr-emp-outra').value || '').trim();
+        const empresa = outra || overlay.querySelector('#dob-tr-emp').value || '';
+        finalizar({ cor: corSel, dataInicio: overlay.querySelector('#dob-tr-ini').value || todayStr(), dataConclusao: overlay.querySelector('#dob-tr-conc').value || todayStr(), empresa });
+      });
+    });
   }
   function removerDesenho(id){
     const idx = mapaState.desenhos.findIndex(d => d.id === id);
@@ -3311,6 +3432,7 @@
       const avisoExtra = opcoes.avisoExtra || '';
       const rotKey = opcoes.rotKey || null;
       const ferramentasExtras = opcoes.ferramentasExtras || '';
+      const barraExtra = opcoes.barraExtra || '';
       const temGiro = !!rotKey;
       return `
         <div style="margin-top:14px; min-width:0;">
@@ -3325,6 +3447,7 @@
             ${ferramentasExtras}
             <span class="dob-dica" style="margin:0 0 0 auto;">arraste a imagem pra navegar quando der zoom</span>
           </div>
+          ${barraExtra}
           <div style="overflow-x:auto; max-width:100%;">
           <div id="dob-mapa-zoomwrap" style="transform:scale(${mapaZoomAtual}); transform-origin:top left; display:inline-block;">
             <div id="dob-mapa-girowrap" style="position:relative;">
@@ -3441,28 +3564,57 @@
         }).join('');
 
         const tracosAtuais = desenhosPara(servico, obra, chaveAtualRede);
+        const nAm = tracosAtuais.filter(d => d.cor !== 'verde').length, nVe = tracosAtuais.length - nAm;
         const resumoDatas = tracosAtuais.length === 0 ? '' :
-          `<div style="font-size:12px; color:var(--muted);">${tracosAtuais.length} traço(s) — datas: ${[...new Set(tracosAtuais.map(d => fmtDate(d.data || todayStr())))].join(', ')}</div>`;
+          `<span style="font-size:12px; color:var(--muted);">${nAm} em execução · ${nVe} concluído(s)</span>`;
 
         const dataAlvoLabel = dataForcadaMapa ? fmtDate(dataForcadaMapa) : 'hoje (' + fmtDate(todayStr()) + ')';
 
-        const ferramentasHtml = !isDesenhavel ? '' : `
-          <div style="display:flex; flex-direction:column; gap:6px; padding:10px; background:var(--paper2, #f3ede1); border-radius:8px; border:1px solid var(--line);">
-            ${mapaModoEdicao ? `<button type="button" class="dob-btn ${modoDesenho ? '' : 'secundario'} pequeno" id="dob-mapa-toggle-desenho">${modoDesenho ? '✅ Desenho ativo' : '✏️ Desenhar no mapa'}</button>` : ''}
-            <button type="button" class="dob-btn secundario pequeno" id="dob-mapa-baixar-imagem">📥 Baixar imagem com marcações</button>
-            ${mapaModoEdicao ? `<button type="button" class="dob-btn perigo pequeno" id="dob-mapa-limpar-tudo-geral">🗑️ Apagar TODOS os traços (todas as redes)</button>` : ''}
+        const grp = 'display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:6px 10px; background:var(--paper2, #f3ede1); border-radius:8px; border:1px solid var(--line);';
+        const rot = 'font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em;';
+        const fbtn = (id, ativo, txt, tit) => `<button type="button" class="dob-btn ${ativo ? '' : 'secundario'} pequeno" id="${id}" title="${tit || ''}">${txt}</button>`;
+        const empresasBarra = empresasDaObra(obra);
+        const empresaBarraAtual = empresaPadraoLer()[servico + '|' + obra] || '';
+        if(empresaBarraAtual && !empresasBarra.includes(empresaBarraAtual)) empresasBarra.push(empresaBarraAtual);
+        const barraFerramentas = !isDesenhavel ? '' : `
+          <div style="display:flex; flex-wrap:wrap; align-items:stretch; gap:8px; margin-bottom:10px;">
+            <div style="${grp}">
+              ${mapaModoEdicao ? `<button type="button" class="dob-btn ${modoDesenho ? '' : 'secundario'} pequeno" id="dob-mapa-toggle-desenho">${modoDesenho ? '✅ Desenho ativo' : '✏️ Desenhar no mapa'}</button>` : ''}
+              ${fbtn('dob-mapa-rotulos', mapaMostrarRotulos, '🏷️ Rótulos', 'Mostrar/ocultar datas e empresa sobre os traços')}
+              ${fbtn('dob-mapa-baixar-imagem', false, '📥 Baixar imagem', 'Baixa o mapa com os traços, datas e empresas')}
+            </div>
             ${modoDesenho ? `
-              <span style="font-size:12px; color:var(--muted);">Cor do lápis:</span>
-              <button type="button" class="dob-btn pequeno" id="dob-mapa-cor-amarelo" style="background:${desenhoFerramenta==='lapis' && desenhoCorAtual==='amarelo' ? '#c99a3d' : 'transparent'}; color:${desenhoFerramenta==='lapis' && desenhoCorAtual==='amarelo' ? '#fff' : 'inherit'}; border:1px solid #a97f2a;">Em execução</button>
-              <button type="button" class="dob-btn pequeno" id="dob-mapa-cor-verde" style="background:${desenhoFerramenta==='lapis' && desenhoCorAtual==='verde' ? '#3f7d5c' : 'transparent'}; color:${desenhoFerramenta==='lapis' && desenhoCorAtual==='verde' ? '#fff' : 'inherit'}; border:1px solid #2f5f45;">Concluído</button>
-              <span style="font-size:12px; color:var(--muted); margin-top:4px;">Ferramentas:</span>
-              <button type="button" class="dob-btn ${desenhoFerramenta==='borracha' ? '' : 'secundario'} pequeno" id="dob-mapa-borracha" title="Apagar um traço tocando nele">🧹 Borracha</button>
-              <button type="button" class="dob-btn ${desenhoFerramenta==='data' ? '' : 'secundario'} pequeno" id="dob-mapa-editar-data-traco" title="Tocar num traço pra mudar a data dele">📅 Editar data do traço</button>
-              <button type="button" class="dob-btn secundario pequeno" id="dob-mapa-desfazer">↩ Desfazer último</button>
-              <button type="button" class="dob-btn perigo pequeno" id="dob-mapa-limpar-desenho">Limpar tudo</button>
-              <span class="dob-dica" style="margin:0;">novos traços vão ficar datados de ${dataAlvoLabel}</span>
-            ` : '<span class="dob-dica" style="margin:0;">marque à mão livre os trechos executados dessa rede</span>'}
-            ${resumoDatas}
+            <div style="${grp}">
+              <span style="${rot}">Forma</span>
+              ${fbtn('dob-ferr-lapis', desenhoFerramenta==='lapis', '✏️ Livre')}
+              ${fbtn('dob-ferr-linha', desenhoFerramenta==='linha', '╱ Reta')}
+              ${fbtn('dob-ferr-circulo', desenhoFerramenta==='circulo', '◯ Círculo')}
+              ${fbtn('dob-ferr-quadrado', desenhoFerramenta==='quadrado', '▢ Quadrado')}
+            </div>
+            <div style="${grp}">
+              <span style="${rot}">Novo traço</span>
+              <button type="button" class="dob-btn pequeno" id="dob-mapa-cor-amarelo" style="background:${desenhoCorAtual==='amarelo' ? '#c99a3d' : 'transparent'}; color:${desenhoCorAtual==='amarelo' ? '#fff' : 'inherit'}; border:1px solid #a97f2a;">🟡 Em execução</button>
+              <button type="button" class="dob-btn pequeno" id="dob-mapa-cor-verde" style="background:${desenhoCorAtual==='verde' ? '#3f7d5c' : 'transparent'}; color:${desenhoCorAtual==='verde' ? '#fff' : 'inherit'}; border:1px solid #2f5f45;">🟢 Concluído</button>
+            </div>
+            <div style="${grp}">
+              <span style="${rot}">Empreiteira</span>
+              <select id="dob-mapa-emp-padrao" class="dob-select" style="font-size:12.5px; max-width:200px;">
+                <option value="">— não informada —</option>
+                ${empresasBarra.map(n => `<option value="${n.replace(/"/g,'&quot;')}" ${n === empresaBarraAtual ? 'selected' : ''}>${n}</option>`).join('')}
+              </select>
+            </div>
+            <div style="${grp}">
+              <span style="${rot}">Editar</span>
+              ${fbtn('dob-mapa-editar-trecho', desenhoFerramenta==='editar', '🖊️ Editar trecho', 'Toque num traço pra mudar status (amarelo→verde), datas, empresa ou apagar')}
+              ${fbtn('dob-mapa-borracha', desenhoFerramenta==='borracha', '🧹 Borracha', 'Apagar um traço tocando nele')}
+              ${fbtn('dob-mapa-desfazer', false, '↩ Desfazer')}
+              <button type="button" class="dob-btn perigo pequeno" id="dob-mapa-limpar-desenho">Limpar mapa</button>
+              ${mapaModoEdicao ? `<button type="button" class="dob-btn perigo pequeno" id="dob-mapa-limpar-tudo-geral" title="Todas as redes, Pequis e Buritis">🗑️ Apagar tudo (todas as redes)</button>` : ''}
+            </div>` : ''}
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              ${modoDesenho ? `<span class="dob-dica" style="margin:0;">novos traços: início em ${dataAlvoLabel}. Pra marcar concluído: 🖊️ Editar trecho → toque no traço amarelo → Concluído.</span>` : (mapaModoEdicao ? '<span class="dob-dica" style="margin:0;">marque os trechos executados dessa rede</span>' : '')}
+              ${resumoDatas}
+            </div>
           </div>`;
 
         const conteudoRede = `<div style="position:relative; width:1000px;" id="dob-mapa-rede-box">
@@ -3471,7 +3623,7 @@
           ${isDesenhavel ? `<canvas id="dob-mapa-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; ${modoDesenho ? 'cursor:crosshair; pointer-events:auto;' : 'pointer-events:none;'}"></canvas>` : ''}
         </div>`;
         const rotKeyRede = 'rede:' + chaveAtualRede;
-        gridEl.innerHTML = montarComZoom(conteudoRede, { rotKey: rotKeyRede, ferramentasExtras: ferramentasHtml });
+        gridEl.innerHTML = montarComZoom(conteudoRede, { rotKey: rotKeyRede, barraExtra: barraFerramentas });
         gridEl.querySelectorAll('.dob-mapa-svg-bloco, .dob-rede-clicavel').forEach(el => el.addEventListener('click', async () => {
           if(modoDesenho) return;
           const mudou = await manipularCliqueBloco(servico, obra, el.dataset.bloco);
@@ -3486,13 +3638,21 @@
           const corAmareloBtn = document.getElementById('dob-mapa-cor-amarelo');
           const corVerdeBtn = document.getElementById('dob-mapa-cor-verde');
           const borrachaBtn = document.getElementById('dob-mapa-borracha');
-          const editarDataBtn = document.getElementById('dob-mapa-editar-data-traco');
+          const editarTrechoBtn = document.getElementById('dob-mapa-editar-trecho');
           const desfazerBtn = document.getElementById('dob-mapa-desfazer');
           const limparBtn = document.getElementById('dob-mapa-limpar-desenho');
-          if(corAmareloBtn) corAmareloBtn.addEventListener('click', () => { desenhoFerramenta = 'lapis'; desenhoCorAtual = 'amarelo'; renderGrid(); });
-          if(corVerdeBtn) corVerdeBtn.addEventListener('click', () => { desenhoFerramenta = 'lapis'; desenhoCorAtual = 'verde'; renderGrid(); });
+          const rotulosBtn = document.getElementById('dob-mapa-rotulos');
+          const empPadraoSel = document.getElementById('dob-mapa-emp-padrao');
+          if(corAmareloBtn) corAmareloBtn.addEventListener('click', () => { desenhoCorAtual = 'amarelo'; if(desenhoFerramenta==='borracha'||desenhoFerramenta==='editar') desenhoFerramenta = 'lapis'; renderGrid(); });
+          if(corVerdeBtn) corVerdeBtn.addEventListener('click', () => { desenhoCorAtual = 'verde'; if(desenhoFerramenta==='borracha'||desenhoFerramenta==='editar') desenhoFerramenta = 'lapis'; renderGrid(); });
+          [['lapis','dob-ferr-lapis'],['linha','dob-ferr-linha'],['circulo','dob-ferr-circulo'],['quadrado','dob-ferr-quadrado']].forEach(([f, id]) => {
+            const el = document.getElementById(id);
+            if(el) el.addEventListener('click', () => { desenhoFerramenta = f; renderGrid(); });
+          });
           if(borrachaBtn) borrachaBtn.addEventListener('click', () => { desenhoFerramenta = desenhoFerramenta === 'borracha' ? 'lapis' : 'borracha'; renderGrid(); });
-          if(editarDataBtn) editarDataBtn.addEventListener('click', () => { desenhoFerramenta = desenhoFerramenta === 'data' ? 'lapis' : 'data'; renderGrid(); });
+          if(editarTrechoBtn) editarTrechoBtn.addEventListener('click', () => { desenhoFerramenta = desenhoFerramenta === 'editar' ? 'lapis' : 'editar'; renderGrid(); });
+          if(rotulosBtn) rotulosBtn.addEventListener('click', () => { mapaMostrarRotulos = !mapaMostrarRotulos; renderGrid(); });
+          if(empPadraoSel) empPadraoSel.addEventListener('change', () => { empresaPadraoSalvar(servico, obra, empPadraoSel.value); });
           if(desfazerBtn) desfazerBtn.addEventListener('click', () => { desfazerUltimoDesenho(servico, obra, chaveAtualRede); renderGrid(); });
           if(limparBtn) limparBtn.addEventListener('click', async () => {
             if(await confirmarCustom('Apagar todos os traços desenhados nesse mapa?')){ limparDesenhos(servico, obra, chaveAtualRede); renderGrid(); }
@@ -3508,27 +3668,19 @@
           const canvas = document.getElementById('dob-mapa-canvas');
           const imgEl = document.getElementById('dob-mapa-rede-img');
           if(canvas){
+            const redesenhar = (preview) => {
+              const ctx = canvas.getContext('2d');
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              desenhosPara(servico, obra, chaveAtualRede).forEach(d => desenharTraco(ctx, d, canvas.width, canvas.height, mapaMostrarRotulos));
+              if(preview) desenharTraco(ctx, preview, canvas.width, canvas.height, false);
+            };
             const inicializarCanvas = () => {
               const box = document.getElementById('dob-mapa-rede-box');
               const largura = box.offsetWidth || 1000;
               const altura = imgEl.offsetHeight || Math.round(largura * (imgEl.naturalHeight / imgEl.naturalWidth || 0.75));
               canvas.width = largura;
               canvas.height = altura;
-              const ctx = canvas.getContext('2d');
-              ctx.lineJoin = 'round';
-              ctx.lineCap = 'round';
-              const CORES = { amarelo: '#c99a3d', verde: '#3f7d5c' };
-              desenhosPara(servico, obra, chaveAtualRede).forEach(d => {
-                if(d.pontos.length < 2) return;
-                ctx.strokeStyle = CORES[d.cor] || CORES.amarelo;
-                ctx.lineWidth = Math.max(3, largura * 0.006);
-                ctx.beginPath();
-                d.pontos.forEach((p, i) => {
-                  const px = (p.x / 100) * largura, py = (p.y / 100) * altura;
-                  if(i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-                });
-                ctx.stroke();
-              });
+              redesenhar();
             };
             if(imgEl.complete) inicializarCanvas(); else imgEl.addEventListener('load', inicializarCanvas);
 
@@ -3555,39 +3707,55 @@
                 const px = a.x + t*dx, py = a.y + t*dy;
                 return Math.hypot(p.x - px, p.y - py);
               };
+              const acharTraco = (pt) => {
+                const lista = desenhosPara(servico, obra, chaveAtualRede);
+                for(let i = lista.length - 1; i >= 0; i--){
+                  const pts = pontosDoTraco(lista[i]);
+                  if(pts.some((p, k) => k > 0 && distanciaPontoSegmento(pt, pts[k-1], p) < 2.5)) return lista[i];
+                }
+                return null;
+              };
+              let formaAtual = 'livre';
+              let ptsInicio = null;
               canvas.addEventListener('pointerdown', async (ev) => {
                 ev.preventDefault();
                 canvas.setPointerCapture(ev.pointerId);
                 if(desenhoFerramenta === 'borracha'){
-                  const pt = pctFromEvent(ev);
-                  const alvo = desenhosPara(servico, obra, chaveAtualRede).find(d =>
-                    d.pontos.some((p, i) => i > 0 && distanciaPontoSegmento(pt, d.pontos[i-1], p) < 2));
-                  if(alvo && await confirmarCustom('Apagar esse traço, pintado em ' + fmtDate(alvo.data || todayStr()) + '?')){
+                  const alvo = acharTraco(pctFromEvent(ev));
+                  if(alvo && await confirmarCustom('Apagar esse traço (' + rotuloTraco(alvo) + ')?')){
                     removerDesenho(alvo.id);
                     renderGrid();
                   }
                   return;
                 }
-                if(desenhoFerramenta === 'data'){
-                  const pt = pctFromEvent(ev);
-                  const alvo = desenhosPara(servico, obra, chaveAtualRede).find(d =>
-                    d.pontos.some((p, i) => i > 0 && distanciaPontoSegmento(pt, d.pontos[i-1], p) < 2));
+                if(desenhoFerramenta === 'editar'){
+                  const alvo = acharTraco(pctFromEvent(ev));
                   if(alvo){
-                    const novaData = await promptDataCustom('Mudar a data desse traço (sem precisar redesenhar):', alvo.data || todayStr());
-                    if(novaData){ alvo.data = novaData; saveMapaState(); renderGrid(); }
+                    const r = await cardTrechoCustom({ servico, obra, d: alvo, forma: alvo.forma });
+                    if(r){
+                      if(r.apagar) removerDesenho(alvo.id); else { atualizarDesenho(alvo.id, r); empresaPadraoSalvar(servico, obra, r.empresa); }
+                      renderGrid();
+                    }
                   }
                   return;
                 }
                 desenhando = true;
-                pontosAtuais = [pctFromEvent(ev)];
+                formaAtual = desenhoFerramenta === 'linha' ? 'linha' : desenhoFerramenta === 'circulo' ? 'circulo' : desenhoFerramenta === 'quadrado' ? 'quadrado' : 'livre';
+                ptsInicio = pctFromEvent(ev);
+                pontosAtuais = [ptsInicio];
               });
               canvas.addEventListener('pointermove', (ev) => {
                 if(!desenhando) return;
                 const pt = pctFromEvent(ev);
+                if(formaAtual !== 'livre'){
+                  pontosAtuais = [ptsInicio, pt];
+                  redesenhar({ forma: formaAtual, pontos: pontosAtuais, cor: desenhoCorAtual });
+                  return;
+                }
                 pontosAtuais.push(pt);
                 const ctx = canvas.getContext('2d');
-                const CORES = { amarelo: '#c99a3d', verde: '#3f7d5c' };
-                ctx.strokeStyle = CORES[desenhoCorAtual] || CORES.amarelo;
+                ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+                ctx.strokeStyle = CORES_TRACO[desenhoCorAtual] || CORES_TRACO.amarelo;
                 ctx.lineWidth = Math.max(3, canvas.width * 0.006);
                 const n = pontosAtuais.length;
                 if(n >= 2){
@@ -3601,16 +3769,15 @@
               const finalizarTraco = async () => {
                 if(!desenhando) return;
                 desenhando = false;
-                if(pontosAtuais.length >= 2){
-                  const dataEfetiva = dataForcadaMapa || todayStr();
-                  const salvar = await confirmarCustom('Salvar esse trecho datado de ' + fmtDate(dataEfetiva) + '?');
-                  if(salvar){
-                    addDesenho(servico, obra, chaveAtualRede, pontosAtuais, desenhoCorAtual, dataEfetiva);
-                  } else {
-                    renderGrid();
-                  }
+                const pts = pontosAtuais; pontosAtuais = [];
+                const valido = pts.length >= 2 && (formaAtual === 'livre' || Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) > 0.8);
+                if(!valido){ redesenhar(); return; }
+                const r = await cardTrechoCustom({ servico, obra, d: null, corInicial: desenhoCorAtual, forma: formaAtual });
+                if(r && !r.apagar){
+                  empresaPadraoSalvar(servico, obra, r.empresa);
+                  addDesenho(servico, obra, chaveAtualRede, { forma: formaAtual, pontos: pts, cor: r.cor, dataInicio: r.dataInicio, dataConclusao: r.cor === 'verde' ? r.dataConclusao : '', empresa: r.empresa });
                 }
-                pontosAtuais = [];
+                renderGrid();
               };
               canvas.addEventListener('pointerup', finalizarTraco);
               canvas.addEventListener('pointercancel', finalizarTraco);
@@ -5381,7 +5548,8 @@
 
     const gruposDesenho = {};
     mapaState.desenhos.forEach(d => {
-      if(d.data !== data) return;
+      const dRef = (d.cor === 'verde' && d.dataConclusao) ? d.dataConclusao : (d.dataInicio || d.data);
+      if(dRef !== data) return;
       const status = d.cor === 'verde' ? 'concluido' : 'andamento';
       const chave = d.servico + '|' + d.obra + '|' + d.planta + '|' + status;
       if(!gruposDesenho[chave]) gruposDesenho[chave] = { servico: d.servico, obra: d.obra, planta: d.planta, status, qtd: 0 };
@@ -5828,7 +5996,7 @@
     const datasComEntry = new Set(entries.map(e => e.date));
     const datas = new Set();
     mapaState.estados.forEach(e => { if(e.dataInicio) datas.add(e.dataInicio); if(e.dataConclusao) datas.add(e.dataConclusao); });
-    mapaState.desenhos.forEach(d => { if(d.data) datas.add(d.data); });
+    mapaState.desenhos.forEach(d => { const dRef = (d.cor === 'verde' && d.dataConclusao) ? d.dataConclusao : (d.dataInicio || d.data); if(dRef) datas.add(dRef); });
     return Array.from(datas).filter(d => !datasComEntry.has(d)).sort().reverse();
   }
 
