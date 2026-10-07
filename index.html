@@ -600,6 +600,31 @@
   .dob-pd-ok input{ width:17px; height:17px; }
   .dob-pd-item.concluido .desc{ color:var(--muted); }
   .dob-pd-item.nao-cumprido{ background:#fdf7f3; }
+  .dob-pd-compacto{ font-size:12px; min-width:0; }
+  .dob-pd-compacto .dob-pd-in{ min-width:34px; padding:4px 1px; font-size:12px; }
+  .dob-pd-compacto .dob-pd-th-dia{ min-width:38px; padding:4px 1px; }
+  .dob-pd-compacto .dob-pd-th-un, .dob-pd-compacto .dob-pd-th-total{ padding:6px 4px; font-size:9.5px; min-width:0; }
+  .dob-pd-compacto .dob-pd-th-desc{ min-width:260px; padding:6px 10px; }
+  .dob-pd-compacto td.desc{ padding:4px 10px !important; max-width:340px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dob-pd-compacto td.desc .cod{ font-weight:700; color:var(--muted); margin-right:4px; }
+  .dob-pd-compacto .dob-pd-macro td{ padding:5px 10px; font-size:12px; }
+  .dob-pd-compacto .dob-pd-sub td{ padding:3px 10px; }
+  .dob-pd-compacto .dob-pd-un{ text-align:center; padding:0 6px; font-size:11px; }
+  .dob-pd-num{ text-align:center; padding:0 5px !important; font-variant-numeric:tabular-nums; color:var(--ink-soft); white-space:nowrap; font-size:11.5px; }
+  .dob-pd-real{ font-weight:700; color:var(--ink); }
+  .dob-pd-mini{ height:3px; background:#e9e4d6; border-radius:2px; margin:0 0 2px; overflow:hidden; }
+  .dob-pd-mini i{ display:block; height:100%; background:var(--clay,#d9662f); }
+  .dob-pd-cel.fds, .dob-pd-th-dia.fds{ background:#f6f4ee; }
+  .dob-pd-item.comprometido td.desc .cod{ color:var(--clay,#d9662f); }
+  .dob-pd-sit{ display:inline-flex; align-items:center; gap:4px; cursor:pointer; font-size:11px; }
+  .dob-pd-sit input{ width:14px; height:14px; }
+  .dob-pd-sit .ok{ color:#2f6b45; font-weight:700; } .dob-pd-sit .atraso{ color:var(--brick); font-weight:700; } .dob-pd-sit .plan{ color:#2f5f8a; }
+  .dob-pd-sit-vazio{ color:#c8c4ba; }
+  .dob-pd-causa{ font-size:10.5px; max-width:110px; margin-left:4px; border:1px solid var(--line); border-radius:5px; }
+  .dob-pd-barra{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-top:12px; }
+  .dob-pd-filtros{ display:flex; gap:12px; flex-wrap:wrap; }
+  .dob-pd-filtros label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; display:flex; align-items:center; gap:6px; }
+  .dob-pd-filtros .dob-select{ width:auto; padding:5px 8px; font-size:12.5px; }
   .dob-pd-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:10px; margin-top:14px; }
   .dob-pd-tabela{ border-collapse:collapse; width:100%; min-width:800px; font-size:12.5px; }
   .dob-pd-tabela th, .dob-pd-tabela td{ border-bottom:1px solid var(--line); border-right:1px solid var(--line); padding:0; }
@@ -813,7 +838,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.07.3';
+  const APP_VERSION = 'v2026.10.07.4';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -1793,6 +1818,8 @@
   let cronogramaDados = null; // { Buritis: {obra,itens,meses,semanas}, Pequis: {...} }
   let cronogramaCarregando = false;
   let cronogramaObraAtual = 'Buritis';
+  let cronogramaModo = 'andamento';
+  let cronogramaDias = 14;
   let cronogramaSemanaAtual = null; // 'YYYY-MM-DD' (início da semana, vem do array "semanas" da planilha)
 
   const CRONOGRAMA_CAUSAS = [
@@ -1919,15 +1946,40 @@
     {
       const [y0,m0,d0] = semanaAtual.split('-').map(Number);
       const nomes = ['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
-      for(let i=0;i<7;i++){
-        const d = new Date(y0, m0-1, d0+i);
-        diasSem.push({ iso: `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`, dt: `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}`, dw: nomes[d.getDay()] });
+      for(let i = cronogramaDias - 1; i >= 0; i--){
+        const d = new Date(y0, m0-1, d0 + 6 - i);
+        diasSem.push({ iso: `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`, dt: `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}`, dw: nomes[d.getDay()], fds: d.getDay()===0 || d.getDay()===6 });
       }
     }
+    const iniPeriodo = diasSem[0].iso, fimPeriodo = diasSem[diasSem.length-1].iso;
     const fmtQ = v => (Math.round(v*100)/100).toString().replace('.', ',');
-    const ncols = 2 + 1 + diasSem.length + 2;
+    // produção real acumulada por item (todas as datas) e dentro do período
+    const realAcum = {};
+    Object.keys(mapaState.producaoDia).forEach(k => {
+      const v = mapaState.producaoDia[k]; if(!v) return;
+      const partes = k.split('|'); if(partes[0] !== cronogramaObraAtual) return;
+      realAcum[partes[1]] = (realAcum[partes[1]] || 0) + v;
+    });
+    // linhas conforme o modo: só compromissos da semana / tudo que está em andamento / tudo
+    const itemNoModo = it => {
+      if(cronogramaModo === 'todos') return true;
+      const comprometido = (it.semanal && (it.semanal[semanaAtual] || 0) > 0);
+      if(cronogramaModo === 'semana') return comprometido;
+      const ativo = it.inicio && it.termino && it.inicio <= fimPeriodo && it.termino >= iniPeriodo;
+      return comprometido || ativo || (realAcum[it.cod] > 0);
+    };
+    const gruposTabela = [];
+    { let g1 = null, g2 = null;
+      dadosObra.itens.forEach(it => {
+        if(it.nivel === 1){ g1 = { cod: it.cod, desc: it.desc, subgrupos: [] }; gruposTabela.push(g1); g2 = null; return; }
+        if(it.nivel === 2){ g2 = { cod: it.cod, desc: it.desc, itens: [] }; if(g1) g1.subgrupos.push(g2); return; }
+        if(it.nivel === 3 && g2 && itemNoModo(it)) g2.itens.push(it);
+      });
+    }
+    const gruposVisiveis = gruposTabela.map(g => ({ ...g, subgrupos: g.subgrupos.filter(sg => sg.itens.length) })).filter(g => g.subgrupos.length);
+    const ncols = 6 + diasSem.length + 2;
     let linhasHtml = '';
-    gruposComItens.forEach(g => {
+    gruposVisiveis.forEach(g => {
       linhasHtml += `<tr class="dob-pd-macro"><td colspan="${ncols}">${g.cod} ${g.desc}</td></tr>`;
       g.subgrupos.forEach(sg => {
         linhasHtml += `<tr class="dob-pd-sub"><td colspan="${ncols}">${sg.cod} ${sg.desc}</td></tr>`;
@@ -1936,45 +1988,63 @@
           const reg = semanalFeitos[chave] || {};
           const cumprido = !!reg.feito;
           const quant = it.quant || 1;
-          const qtdSemana = it.semanal[semanaAtual] || 0;
-          const pctSemana = Math.round((qtdSemana / quant) * 100);
+          const qtdSemana = (it.semanal && it.semanal[semanaAtual]) || 0;
+          const comprometido = qtdSemana > 0;
           const ehPct = it.unid === '%';
           const unLabel = ehPct ? '%' : (it.unid || '').toLowerCase();
-          const previsto = ehPct ? pctSemana : qtdSemana;
-          const cumQtd = idxSemana >= 0 ? semanas.slice(0, idxSemana + 1).reduce((s2, sem) => s2 + ((it.semanal && it.semanal[sem]) || 0), 0) : 0;
-          const cumPct = Math.min(100, Math.round((cumQtd / quant) * 100));
-          let total = 0;
+          const prevTxt = comprometido ? (ehPct ? Math.round((qtdSemana / quant) * 100) + '%' : fmtQ(qtdSemana)) : '';
+          const real = realAcum[it.cod] || 0;
+          const pctReal = Math.min(999, Math.round((real / quant) * 100));
+          let totalPer = 0;
           const celulas = diasSem.map(d => {
             const k = `${cronogramaObraAtual}|${it.cod}|${d.iso}`;
             const v = mapaState.producaoDia[k];
-            if(v) total += v;
-            return `<td class="dob-pd-cel ${d.iso===hoje?'hoje':''} ${v?'tem-dado':''}"><input class="dob-pd-in" type="number" step="any" min="0" inputmode="decimal" data-prod-chave="${k}" value="${v ? v : ''}" placeholder="–" /></td>`;
+            if(v) totalPer += v;
+            return `<td class="dob-pd-cel ${d.iso===hoje?'hoje':''} ${d.fds?'fds':''} ${v?'tem-dado':''}"><input class="dob-pd-in" type="number" step="any" min="0" inputmode="decimal" data-prod-chave="${k}" value="${v ? v : ''}" /></td>`;
           }).join('');
-          const mostrarCausa = semanaFechada && !cumprido;
-          const causaHtml = mostrarCausa ? `<div class="dob-crono-causa"><span class="dob-crono-causa-label">Causa do não cumprimento:</span><select data-crono-causa-chave="${chave}"><option value="">Selecionar…</option>${CRONOGRAMA_CAUSAS.map(c => `<option value="${c.v}" ${reg.causa===c.v?'selected':''}>${c.t}</option>`).join('')}</select></div>` : '';
-          const prazoTxt = it.inicio && it.termino ? `${fmtDate(it.inicio)} → ${fmtDate(it.termino)}` : '';
-          linhasHtml += `<tr class="dob-pd-item ${cumprido?'concluido':''} ${mostrarCausa && !reg.causa ? 'nao-cumprido':''}">
-            <td class="desc"><b>${it.cod}</b> ${it.desc}<div class="dob-crono-meta">acumulado previsto: ${cumPct}% · prazo ${prazoTxt}</div>${causaHtml}</td>
+          const mostrarCausa = comprometido && semanaFechada && !cumprido;
+          const causaHtml = mostrarCausa ? `<select class="dob-pd-causa" data-crono-causa-chave="${chave}"><option value="">causa…</option>${CRONOGRAMA_CAUSAS.map(c => `<option value="${c.v}" ${reg.causa===c.v?'selected':''}>${c.t}</option>`).join('')}</select>` : '';
+          const sit = !comprometido ? '<span class="dob-pd-sit-vazio">–</span>' :
+            `<label class="dob-pd-sit"><input type="checkbox" data-crono-chave="${chave}" ${cumprido ? 'checked' : ''} /><span class="${cumprido ? 'ok' : (semanaFechada ? 'atraso' : 'plan')}">${cumprido ? 'Cumprido' : (semanaFechada ? 'Não cump.' : 'Planejado')}</span></label>${causaHtml}`;
+          const tip = `${it.cod} ${it.desc}${it.inicio && it.termino ? ' — prazo ' + fmtDate(it.inicio) + ' → ' + fmtDate(it.termino) : ''}`;
+          linhasHtml += `<tr class="dob-pd-item ${cumprido?'concluido':''} ${mostrarCausa && !reg.causa ? 'nao-cumprido':''} ${comprometido?'comprometido':''}">
+            <td class="desc" title="${tip.replace(/"/g,'&quot;')}"><span class="cod">${it.cod}</span> ${it.desc}</td>
             <td class="dob-pd-un">${unLabel}</td>
-            <td class="dob-pd-prev">${ehPct ? previsto + '%' : previsto}</td>
+            <td class="dob-pd-num">${fmtQ(quant)}</td>
+            <td class="dob-pd-num dob-pd-real">${real ? fmtQ(real) : ''}</td>
+            <td class="dob-pd-num"><div class="dob-pd-mini"><i style="width:${Math.min(100,pctReal)}%"></i></div>${real ? pctReal + '%' : ''}</td>
+            <td class="dob-pd-prev">${prevTxt}</td>
             ${celulas}
-            <td class="dob-pd-total">${fmtQ(total)}</td>
-            <td class="dob-pd-ok"><label style="cursor:pointer;"><input type="checkbox" data-crono-chave="${chave}" ${cumprido ? 'checked' : ''} /><div class="dob-crono-status ${cumprido ? 'concluido' : (semanaFechada ? 'atrasado' : 'andamento')}">${cumprido ? '✅ Cumprido' : (semanaFechada ? '⚠️ Não cumprido' : '🔧 Planejado')}</div></label></td>
+            <td class="dob-pd-total">${totalPer ? fmtQ(totalPer) : ''}</td>
+            <td class="dob-pd-ok">${sit}</td>
           </tr>`;
         });
       });
     });
-    const corpoHtml = gruposComItens.length === 0 ?
-      `<p class="dob-dica">Nenhum compromisso planejado pra ${cronogramaSemanaLabel(semanaAtual)} em ${cronogramaObraAtual === 'Buritis' ? 'Solar dos Buritis' : 'Solar dos Pequis'}.</p>` :
-      `<p class="dob-dica">Digite a quantidade produzida em cada dia (na unidade do item). O previsto é o compromisso da semana; marque "Cumprido" quando fechar o compromisso.</p>
-       <div class="dob-pd-wrap"><table class="dob-pd-tabela">
+    const corpoHtml = `
+      <div class="dob-pd-barra">
+        <div class="dob-pd-filtros">
+          <label>Mostrar <select class="dob-select" id="dob-crono-modo">
+            <option value="andamento" ${cronogramaModo==='andamento'?'selected':''}>Em andamento</option>
+            <option value="semana" ${cronogramaModo==='semana'?'selected':''}>Só compromissos da semana</option>
+            <option value="todos" ${cronogramaModo==='todos'?'selected':''}>Todos os serviços</option>
+          </select></label>
+          <label>Dias <select class="dob-select" id="dob-crono-dias">
+            ${[7,14,21,30].map(n => `<option value="${n}" ${cronogramaDias===n?'selected':''}>${n} dias até ${fmtDate(fimPeriodo).slice(0,5)}</option>`).join('')}
+          </select></label>
+        </div>
+        <span class="dob-dica" style="margin:0;">Digite a quantidade produzida direto no dia. "Real" = acumulado de tudo que já foi lançado.</span>
+      </div>
+      ${gruposVisiveis.length === 0 ? '<p class="dob-dica">Nenhum serviço nesse filtro.</p>' : `
+       <div class="dob-pd-wrap"><table class="dob-pd-tabela dob-pd-compacto">
         <thead><tr>
-          <th class="dob-pd-th-desc">Serviço</th><th class="dob-pd-th-un">Un.</th><th class="dob-pd-th-un">Prev.</th>
-          ${diasSem.map(d => `<th class="dob-pd-th-dia ${d.iso===hoje?'hoje':''}"><div class="dt">${d.dt}</div><div class="dw">${d.dw}</div></th>`).join('')}
-          <th class="dob-pd-th-total">Real</th><th class="dob-pd-th-total">Situação</th>
+          <th class="dob-pd-th-desc">Serviço</th><th class="dob-pd-th-un">Un.</th><th class="dob-pd-th-un">Contr.</th><th class="dob-pd-th-un">Real</th><th class="dob-pd-th-un">%</th><th class="dob-pd-th-un">Prev. sem.</th>
+          ${diasSem.map(d => `<th class="dob-pd-th-dia ${d.iso===hoje?'hoje':''} ${d.fds?'fds':''}"><div class="dt">${d.dt}</div><div class="dw">${d.dw}</div></th>`).join('')}
+          <th class="dob-pd-th-total">Período</th><th class="dob-pd-th-total">Situação</th>
         </tr></thead>
         <tbody>${linhasHtml}</tbody>
-       </table></div>`;
+       </table></div>`}
+    `;
 
     container.innerHTML = `
       <div class="dob-card-form">
@@ -2028,6 +2098,10 @@
       cronogramaSemanaAtual = cronogramaSemanaDefaultAtual(semanas);
       renderCronograma();
     });
+    const modoSel = document.getElementById('dob-crono-modo');
+    if(modoSel) modoSel.addEventListener('change', () => { cronogramaModo = modoSel.value; renderCronograma(); });
+    const diasSel = document.getElementById('dob-crono-dias');
+    if(diasSel) diasSel.addEventListener('change', () => { cronogramaDias = parseInt(diasSel.value); renderCronograma(); });
     container.querySelectorAll('[data-prod-chave]').forEach(inp => {
       inp.addEventListener('change', () => {
         const v = parseFloat(String(inp.value).replace(',', '.'));
