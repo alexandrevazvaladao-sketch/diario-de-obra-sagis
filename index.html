@@ -838,7 +838,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.07.6';
+  const APP_VERSION = 'v2026.10.07.7';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2207,7 +2207,7 @@
   // sem restrição — importante porque o mesmo nome de serviço às vezes é usado tanto no Pequis quanto no Buritis.
   // Aplicado no load se o serviço ainda não tiver esse escopo definido, pra não depender de mexer no localStorage por fora.
   const ESCOPO_PADRAO_SERVICOS = {
-    'PREPARAÇÃO RADIER ( BLOCOS 1 A 7 PEQUIS)': { Pequis: BLOCOS_MAPA.filter(b => b.obra === 'Pequis' && b.cat === 'bloco' && ['2','3','4','5','6','7'].includes(b.num)).map(b => b.id) }
+    'PREPARAÇÃO RADIER ( BLOCOS 1 A 7 PEQUIS)': { Pequis: BLOCOS_MAPA.filter(b => b.obra === 'Pequis' && b.cat === 'bloco' && ['2','3','4','5','6','7'].includes(b.num)).map(b => b.id), Buritis: ['__nenhum__'] }
   };
   let precisaMigrarPrereq = false;
   (function loadMapaState(){
@@ -2249,6 +2249,11 @@
       if(mapaState.servicos.includes(servico) && !mapaState.escopoPorServico[servico]){
         mapaState.escopoPorServico[servico] = porObra;
         mudouEscopo = true;
+      } else if(mapaState.servicos.includes(servico)){
+        // obra marcada como "não se aplica" (['__nenhum__']) que ainda não está no escopo salvo
+        Object.entries(porObra).forEach(([obra, ids]) => {
+          if(ids[0] === '__nenhum__' && !mapaState.escopoPorServico[servico][obra]){ mapaState.escopoPorServico[servico][obra] = ids; mudouEscopo = true; }
+        });
       }
     });
     if(mudouEscopo || precisaMigrarPrereq) localStorage.setItem('dob:mapa_state', JSON.stringify(mapaState));
@@ -2345,7 +2350,12 @@
   }
   function custoEtapaAvancoDoServico(servico){
     const tipo = mapaState.tipoPorServico[servico];
-    const base = tipo === 'bloco' ? BLOCOS_MAPA.filter(b => b.cat === 'bloco')
+    const noEscopo = b => {
+      const ids = escopoDoServico(servico, b.obra);
+      if(!ids) return true;
+      return ids[0] !== '__nenhum__' && ids.includes(b.id);
+    };
+    const base = tipo === 'bloco' ? BLOCOS_MAPA.filter(b => b.cat === 'bloco' && noEscopo(b))
                : tipo === 'area_comum' ? BLOCOS_MAPA.filter(b => b.cat === 'area_comum') : null;
     if(!base || !base.length) return null;
     const ids = new Set(base.map(b => b.id));
@@ -3392,6 +3402,10 @@
 
       const tipoMapa = mapaState.tipoPorServico[servico] || 'bloco';
       let blocosDaObra = BLOCOS_MAPA.filter(b => b.obra === obra && b.cat === tipoMapa);
+      if(escopoIds && escopoIds[0] === '__nenhum__'){
+        gridEl.innerHTML = `<p class="dob-dica" style="padding:18px;">Este serviço não se aplica ${obra === 'Buritis' ? 'ao Solar dos Buritis' : 'a esta obra'} (é só de outra obra). Troque a obra acima para ver os blocos.</p>`;
+        return;
+      }
       if(escopoIds && tipoMapa === 'bloco') blocosDaObra = blocosDaObra.filter(b => escopoIds.includes(b.id));
 
       const seletorRedeWrap = document.getElementById('dob-rede-seletor-wrap');
