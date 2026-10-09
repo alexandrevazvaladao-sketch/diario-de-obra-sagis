@@ -838,7 +838,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.07.8';
+  const APP_VERSION = 'v2026.10.09.1';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -3273,10 +3273,12 @@
           </div>
           <div class="dob-campo" style="margin-top:14px;">
             <label>Serviço acompanhado</label>
-            <select class="dob-select" id="dob-mapa-servico" style="display:none;"></select>
-            <input class="dob-input" id="dob-mapa-servico-busca" placeholder="🔎 Buscar serviço..." style="margin-bottom:6px;" />
-            <p class="dob-dica" style="margin:0 0 6px;">Arraste um serviço pelo ⠿ pra mudar a ordem em que aparece aqui.</p>
-            <div id="dob-mapa-servico-lista" style="display:flex; flex-direction:column; gap:6px; max-height:420px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:8px; background:#fbfaf6;"></div>
+            <select class="dob-select" id="dob-mapa-servico"></select>
+            <details id="dob-mapa-ordem-wrap" style="margin-top:8px;">
+              <summary style="cursor:pointer; font-size:12.5px; color:var(--muted); user-select:none;">Ver todos os serviços / reordenar</summary>
+              <p class="dob-dica" style="margin:6px 0;">Arraste um serviço pelo ⠿ pra mudar a ordem em que aparece na lista.</p>
+              <div id="dob-mapa-servico-lista" style="display:flex; flex-direction:column; gap:6px; max-height:420px; overflow-y:auto; border:1px solid var(--line); border-radius:8px; padding:8px; background:#fbfaf6;"></div>
+            </details>
             <div class="dob-linha" style="gap:6px; margin-top:10px; flex-wrap:wrap;">
               <button class="dob-btn secundario pequeno" id="dob-mapa-editar-servico" type="button" title="Editar nome do serviço">✏️ Editar</button>
               <button class="dob-btn secundario pequeno" id="dob-mapa-escopo-servico" type="button" title="Restringir este serviço a apenas alguns blocos (ex: só blocos 2 a 7)">🎯 Escopo</button>
@@ -3401,23 +3403,28 @@
     }
     function popularServicos(){
       const sel = document.getElementById('dob-mapa-servico');
+      const obraEl = document.getElementById('dob-mapa-obra');
+      const obraSel = obraEl ? obraEl.value : '';
       const atual = sel.value;
-      // Mantido só como estado interno (compatibilidade com o resto do código) — a lista visível agora é de cards.
-      sel.innerHTML = mapaState.servicos.map(s => `<option value="${s}">${s}</option>`).join('');
-      if(mapaState.servicos.includes(atual)) sel.value = atual;
+      // Só lista os serviços que se aplicam à obra escolhida (um serviço só do Pequis some quando a obra é Buritis).
+      const disponiveis = mapaState.servicos.filter(s => {
+        const esc = obraSel ? escopoDoServico(s, obraSel) : null;
+        return !(esc && esc[0] === '__nenhum__');
+      });
+      sel.innerHTML = '<option value="">Selecione o serviço…</option>' + disponiveis.map(s => `<option value="${s}">${s}</option>`).join('');
+      if(disponiveis.includes(atual)) sel.value = atual;
+      else sel.value = '';
       renderizarListaServicos();
     }
-    popularServicos();
     if(mapaObraAtual){
       const obraSelRestaurar = document.getElementById('dob-mapa-obra');
       if(obraSelRestaurar) obraSelRestaurar.value = mapaObraAtual;
     }
+    popularServicos();
     if(mapaServicoAtual && mapaState.servicos.includes(mapaServicoAtual)){
       document.getElementById('dob-mapa-servico').value = mapaServicoAtual;
       renderizarListaServicos();
     }
-    const buscaServicoEl = document.getElementById('dob-mapa-servico-busca');
-    if(buscaServicoEl) buscaServicoEl.addEventListener('input', renderizarListaServicos);
 
     function corClasse(cor){ return cor === 'amarelo' ? 'rgba(201,154,61,0.75)' : cor === 'verde' ? 'rgba(63,125,92,0.75)' : 'transparent'; }
 
@@ -3519,7 +3526,7 @@
       const obra = obraSelEl.value;
       const servico = document.getElementById('dob-mapa-servico').value;
       const gridEl = document.getElementById('dob-mapa-grid');
-      if(!servico){ gridEl.innerHTML = '<p class="dob-dica">Cadastre um serviço para começar.</p>'; return; }
+      if(!servico){ gridEl.innerHTML = `<p class="dob-dica" style="padding:18px;">Escolha a obra e o serviço ao lado para ver o mapa${mapaState.servicos.length ? '' : ' (cadastre um serviço para começar)'}.</p>`; return; }
 
       const escopoIds = escopoDoServico(servico, obra);
 
@@ -3905,6 +3912,8 @@
     }
     document.getElementById('dob-mapa-obra').addEventListener('change', () => {
       mapaObraAtual = document.getElementById('dob-mapa-obra').value;
+      popularServicos();
+      mapaServicoAtual = document.getElementById('dob-mapa-servico').value;
       atualizarTituloFixo();
       renderGrid();
     });
