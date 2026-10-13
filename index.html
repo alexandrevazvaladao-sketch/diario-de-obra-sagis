@@ -840,7 +840,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.13.2';
+  const APP_VERSION = 'v2026.10.13.3';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2736,15 +2736,22 @@
       notas:[['O contrato 69 (GS) é só mão de obra. Tubos, retroescavadeira, BGS, areia e material das caixas são da CCB.',''],['Executado até agora (Pequis): R$ 31.699,82 em 89 m de rede e 5 poços. Rede completa prevista: R$ 121.406,65 em 404 m e 16 poços, média de R$ 300/m com os poços.','']],
       calc:'dren' }
   ];
+  function catCustoUnit(x){
+    const mats = (x.materiais || []).reduce((s,m) => s + (Number(m.qtd)||0) * (Number(m.preco)||0), 0);
+    return (Number(x.preco) || 0) + mats;
+  }
   function catServicos(){
     const lista = CATALOGO_BASE.slice();
     const c = mapaState.catalogoCustom || {};
     Object.keys(c).forEach(id => {
-      const x = c[id];
-      lista.push({ id, custom:true, nome:x.nome, un:x.un || 'unidade', macro:x.macro || '', preco:Number(x.preco) || 0,
-        resumo: x.preco ? catR(x.preco) + ' por ' + (x.un || 'unidade') : 'sem valor ainda', vazio:true, calc:'simples', notas:[] });
+      const x = c[id]; const tot = catCustoUnit(x);
+      lista.push({ id, custom:true, nome:x.nome, un:x.un || 'unidade', macro:x.macro || '', preco:Number(x.preco) || 0, contrato:x.contrato || null, materiais:x.materiais || [],
+        total:tot, resumo: tot ? catR(tot) + ' por ' + (x.un || 'unidade') : 'sem valor ainda', vazio:true, calc:'simples', notas:[] });
     });
     return lista;
+  }
+  function catContratosUau(){
+    return ((uauBeeState && uauBeeState.contratos) || []).slice().sort((a,b) => (a.obra||'').localeCompare(b.obra||'') || (parseInt(a.contratoNumero)||0) - (parseInt(b.contratoNumero)||0));
   }
   function catTag(t){ return t === 'ex' ? '<span class="tag ex">executado</span>' : t === 'pv' ? '<span class="tag pv">previsto</span>' : '<span class="tag ac">a confirmar</span>'; }
   function catTabelaHtml(s){
@@ -2771,7 +2778,7 @@
       <label>Blocos<input id="dob-cat-c3" type="number" min="1" value="10"></label></div><div class="res" id="dob-cat-res"></div></div>`;
     if(s.calc === 'dren') return `<div class="calc"><h3 style="margin:0">Estimar custo</h3><div class="linha">
       <label>Tubo DN600 (m)<input id="dob-cat-c1" type="number" min="0" value="100"></label><label>Tubo DN400 (m)<input id="dob-cat-c2" type="number" min="0" value="200"></label><label>Poços de visita (un)<input id="dob-cat-c3" type="number" min="0" value="8"></label></div><div class="res" id="dob-cat-res"></div></div>`;
-    return `<div class="calc"><h3 style="margin:0">Estimar custo</h3><div class="linha"><label>Quantidade (${catEsc(s.unCalc || s.un)})<input id="dob-cat-c1" type="number" min="0" value="${s.vazio ? 1 : 10}"></label><label>Valor unitário (R$)<input id="dob-cat-c2" type="number" min="0" step="0.01" value="${s.preco || 0}"></label>${s.custom ? '<button type="button" class="btn" id="dob-cat-salvar-preco">Salvar valor no catálogo</button>' : ''}</div><div class="res" id="dob-cat-res"></div></div>`;
+    return `<div class="calc"><h3 style="margin:0">Estimar custo</h3><div class="linha"><label>Quantidade (${catEsc(s.unCalc || s.un)})<input id="dob-cat-c1" type="number" min="0" value="${s.vazio ? 1 : 10}"></label><label>Custo unitário (R$)<input id="dob-cat-c2" type="number" min="0" step="0.01" value="${s.custom ? s.total : (s.preco || 0)}"></label></div><div class="res" id="dob-cat-res"></div></div>`;
   }
   function catAtualizaCalc(s){
     const r = document.getElementById('dob-cat-res'); if(!r) return;
@@ -2796,6 +2803,7 @@
     const todos = catServicos();
     let s = todos.find(x => x.id === catalogoSel);
     if(!s){ s = todos[0]; catalogoSel = s.id; }
+    const contratoOpts = '<option value="">— sem contrato —</option>' + catContratosUau().map(c => `<option value="${catEsc(c.key)}">${catEsc((c.obra||'') + ' · ' + c.contratoNumero + ' · ' + (c.objeto||'') + ' · ' + (c.fornecedorNome||''))}</option>`).join('');
     const macroOpts = '<option value="">— sem macroserviço —</option>' + Object.keys(MACROS_CRONOGRAMA).sort().map(c => `<option value="${c}">${catEsc(rotuloMacro(c))}</option>`).join('');
     const style = `<style>
 .dob-cat{--navy:#1f2d4a;--green:#2f7a54;--green-bg:#dcefe4;--amber:#a86f0c;--amber-bg:#f8ecd2;--warn:#b4491f;--warn-bg:#f9e4da;--todo-bg:#e8ebf0;--bg:#f3f4f6;display:flex;flex-direction:column;gap:14px;margin-top:14px;color:var(--ink-text)}
@@ -2839,41 +2847,76 @@
 .dob-cat .novoform.on{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
 .dob-cat .btn{font:inherit;font-weight:600;font-size:13px;border:none;background:var(--navy);color:#fff;border-radius:6px;padding:9px 14px;cursor:pointer}
 .dob-cat .btn.sec{background:none;color:var(--brick);border:1px solid var(--line)}
+.dob-cat-macro{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--navy);margin:10px 4px 0;padding-top:8px;border-top:1px solid var(--line)}
 @media(max-width:860px){.dob-cat .grid{grid-template-columns:minmax(0,1fr)}.dob-cat .lista{flex-direction:row;flex-wrap:wrap}.dob-cat .lista h2{width:100%}.dob-cat-item{flex:1 1 150px}}
 </style>`;
-    const lista = '<h2>Tipos de serviço</h2>' + todos.map(x => `<button class="dob-cat-item" type="button" aria-pressed="${x.id === s.id}" data-cat="${catEsc(x.id)}"><b>${catEsc(x.nome)}</b><span>${catEsc(x.resumo)}</span></button>`).join('') +
-      '<button class="novo" type="button" id="dob-cat-novo">+ Adicionar tipo de serviço</button>' +
+    const grupos = {};
+    todos.forEach(x => { (grupos[x.macro || ''] = grupos[x.macro || ''] || []).push(x); });
+    const codsOrdem = Object.keys(grupos).sort((a,b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)));
+    const lista = '<h2>Macroserviço › serviço</h2>' + codsOrdem.map(cod => `<div class="dob-cat-macro">${catEsc(cod ? rotuloMacro(cod) : 'Sem macroserviço')}</div>` +
+      grupos[cod].map(x => `<button class="dob-cat-item" type="button" aria-pressed="${x.id === s.id}" data-cat="${catEsc(x.id)}"><b>${catEsc(x.nome)}</b><span>${catEsc(x.resumo)}</span></button>`).join('')).join('') +
+      '<button class="novo" type="button" id="dob-cat-novo">+ Cadastrar serviço</button>' +
       `<div class="novoform ${catalogoNovoAberto ? 'on' : ''}" id="dob-cat-form">
+        <label style="width:100%">Contrato do UAU (opcional)<select id="dob-cat-n-contrato" style="width:100%">${contratoOpts}</select></label>
         <label>Nome<input id="dob-cat-n-nome" type="text" placeholder="Ex.: Alvenaria 1ª fiada"></label>
         <label>Unidade<input id="dob-cat-n-un" type="text" placeholder="bloco, m, m²..."></label>
-        <label>Macroserviço<select id="dob-cat-n-macro">${macroOpts}</select></label>
-        <label>Valor unitário (R$)<input id="dob-cat-n-preco" type="number" min="0" step="0.01"></label>
+        <label style="width:100%">Macroserviço<select id="dob-cat-n-macro" style="width:100%">${macroOpts}</select></label>
+        <label>Preço do contrato (R$/un)<input id="dob-cat-n-preco" type="number" min="0" step="0.01"></label>
         <button type="button" class="btn" id="dob-cat-n-salvar">Salvar</button></div>`;
-    const ficha = `<div class="cab"><h2>${catEsc(s.nome)}</h2><div class="meta"><span>Unidade: <b>${catEsc(s.un)}</b></span><span>·</span><span>Macroserviço <span class="cod">${catEsc(s.macro || '—')}</span> ${catEsc(s.macro ? (MACROS_CRONOGRAMA[s.macro] || '') : 'a definir')}</span>${s.vazio ? '' : '<span>·</span><span>ligado ao BEE pelo código</span>'}</div></div>` +
-      (s.vazio ? '<div class="nota">Serviço novo, ainda sem composição. Informe o valor unitário na calculadora para já usar na estimativa. Depois dá para detalhar material, mão de obra e equipamento.</div>'
-               : `<div class="kpis">${s.kpis.map(k => `<div class="kpi"><small>${k[0]}</small><strong>${k[1]}</strong><em>${k[2]}</em></div>`).join('')}</div>`) +
-      catTabelaHtml(s) + (s.notas || []).map(n => `<div class="nota ${n[1] === 'w' ? 'w' : ''}">${n[0]}</div>`).join('') + catCalcHtml(s) +
-      (s.custom ? '<div><button type="button" class="btn sec" id="dob-cat-excluir">Excluir este serviço</button></div>' : '');
-    container.innerHTML = style + `<div class="dob-cat"><div class="aviso">Valores do memorial de cálculo (R$ por bloco e por metro, preços de 10/2026). Os tipos que você adicionar ficam salvos e sincronizam com o Drive junto com o Mapa.</div><div class="grid"><nav class="lista">${lista}</nav><main class="ficha">${ficha}</main></div></div>`;
+    let corpo;
+    if(s.custom){
+      const ct = s.contrato;
+      const contratoHtml = ct ? `<div class="nota"><b>Contrato UAU ${catEsc(ct.numero)}</b> · ${catEsc(ct.obra || '')} · ${catEsc(ct.fornecedor || '')}<br>${catEsc(ct.objeto || '')}</div>` : '<div class="nota">Sem contrato do UAU vinculado (serviço só de material ou ainda não contratado).</div>';
+      const matLinhas = s.materiais.map((m,i) => `<tr><td>${catEsc(m.desc)}</td><td>${catEsc(m.un)}</td><td class="n">${catN(m.qtd,4)}</td><td class="n">${catR(m.preco)}</td><td class="n">${catR((Number(m.qtd)||0)*(Number(m.preco)||0))}</td><td><button type="button" class="btn sec dob-cat-mat-del" data-i="${i}">✕</button></td></tr>`).join('');
+      corpo = `<div class="cab"><h2>${catEsc(s.nome)}</h2><div class="meta"><span>Unidade: <b>${catEsc(s.un)}</b></span><span>·</span><label style="flex-direction:row;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:400">Macroserviço <select id="dob-cat-macro-sel" style="width:auto">${macroOpts.replace('value="'+s.macro+'"','value="'+s.macro+'" selected')}</select></label></div></div>
+      <div class="kpis"><div class="kpi"><small>Custo unitário</small><strong>${catR(s.total)}</strong><em>por ${catEsc(s.un)}</em></div><div class="kpi"><small>Contrato (mão de obra/serviço)</small><strong>${catR(s.preco)}</strong><em>por ${catEsc(s.un)}</em></div><div class="kpi"><small>Material</small><strong>${catR(s.total - s.preco)}</strong><em>por ${catEsc(s.un)}</em></div></div>
+      ${contratoHtml}
+      <div class="linha"><label>Preço do contrato (R$/un)<input id="dob-cat-preco-edit" type="number" min="0" step="0.01" value="${s.preco}"></label><button type="button" class="btn" id="dob-cat-salvar-preco">Salvar</button></div>
+      <div><h3>Materiais por ${catEsc(s.un)}</h3><div class="tw"><table><thead><tr><th>Material</th><th>Un.</th><th class="n">Qtd. por ${catEsc(s.un)}</th><th class="n">Preço unit.</th><th class="n">Custo</th><th></th></tr></thead><tbody>${matLinhas || '<tr><td colspan="6" style="color:var(--muted)">Nenhum material lançado.</td></tr>'}</tbody></table></div>
+      <div class="linha" style="margin-top:10px"><label>Material<input id="dob-cat-m-desc" type="text" style="width:200px"></label><label>Un.<input id="dob-cat-m-un" type="text" style="width:70px"></label><label>Qtd. por ${catEsc(s.un)}<input id="dob-cat-m-qtd" type="number" min="0" step="any" style="width:110px"></label><label>Preço unit. (R$)<input id="dob-cat-m-preco" type="number" min="0" step="0.01" style="width:110px"></label><button type="button" class="btn" id="dob-cat-m-add">+ Material</button></div></div>
+      ${catCalcHtml(s)}
+      <div><button type="button" class="btn sec" id="dob-cat-excluir">Excluir este serviço</button></div>`;
+    } else {
+      corpo = `<div class="cab"><h2>${catEsc(s.nome)}</h2><div class="meta"><span>Unidade: <b>${catEsc(s.un)}</b></span><span>·</span><span>Macroserviço <span class="cod">${catEsc(s.macro || '—')}</span> ${catEsc(MACROS_CRONOGRAMA[s.macro] || '')}</span><span>·</span><span>memorial de cálculo</span></div></div>
+      <div class="kpis">${s.kpis.map(k => `<div class="kpi"><small>${k[0]}</small><strong>${k[1]}</strong><em>${k[2]}</em></div>`).join('')}</div>` +
+      catTabelaHtml(s) + (s.notas || []).map(n => `<div class="nota ${n[1] === 'w' ? 'w' : ''}">${n[0]}</div>`).join('') + catCalcHtml(s);
+    }
+    const ficha = corpo;
+    container.innerHTML = style + `<div class="dob-cat"><div class="aviso">Cada macroserviço (código do cronograma/BEE) agrupa os serviços. Cadastre o serviço conforme o contrato do UAU e, se houver, os materiais; ele fica no macro que você escolher. Radier, estaca, solo e drenagem vêm do memorial de cálculo (preços de 10/2026). O que você cadastrar sincroniza com o Drive junto com o Mapa.</div><div class="grid"><nav class="lista">${lista}</nav><main class="ficha">${ficha}</main></div></div>`;
     container.querySelectorAll('.dob-cat-item').forEach(b => b.addEventListener('click', () => { catalogoSel = b.dataset.cat; renderCatalogo(); }));
     container.querySelectorAll('.dob-cat .calc input, .dob-cat .calc select').forEach(e => e.addEventListener('input', () => catAtualizaCalc(s)));
     catAtualizaCalc(s);
     document.getElementById('dob-cat-novo').addEventListener('click', () => { catalogoNovoAberto = !catalogoNovoAberto; document.getElementById('dob-cat-form').classList.toggle('on', catalogoNovoAberto); });
+    const selC = document.getElementById('dob-cat-n-contrato');
+    selC.addEventListener('change', () => {
+      const c = catContratosUau().find(x => x.key === selC.value); if(!c) return;
+      const it = (c.itens || [])[0] || {};
+      const set = (id, v) => { const e = document.getElementById(id); if(e && v != null && v !== '') e.value = v; };
+      set('dob-cat-n-nome', c.objeto); set('dob-cat-n-un', it.unidade); set('dob-cat-n-macro', c.macroCod); set('dob-cat-n-preco', it.precoUnitario);
+    });
     document.getElementById('dob-cat-n-salvar').addEventListener('click', () => {
       const nome = document.getElementById('dob-cat-n-nome').value.trim();
       if(!nome) return;
       if(!mapaState.catalogoCustom) mapaState.catalogoCustom = {};
+      const c = catContratosUau().find(x => x.key === selC.value);
       const id = 'c' + Date.now().toString(36);
-      mapaState.catalogoCustom[id] = { nome, un: document.getElementById('dob-cat-n-un').value.trim() || 'unidade', macro: document.getElementById('dob-cat-n-macro').value, preco: parseFloat(document.getElementById('dob-cat-n-preco').value) || 0 };
+      mapaState.catalogoCustom[id] = { nome, un: document.getElementById('dob-cat-n-un').value.trim() || 'unidade', macro: document.getElementById('dob-cat-n-macro').value, preco: parseFloat(document.getElementById('dob-cat-n-preco').value) || 0, materiais: [],
+        contrato: c ? { key:c.key, obra:c.obra, numero:c.contratoNumero, fornecedor:c.fornecedorNome, objeto:c.objeto } : null };
       catalogoSel = id; catalogoNovoAberto = false;
       saveMapaState(true); renderCatalogo();
     });
+    const cust = () => mapaState.catalogoCustom && mapaState.catalogoCustom[s.id];
     const bp = document.getElementById('dob-cat-salvar-preco');
-    if(bp) bp.addEventListener('click', () => {
-      const x = mapaState.catalogoCustom && mapaState.catalogoCustom[s.id]; if(!x) return;
-      x.preco = parseFloat(document.getElementById('dob-cat-c2').value) || 0;
+    if(bp) bp.addEventListener('click', () => { const x = cust(); if(!x) return; x.preco = parseFloat(document.getElementById('dob-cat-preco-edit').value) || 0; saveMapaState(true); renderCatalogo(); });
+    const ms = document.getElementById('dob-cat-macro-sel');
+    if(ms) ms.addEventListener('change', () => { const x = cust(); if(!x) return; x.macro = ms.value; saveMapaState(true); renderCatalogo(); });
+    const ma = document.getElementById('dob-cat-m-add');
+    if(ma) ma.addEventListener('click', () => {
+      const x = cust(); if(!x) return; const d = document.getElementById('dob-cat-m-desc').value.trim(); if(!d) return;
+      (x.materiais = x.materiais || []).push({ desc:d, un:document.getElementById('dob-cat-m-un').value.trim(), qtd:parseFloat(document.getElementById('dob-cat-m-qtd').value) || 0, preco:parseFloat(document.getElementById('dob-cat-m-preco').value) || 0 });
       saveMapaState(true); renderCatalogo();
     });
+    container.querySelectorAll('.dob-cat-mat-del').forEach(b => b.addEventListener('click', () => { const x = cust(); if(!x) return; x.materiais.splice(+b.dataset.i, 1); saveMapaState(true); renderCatalogo(); }));
     const be = document.getElementById('dob-cat-excluir');
     if(be) be.addEventListener('click', () => {
       if(!confirm('Excluir "' + s.nome + '" do catálogo?')) return;
