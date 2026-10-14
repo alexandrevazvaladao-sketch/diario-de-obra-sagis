@@ -755,7 +755,6 @@
     <div class="dob-side-item" data-side="relatorio"><span class="ic">📑</span><span class="label">Apresentação</span></div>
     <div class="dob-side-item" data-side="gamma"><span class="ic">🤖</span><span class="label">Comando Gamma</span></div>
     <div class="dob-side-item" data-side="uaubee"><span class="ic">🔄</span><span class="label">UAU → BEE</span></div>
-    <div class="dob-side-item" data-side="drive"><span class="ic">☁️</span><span class="label">Google Drive</span></div>
     <div class="dob-side-item" data-side="config"><span class="ic">⚙️</span><span class="label">Configurações</span></div>
     <div class="dob-side-recolher" id="dob-side-recolher-link"><span class="ic">←</span><span class="label">Recolher</span></div>
   </div>
@@ -779,17 +778,15 @@
   <div class="dob-status-bar" id="dob-status-bar" style="display:none;">
     <span><span class="dob-dot off" id="dob-dot"></span><span id="dob-status-texto">Drive não conectado</span></span>
     <span class="dob-nuvem-texto" id="dob-nuvem-texto" style="margin-left:14px;font-size:13px;"></span>
+    <button class="dob-btn pequeno" id="dob-btn-nuvem-login" style="margin-left:14px;">Entrar com Google</button>
+    <button class="dob-btn secundario pequeno" id="dob-btn-conectar" style="display:none;">Conectar ao Google Drive</button>
     <details class="dob-status-mais" id="dob-status-mais">
       <summary>⋯ Mais opções</summary>
       <div class="dob-status-mais-botoes">
-        <button class="dob-btn secundario pequeno" id="dob-btn-nuvem-login">Entrar com Google (editar)</button>
-        <button class="dob-btn secundario pequeno" id="dob-btn-nuvem-sair" style="display:none;">Sair da conta</button>
-        <button class="dob-btn secundario pequeno" id="dob-btn-nuvem-editores" style="display:none;">👥 Quem pode editar</button>
-        <button class="dob-btn secundario pequeno" id="dob-btn-conectar">Conectar ao Google Drive</button>
+        <button class="dob-btn secundario pequeno" id="dob-btn-config">Configurações</button>
         <button class="dob-btn secundario pequeno" id="dob-btn-sync-fotos" style="display:none;">📤 Sincronizar fotos locais</button>
         <button class="dob-btn secundario pequeno" id="dob-btn-reparar-thumbs" style="display:none;">🔧 Reparar miniaturas</button>
         <button class="dob-btn secundario pequeno" id="dob-btn-recuperar-fotos">🔄 Recuperar fotos do Drive</button>
-        <button class="dob-btn secundario pequeno" id="dob-btn-config">Configurações</button>
       </div>
     </details>
   </div>
@@ -852,7 +849,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.8';
+  const APP_VERSION = 'v2026.10.14.9';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2491,7 +2488,11 @@
     else if(nuvem.gravando || nuvem.sujo) txt += 'salvando…';
     else txt += 'sincronizado (' + (nuvem.dono ? 'dono' : 'editor') + ')';
     t.textContent = txt;
-    if(login) login.style.display = nuvem.user ? 'none' : '';
+    if(login){
+      // um só botão: entra na conta (nuvem + Drive). Some quando já está tudo conectado.
+      login.style.display = (nuvem.user && accessToken) ? 'none' : '';
+      login.textContent = nuvem.user ? 'Reconectar Google Drive' : 'Entrar com Google';
+    }
     if(sair) sair.style.display = nuvem.user ? '' : 'none';
     if(ed) ed.style.display = nuvem.dono ? '' : 'none';
     if(faixa){
@@ -2499,7 +2500,7 @@
         faixa.style.display = 'block';
         faixa.innerHTML = nuvem.user
           ? '👁 <b>Modo visualização.</b> Sua conta (' + escapeHtmlSaud(nuvem.user.email || '') + ') ainda não tem permissão para editar — peça ao dono para autorizar. O que você alterar aqui <b>não é salvo</b> na nuvem.'
-          : '👁 <b>Modo visualização.</b> Você vê todos os dados. Para editar, entre com o Google (menu "⋯ Mais opções") — só e-mails autorizados pelo dono conseguem salvar.';
+          : '👁 <b>Modo visualização.</b> Você vê todos os dados. Para editar, clique em "Entrar com Google" — só e-mails autorizados pelo dono conseguem salvar.';
       }else faixa.style.display = 'none';
     }
   }
@@ -5676,6 +5677,7 @@
       btnSync.textContent = `📤 Sincronizar ${pendentes} foto${pendentes === 1 ? '' : 's'} local${pendentes === 1 ? '' : 'is'}`;
     }
     atualizarBotaoReparar();
+    try{ nuvemStatus(); }catch(e){ /* ignora */ }
   }
 
   document.getElementById('dob-btn-conectar').addEventListener('click', () => {
