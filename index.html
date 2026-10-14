@@ -755,6 +755,56 @@
     .dob-lista{ gap:16px; }
   }
 
+
+  /* ---------- CELULAR (<= 720px): gaveta de menu + barra inferior + conteúdo em tela cheia. O PC não muda. ---------- */
+  #dob-m-bar, #dob-m-fundo{ display:none; }
+  @media (max-width:720px){
+    .dob-app-shell{ display:block; }
+    body{ padding:0 !important; }
+    #dob-root{ padding:14px 12px 84px; }
+    #dob-sidebar, #dob-sidebar.recolhida{
+      position:fixed; top:0; left:0; bottom:0; width:min(82vw,300px); min-height:0; height:100%; overflow-y:auto; -webkit-overflow-scrolling:touch;
+      transform:translateX(-102%); transition:transform .22s ease; z-index:1200; padding:14px 0 90px; box-shadow:none;
+    }
+    #dob-sidebar.m-aberto{ transform:none; box-shadow:0 0 40px rgba(0,0,0,.45); }
+    #dob-sidebar.recolhida .dob-side-top{ padding:0 18px 14px; justify-content:flex-start; }
+    #dob-sidebar.recolhida .dob-side-brand{ display:inline; }
+    #dob-sidebar.recolhida .dob-side-item{ padding:13px 18px; justify-content:flex-start; }
+    #dob-sidebar.recolhida .dob-side-item .label{ display:inline; }
+    #dob-sidebar .dob-side-item{ min-height:50px; font-size:15px; }
+    #dob-sidebar .dob-side-recolher{ display:none; }
+    body.m-sec .dob-header, body.m-sec .dob-saudacao, body.m-sec #dob-status-bar{ display:none !important; } /* dentro de uma seção: sem o topo, o conteúdo vem direto */
+    #dob-toast-salvo{ bottom:84px !important; max-width:92vw !important; border-radius:14px !important; }
+    #dob-m-fundo{ position:fixed; inset:0; background:rgba(10,18,36,.5); z-index:1100; }
+    #dob-m-fundo.on{ display:block; }
+    #dob-m-bar{
+      display:flex; position:fixed; left:0; right:0; bottom:0; z-index:1000; background:var(--ink); color:#fff;
+      padding:6px 4px calc(6px + env(safe-area-inset-bottom)); box-shadow:0 -6px 18px -8px rgba(0,0,0,.5);
+    }
+    #dob-m-bar button{
+      flex:1; background:none; border:none; color:rgba(255,255,255,.7); display:flex; flex-direction:column; align-items:center; gap:2px;
+      font:600 10.5px/1.1 inherit; font-family:inherit; padding:6px 2px; min-height:52px; cursor:pointer; border-radius:10px; -webkit-tap-highlight-color:transparent;
+    }
+    #dob-m-bar button .ic{ font-size:21px; line-height:1; }
+    #dob-m-bar button.on{ color:#fff; background:rgba(255,255,255,.12); }
+    #dob-m-bar button.dob-oculto{ display:none; }
+    /* cabeçalho e cartões mais enxutos */
+    .dob-header{ padding:16px 16px !important; border-radius:14px; }
+    .dob-card-form{ padding:14px 12px !important; border-radius:12px; }
+    .dob-saudacao-titulo{ font-size:22px; }
+    .dob-stats{ gap:8px; }
+    .dob-stat{ padding:12px 12px; }
+    input, select, textarea, .dob-input, .dob-select{ font-size:16px !important; } /* evita o zoom automático do iPhone */
+    .dob-btn{ min-height:44px; }
+    .dob-toolbar, .dob-filtros{ gap:8px; }
+    /* tabelas: rolam de lado e a primeira coluna fica fixa */
+    .dob-pd-tabela{ min-width:640px; }
+    .dob-pd-tabela th:first-child, .dob-pd-tabela td:first-child{ position:sticky; left:0; z-index:2; background:#fff; box-shadow:2px 0 4px -2px rgba(0,0,0,.18); max-width:150px; }
+    .dob-pd-tabela td:first-child{ white-space:normal; word-break:break-word; font-size:12px; }
+    .dob-pd-wrap, .tw{ -webkit-overflow-scrolling:touch; margin-left:-4px; margin-right:-4px; }
+    /* janelas (modais) ocupam a tela toda */
+    div[style*="position:fixed"][style*="inset:0"] > div{ max-width:100% !important; max-height:92vh !important; border-radius:14px; }
+  }
   /* Tooltip de bloco no Mapa — só aparece passando o MOUSE (pointerType mouse) por cima, nunca
      no toque, então no celular o toque continua marcando o bloco normalmente sem esse popup no
      caminho. pointer-events:none pra nunca atrapalhar o clique mesmo se ficar por cima do bloco. */
@@ -768,6 +818,14 @@
 </head>
 <body>
 <div id="dob-gate"><div class="lg-carregando"><b>Diário de Obra</b><span>Carregando…</span></div></div>
+<div id="dob-m-fundo"></div>
+<div id="dob-m-bar" aria-label="Navegação">
+  <button type="button" data-go="home"><span class="ic">📋</span>Diário</button>
+  <button type="button" data-go="novo"><span class="ic">📝</span>Novo</button>
+  <button type="button" data-go="mapa"><span class="ic">🗺️</span>Mapa</button>
+  <button type="button" data-go="cronograma"><span class="ic">📅</span>Cronograma</button>
+  <button type="button" data-go="__menu"><span class="ic">☰</span>Menu</button>
+</div>
 <div class="dob-app-shell">
   <div id="dob-sidebar">
     <div class="dob-side-top">
@@ -881,7 +939,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.19';
+  const APP_VERSION = 'v2026.10.14.20';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -1863,7 +1921,7 @@
   }
 
   // ---------- Cronograma (Last Planner System / Lean Construction — compromissos semanais e PPC) ----------
-  let cronogramaAberto = false;
+  let cronogramaAberto = false, cronogramaFalhou = false;
   let cronogramaDados = null; // { Buritis: {obra,itens,meses,semanas}, Pequis: {...} }
   let cronogramaCarregando = false;
   let cronogramaObraAtual = 'Buritis';
@@ -1913,7 +1971,7 @@
       const resp = await fetch('cronograma-data.json');
       cronogramaDados = await resp.json();
     }catch(e){
-      cronogramaDados = null;
+      cronogramaDados = null; cronogramaFalhou = true;
     }
     cronogramaCarregando = false;
   }
@@ -1922,6 +1980,11 @@
     const container = document.getElementById('dob-cronograma-container');
     if(!cronogramaAberto){ container.innerHTML = ''; return; }
 
+    if(!cronogramaDados && cronogramaFalhou){
+      container.innerHTML = `<div class="dob-card-form"><div class="dob-status-msg erro">Não consegui carregar o cronograma (sem internet?). <button type="button" class="dob-btn pequeno" id="dob-crono-tentar">Tentar de novo</button></div></div>`;
+      const bt = document.getElementById('dob-crono-tentar'); if(bt) bt.onclick = () => { cronogramaFalhou = false; renderCronograma(); };
+      return;
+    }
     if(!cronogramaDados){
       container.innerHTML = `<div class="dob-card-form"><p class="dob-dica">Carregando cronograma…</p></div>`;
       cronogramaGarantirDados().then(() => { if(cronogramaAberto) renderCronograma(); });
@@ -4240,7 +4303,7 @@
     const erro = !!(opts && opts.erro);
     const antigo = document.getElementById('dob-toast-salvo');
     if(antigo) antigo.remove();
-    const semDrive = !accessToken;
+    const semDrive = false; // Drive não é mais usado
     const toast = document.createElement('div');
     toast.id = 'dob-toast-salvo';
     toast.style.cssText = `position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:99999; background:${erro ? 'var(--brick,#b4472e)' : 'var(--ink,#16233d)'}; color:#fff; padding:10px 10px 10px 16px; border-radius:999px; box-shadow:0 8px 24px rgba(0,0,0,0.3); font-size:13px; display:flex; align-items:center; gap:10px; max-width:92vw;`;
@@ -7907,6 +7970,29 @@
     aplicarEstadoRecolhido(recolhidaSalva);
     document.getElementById('dob-side-toggle').addEventListener('click', () => aplicarEstadoRecolhido(!sidebarEl.classList.contains('recolhida')));
     recolherLink.addEventListener('click', () => aplicarEstadoRecolhido(!sidebarEl.classList.contains('recolhida')));
+    // ---------- Celular: gaveta de menu + barra inferior ----------
+    (function(){
+      const fundo = document.getElementById('dob-m-fundo'), barra = document.getElementById('dob-m-bar');
+      const fecha = () => { sidebarEl.classList.remove('m-aberto'); fundo.classList.remove('on'); };
+      const abre = () => { sidebarEl.classList.add('m-aberto'); fundo.classList.add('on'); };
+      fundo.addEventListener('click', fecha);
+      document.getElementById('dob-side-toggle').addEventListener('click', () => { if(window.innerWidth <= 720) fecha(); });
+      sidebarEl.addEventListener('click', (e) => { if(e.target.closest('.dob-side-item')) fecha(); });
+      barra.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+        const go = b.dataset.go;
+        if(go === '__menu'){ sidebarEl.classList.contains('m-aberto') ? fecha() : abre(); return; }
+        const item = document.querySelector('.dob-side-item[data-side="' + go + '"]'); if(item) item.click();
+        window.scrollTo(0, 0);
+      }));
+      const marcar = () => {
+        const ativo = document.querySelector('.dob-side-item.active'), k = ativo ? ativo.dataset.side : 'home';
+        barra.querySelectorAll('button[data-go]').forEach(b => b.classList.toggle('on', b.dataset.go === k));
+        document.body.classList.toggle('m-sec', k !== 'home');
+        ['novo', 'mapa', 'cronograma'].forEach(k2 => { const it = document.querySelector('.dob-side-item[data-side="' + k2 + '"]'), bt = barra.querySelector('button[data-go="' + k2 + '"]'); if(it && bt) bt.classList.toggle('dob-oculto', it.classList.contains('dob-oculto')); });
+      };
+      new MutationObserver(marcar).observe(sidebarEl, { subtree: true, attributes: true, attributeFilter: ['class'] });
+      marcar();
+    })();
     const mapaBotoes = {
       mapa: 'dob-btn-mapa',
       cronograma: 'dob-btn-cronograma',
