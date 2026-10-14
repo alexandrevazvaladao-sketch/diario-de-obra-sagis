@@ -843,7 +843,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.1';
+  const APP_VERSION = 'v2026.10.14.2';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -858,7 +858,9 @@
 
   let entries = [];
   let driveFolderId = localStorage.getItem('dob:drive_folder_id_v2') || null;
-  let clientId = localStorage.getItem('dob:client_id') || '';
+  // Client ID público do app (não é segredo). Usado por padrão para ninguém precisar colar nada; ainda dá para trocar em Configurações.
+  const CLIENT_ID_PADRAO = '572866757178-ba4lfo5mg9l3ep38gh16s1rqpqj63b1e.apps.googleusercontent.com';
+  let clientId = localStorage.getItem('dob:client_id') || CLIENT_ID_PADRAO;
   let accessToken = null;
   let tokenClient = null;
   let diaSelecionado = null;
