@@ -881,7 +881,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.16';
+  const APP_VERSION = 'v2026.10.14.17';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2816,8 +2816,7 @@
           <button type="submit" class="lg-btn">Entrar</button>
         </form>
         <form id="dob-lg-form-criar" autocomplete="on" style="display:none;">
-          <label>Como devemos te chamar?<span class="lg-dica">Aparece na saudação ("Bom dia, ...").</span><input type="text" id="dob-lg-nome" autocomplete="name" placeholder="seu nome" /></label>
-          <label>Nome de usuário<span class="lg-dica">3 a 20 caracteres: letras minúsculas, números, ponto, traço ou sublinhado. Sem espaço nem acento. Tem que ser único.</span><input type="text" id="dob-lg-novo-usuario" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex.: maria.silva" /></label>
+          <label>Nome de usuário<span class="lg-dica">Também aparece na saudação ("Bom dia, ..."). 3 a 20 caracteres: letras minúsculas, números, ponto, traço ou sublinhado. Sem espaço nem acento. Tem que ser único.</span><input type="text" id="dob-lg-novo-usuario" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex.: maria.silva" /></label>
           <label>Senha<span class="lg-dica">Mínimo de 8 caracteres.</span><input type="password" id="dob-lg-nova-senha" autocomplete="new-password" /></label>
           <label>Repita a senha<input type="password" id="dob-lg-nova-senha2" autocomplete="new-password" /></label>
           <div class="lg-msg" id="dob-lg-msg-criar"></div>
@@ -2832,7 +2831,7 @@
       $('dob-lg-form-criar').style.display = qual === 'criar' ? '' : 'none';
       $('dob-lg-tab-entrar').className = qual === 'entrar' ? 'on' : '';
       $('dob-lg-tab-criar').className = qual === 'criar' ? 'on' : '';
-      setTimeout(() => { const f = $(qual === 'entrar' ? 'dob-lg-usuario' : 'dob-lg-nome'); if(f) f.focus(); }, 30);
+      setTimeout(() => { const f = $(qual === 'entrar' ? 'dob-lg-usuario' : 'dob-lg-novo-usuario'); if(f) f.focus(); }, 30);
     };
     $('dob-lg-tab-entrar').addEventListener('click', () => mostrarAba('entrar'));
     $('dob-lg-tab-criar').addEventListener('click', () => mostrarAba('criar'));
@@ -2849,9 +2848,8 @@
     });
     $('dob-lg-form-criar').addEventListener('submit', async (ev) => {
       ev.preventDefault();
-      const nome = $('dob-lg-nome').value.trim().replace(/\s+/g, ' '), u = $('dob-lg-novo-usuario').value.trim().toLowerCase();
+      const u = $('dob-lg-novo-usuario').value.trim().toLowerCase(), nome = u.split(/[._-]/)[0].replace(/^./, c => c.toUpperCase());
       const s1 = $('dob-lg-nova-senha').value, s2 = $('dob-lg-nova-senha2').value;
-      if(!nome){ erro('dob-lg-msg-criar', 'Diga como devemos te chamar.'); return; }
       if(!usuarioValido(u)){ erro('dob-lg-msg-criar', 'Nome de usuário inválido: use 3 a 20 letras minúsculas, números, ponto, traço ou sublinhado.'); return; }
       if(s1.length < 8){ erro('dob-lg-msg-criar', 'A senha precisa ter pelo menos 8 caracteres.'); return; }
       if(s1 !== s2){ erro('dob-lg-msg-criar', 'As duas senhas não são iguais.'); return; }
