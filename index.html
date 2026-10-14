@@ -881,7 +881,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.18';
+  const APP_VERSION = 'v2026.10.14.19';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -1886,6 +1886,7 @@
   }
   function cronogramaSemanalSalvar(obj){
     try{ localStorage.setItem('dob:cronograma_semanal', JSON.stringify(obj)); }catch(e){}
+    if(typeof nuvemCrono !== 'undefined' && nuvemCrono) nuvemCrono.agendar();
   }
   function cronogramaChaveSemana(obra, cod, semana){ return `${obra}|${cod}|${semana}`; }
 
@@ -1914,16 +1915,6 @@
     }catch(e){
       cronogramaDados = null;
     }
-    // carga única do "já feito" marcado em verde na planilha (não sobrescreve o que já foi marcado/desmarcado no app)
-    try{
-      if(localStorage.getItem('dob:crono_seed_v1') !== '1'){
-        const seed = await (await fetch('cronograma-feitos.json')).json();
-        const atuais = cronogramaSemanalLer();
-        Object.keys(seed).forEach(k => { if(!(k in atuais)) atuais[k] = seed[k]; });
-        cronogramaSemanalSalvar(atuais);
-        localStorage.setItem('dob:crono_seed_v1', '1');
-      }
-    }catch(e){ /* tenta de novo na próxima abertura */ }
     cronogramaCarregando = false;
   }
 
@@ -2519,6 +2510,7 @@
     try{ if(catalogoAberto) renderCatalogo(); }catch(e){ /* ignora */ }
     try{ if(metodoAberto) renderMetodo(); }catch(e){ /* ignora */ }
     try{ if(custoEtapaAberto) renderCustoEtapa(); }catch(e){ /* ignora */ }
+    try{ if(cronogramaAberto) renderCronograma(); }catch(e){ /* ignora */ }
   }
   function nuvemStatus(){
     const t = document.getElementById('dob-nuvem-texto'); if(!t) return;
@@ -2726,6 +2718,11 @@
       if((!nuvem.existe && temDados) || nuvem.sujo) nuvemAgendarGravacao(true);
     }
     if(nuvem.editor){ [nuvemEquip, nuvemMao].forEach(x => { if(x) x.iniciarEditor(); });
+      if(nuvemCrono){ (async () => { // primeira vez: sobe o "já feito" (verde) da planilha, se ainda não houver nada no banco
+        await nuvemCrono.primeiro;
+        if(!nuvemCrono.existe && !Object.keys(cronogramaSemanalLer()).length){ try{ const seed = await (await fetch('cronograma-feitos.json')).json(); localStorage.setItem('dob:cronograma_semanal', JSON.stringify(seed)); }catch(e){ /* ignora */ } }
+        nuvemCrono.iniciarEditor();
+      })(); }
       [nuvemContr, nuvemUau].forEach(x => { if(x){ if(!x.primeiro) x.ouvir(); x.iniciarEditor(); } }); nuvemEntradasEnviar(); }
     try{ aplicarVisibilidade(); }catch(e){ /* ignora */ }
     nuvemStatus();
@@ -2964,7 +2961,7 @@
     };
     return d;
   }
-  var nuvemEquip = null, nuvemMao = null, nuvemContr = null, nuvemUau = null;
+  var nuvemEquip = null, nuvemMao = null, nuvemContr = null, nuvemUau = null, nuvemCrono = null;
   function mesclarPorId(remote, local, listas){
     const excl = Array.from(new Set([...(remote.excluidos || []), ...(local.excluidos || [])]));
     const out = Object.assign({}, remote, local, { excluidos: excl });
@@ -3005,7 +3002,14 @@
       mesclar: (r, l) => mesclarPorId(Object.assign({ items: [], contratos: [] }, r), Object.assign({ items: [], contratos: [] }, l), [['items', x => x.key], ['contratos', x => x.key]]),
       temDados: (st) => ((st.items || []).length + (st.contratos || []).length) > 0
     });
-    nuvemEquip.ouvir(); nuvemMao.ouvir();
+    nuvemCrono = criarDocNuvem({
+      path: 'estado/cronograma', rotulo: 'Cronograma (feito por semana)',
+      ler: () => cronogramaSemanalLer(),
+      aplicar: (st) => { try{ localStorage.setItem('dob:cronograma_semanal', JSON.stringify(st || {})); }catch(e){ /* ignora */ } try{ if(cronogramaAberto) nuvemRerender(); }catch(e){ /* ignora */ } },
+      mesclar: (r, l) => Object.assign({}, r, l),
+      temDados: (st) => Object.keys(st || {}).length > 0
+    });
+    nuvemEquip.ouvir(); nuvemMao.ouvir(); nuvemCrono.ouvir();
     if(nuvem.editor){ nuvemContr.ouvir(); nuvemUau.ouvir(); } // contratos e UAU: só editores (valores de fornecedores)
   }
 

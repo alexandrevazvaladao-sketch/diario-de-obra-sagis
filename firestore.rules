@@ -44,7 +44,7 @@ service cloud.firestore {
     // dados da obra: só quem entrou lê; só dono/editores gravam
     match /mapa/{doc} { allow read: if logado(); allow write: if editor(); }
     match /estado/{doc} {
-      allow read: if logado() && (doc in ['equipamentos', 'maodeobra'] || editor()); // contratos e UAU: só editores
+      allow read: if logado() && (doc in ['equipamentos', 'maodeobra', 'cronograma'] || editor()); // contratos e UAU: só editores
       allow write: if editor();
     }
     match /entradas/{doc} { allow read: if logado(); allow write: if editor(); }
