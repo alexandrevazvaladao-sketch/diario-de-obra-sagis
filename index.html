@@ -14,7 +14,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Diário de Obra" />
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -38,6 +37,35 @@
     --shadow-sm: 0 1px 2px rgba(22,35,61,0.08);
   }
   *{box-sizing:border-box;}
+  #dob-gate{ position:fixed; inset:0; z-index:10000; overflow:auto; display:flex; align-items:center; justify-content:center; padding:20px;
+    background: radial-gradient(900px 500px at 85% 10%, rgba(217,102,47,.35), transparent 60%), linear-gradient(155deg, #16233d 0%, #1e3050 60%, #24395c 100%); font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  #dob-gate .lg-carregando{ color:#fff; text-align:center; font-family:Georgia,serif; }
+  #dob-gate .lg-carregando b{ display:block; font-size:28px; margin-bottom:6px; }
+  #dob-gate .lg-carregando span{ font-size:13px; opacity:.75; font-family:inherit; }
+  .lg-card{ display:flex; width:100%; max-width:900px; min-height:540px; background:#fff; border-radius:22px; overflow:hidden; box-shadow:0 30px 70px -20px rgba(0,0,0,.55); }
+  .lg-arte{ flex:1.05; background: linear-gradient(160deg,#1e3050 0%,#16233d 100%); position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:28px; color:#fff; overflow:hidden; }
+  .lg-arte::before{ content:""; position:absolute; width:340px; height:340px; border-radius:50%; background:rgba(217,102,47,.22); right:-110px; top:-110px; }
+  .lg-arte::after{ content:""; position:absolute; width:260px; height:260px; border-radius:50%; background:rgba(201,154,61,.16); left:-90px; bottom:-90px; }
+  .lg-arte svg{ width:100%; max-width:330px; height:auto; position:relative; z-index:1; }
+  .lg-arte h2{ position:relative; z-index:1; margin:16px 0 4px; font-family:Georgia,serif; font-size:24px; text-align:center; }
+  .lg-arte p{ position:relative; z-index:1; margin:0; font-size:13px; opacity:.8; text-align:center; letter-spacing:.04em; }
+  .lg-form{ flex:1; padding:38px 36px; display:flex; flex-direction:column; justify-content:center; color:#232a35; }
+  .lg-form h1{ margin:0 0 4px; text-align:center; font-family:Georgia,serif; font-size:27px; color:#d9662f; }
+  .lg-form .lg-sub{ margin:0 0 18px; text-align:center; font-size:13px; color:#767e8c; }
+  .lg-abas{ display:flex; background:#eef1f6; border-radius:999px; padding:4px; margin-bottom:18px; }
+  .lg-abas button{ flex:1; border:0; background:transparent; padding:9px; border-radius:999px; font:600 13px inherit; color:#2c3c5c; cursor:pointer; }
+  .lg-abas button.on{ background:#16233d; color:#fff; }
+  .lg-form label{ display:block; font-size:12.5px; font-weight:600; color:#2c3c5c; }
+  .lg-form label .lg-dica{ display:block; font-weight:400; font-size:11.5px; color:#767e8c; margin-top:1px; }
+  .lg-form input[type=text], .lg-form input[type=password]{ width:100%; padding:11px 16px; border:1px solid #d9dde5; background:#f1f3f8; border-radius:999px; font:15px inherit; margin:5px 0 12px; outline:none; }
+  .lg-form input:focus{ border-color:#d9662f; background:#fff; box-shadow:0 0 0 3px rgba(217,102,47,.15); }
+  .lg-form .lg-ver{ display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:500; margin:0 0 12px; }
+  .lg-btn{ width:100%; border:0; border-radius:999px; background:#d9662f; color:#fff; font:700 14px inherit; letter-spacing:.06em; text-transform:uppercase; padding:13px; cursor:pointer; box-shadow:0 8px 18px -8px rgba(217,102,47,.8); }
+  .lg-btn:hover{ background:#c2551f; } .lg-btn:disabled{ opacity:.6; cursor:wait; }
+  .lg-msg{ min-height:18px; font-size:13px; margin:0 0 8px; color:#b3261e; text-align:center; }
+  .lg-nota{ margin:12px 0 0; font-size:11.5px; line-height:1.5; color:#767e8c; text-align:center; }
+  .lg-dono{ margin-top:14px; text-align:center; } .lg-dono button{ background:none; border:0; color:#767e8c; font:12px inherit; text-decoration:underline; cursor:pointer; }
+  @media (max-width:760px){ .lg-card{ flex-direction:column; min-height:0; } .lg-arte{ padding:18px 20px 12px; flex:none; } .lg-arte svg{ max-width:150px; } .lg-arte h2{ font-size:19px; margin:6px 0 2px; } .lg-arte p{ display:none; } .lg-form{ padding:24px 22px 28px; } }
   html,body{margin:0; padding:0;}
   body{
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -736,6 +764,7 @@
 </style>
 </head>
 <body>
+<div id="dob-gate"><div class="lg-carregando"><b>Diário de Obra</b><span>Carregando…</span></div></div>
 <div class="dob-app-shell">
   <div id="dob-sidebar">
     <div class="dob-side-top">
@@ -786,7 +815,7 @@
         <button class="dob-btn secundario pequeno" id="dob-btn-config">Configurações</button>
         <button class="dob-btn secundario pequeno" id="dob-btn-sync-fotos" style="display:none;">📤 Sincronizar fotos locais</button>
         <button class="dob-btn secundario pequeno" id="dob-btn-reparar-thumbs" style="display:none;">🔧 Reparar miniaturas</button>
-        <button class="dob-btn secundario pequeno" id="dob-btn-recuperar-fotos">🔄 Recuperar fotos do Drive</button>
+        <button class="dob-btn secundario pequeno" id="dob-btn-recuperar-fotos" style="display:none;">🔄 Recuperar fotos do Drive</button>
       </div>
     </details>
   </div>
@@ -849,7 +878,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.10';
+  const APP_VERSION = 'v2026.10.14.13';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -1015,6 +1044,7 @@
   })();
   function saveContratosState(sincronizar){
     localStorage.setItem('dob:contratos_state', JSON.stringify(contratosState));
+    if(sincronizar !== false && typeof nuvemContr !== 'undefined' && nuvemContr) nuvemContr.agendar();
     if(sincronizar !== false && accessToken) return syncContratosToDrive();
     return null;
   }
@@ -1034,6 +1064,7 @@
   })();
   function saveUauBeeState(sincronizar){
     localStorage.setItem('dob:uaubee_state', JSON.stringify(uauBeeState));
+    if(sincronizar !== false && typeof nuvemUau !== 'undefined' && nuvemUau) nuvemUau.agendar();
     if(sincronizar !== false && accessToken) return syncUauBeeToDrive();
     return null;
   }
@@ -2493,7 +2524,7 @@
       if(st) st.textContent = nuvem.ok ? 'Conectado ao banco de dados' : 'Conectando ao banco de dados…';
     }
     t.textContent = txt;
-    if(login){ login.style.display = nuvem.user ? 'none' : ''; login.textContent = 'Entrar / Cadastrar'; }
+    if(login){ login.style.display = nuvem.user ? 'none' : ''; login.textContent = 'Entrar'; }
     if(sair) sair.style.display = nuvem.user ? '' : 'none';
     if(ed) ed.style.display = nuvem.dono ? '' : 'none';
     if(faixa){
@@ -2501,7 +2532,7 @@
         faixa.style.display = 'block';
         faixa.innerHTML = nuvem.user
           ? '👁 <b>Modo visualização.</b> Sua conta (' + escapeHtmlSaud(nuvem.rotulo || '') + ') só pode visualizar — peça ao dono para liberar a edição. O que você alterar aqui <b>não é salvo</b> na nuvem.'
-          : '👁 <b>Modo visualização.</b> Você vê todos os dados. Clique em "Entrar / Cadastrar" para criar sua conta ou entrar; só quem o dono liberar como editor consegue salvar.';
+          : '';
       }else faixa.style.display = 'none';
     }
   }
@@ -2511,6 +2542,31 @@
     clearTimeout(nuvem.timer);
     nuvem.timer = setTimeout(nuvemGravar, imediato ? 50 : 1500);
     nuvemStatus();
+  }
+  // ---------- Histórico de atividades (só o dono lê; o dono não registra as próprias ações) ----------
+  var histRecente = {};
+  function registrarHistorico(tipo, resumo, janelaMs){
+    try{
+      if(!nuvem.db || !nuvem.user || nuvem.dono) return;
+      const chave = tipo + '|' + resumo, agora = Date.now();
+      if(histRecente[chave] && agora - histRecente[chave] < (janelaMs || 60000)) return;
+      histRecente[chave] = agora;
+      nuvem.db.collection('historico').add({
+        uid: nuvem.user.uid, usuario: nuvem.usuario || nuvem.rotulo || '', nome: nuvem.nomeCad || (nuvem.user.displayName || ''),
+        papel: nuvem.papel || 'visualizador', tipo: String(tipo).slice(0, 30), resumo: String(resumo).slice(0, 280), em: agora, enviado: false
+      }).catch(() => { /* histórico é best-effort */ });
+    }catch(e){ /* ignora */ }
+  }
+  function contagemMapa(m){
+    m = m || {};
+    return { 'marcações': (m.estados || []).length, 'desenhos': (m.desenhos || []).length, 'serviços': (m.servicos || []).length,
+      'itens de catálogo': Object.keys(m.catalogoCustom || {}).length, 'passos do método': (m.metodoPassos || []).length, 'custos por etapa': Object.keys(m.custoEtapa || {}).length };
+  }
+  function resumoMudancaMapa(antes, depois){
+    if(!antes) return 'alterou o Mapa / Catálogo / Método / Custos';
+    const partes = [];
+    Object.keys(depois).forEach(k => { const d = depois[k] - (antes[k] || 0); if(d) partes.push((d > 0 ? '+' : '') + d + ' ' + k); });
+    return 'alterou o Mapa' + (partes.length ? ': ' + partes.join(', ') : ' (edição de marcações/estados existentes)');
   }
   async function nuvemGravar(){
     if(!nuvem.db || !nuvem.editor || !nuvem.user) return;
@@ -2533,6 +2589,7 @@
         escrito = { estado, rev: novo };
       });
       nuvem.revEnviado = escrito.rev; nuvem.rev = escrito.rev; nuvem.existe = true; nuvem.erro = '';
+      { const dep = contagemMapa(escrito.estado); registrarHistorico('mapa', resumoMudancaMapa(nuvem.contMapa, dep), 5 * 60000); nuvem.contMapa = dep; }
       if(escrito.estado !== mapaState){ mapaState = escrito.estado; nuvemSalvarLocal(); nuvemRerender(); }
       if(nuvem.seq === seqInicio) nuvem.sujo = false;
       else { clearTimeout(nuvem.timer); nuvem.timer = setTimeout(nuvemGravar, 300); }
@@ -2547,6 +2604,7 @@
     let remoto;
     try{ remoto = normalizarMapa(JSON.parse(d.json)); }catch(e){ return; }
     try{ localStorage.setItem('dob:mapa_state_bak', JSON.stringify(mapaState)); }catch(e){ /* ignora */ }
+    nuvem.contMapa = contagemMapa(remoto);
     if(nuvem.sujo && nuvem.editor){ mapaState = mesclarMapa(remoto, mapaState); nuvem.rev = d.rev || 0; nuvemSalvarLocal(); nuvemAgendarGravacao(); }
     else { mapaState = remoto; nuvem.rev = d.rev || 0; nuvemSalvarLocal(); }
     nuvemRerender();
@@ -2576,8 +2634,9 @@
         const sp = await nuvem.db.doc('usuarios/' + u.uid).get();
         if(sp.exists){ const dd = sp.data(); nuvem.papel = dd.papel || 'visualizador'; nuvem.usuario = dd.usuario || ''; nuvem.nomeCad = dd.nome || ''; }
       }catch(e){ /* sem cadastro: visualizador */ }
-      nuvem.editor = (nuvem.papel === 'editor' || nuvem.papel === 'admin');
-      nuvem.admin = nuvem.papel === 'admin';
+      nuvem.editor = (nuvem.papel === 'editor' || nuvem.papel === 'admin' || nuvem.papel === 'dono');
+      nuvem.admin = (nuvem.papel === 'admin' || nuvem.papel === 'dono');
+      if(nuvem.papel === 'dono') nuvem.dono = true; // dono por usuário e senha (papel marcado pelo próprio dono no banco)
       if(!nuvem.editor && u.emailVerified){ // lista antiga de e-mails Google
         try{
           const s = await nuvem.db.doc('config/editores').get();
@@ -2605,7 +2664,8 @@
       const temDados = (m.estados.length + m.desenhos.length + Object.keys(m.catalogoCustom).length + m.metodoPassos.length + Object.keys(m.custoEtapa).length) > 0;
       if((!nuvem.existe && temDados) || nuvem.sujo) nuvemAgendarGravacao(true);
     }
-    if(nuvem.editor){ [nuvemEquip, nuvemMao].forEach(x => { if(x) x.iniciarEditor(); }); nuvemEntradasEnviar(); }
+    if(nuvem.editor){ [nuvemEquip, nuvemMao].forEach(x => { if(x) x.iniciarEditor(); });
+      [nuvemContr, nuvemUau].forEach(x => { if(x){ if(!x.primeiro) x.ouvir(); x.iniciarEditor(); } }); nuvemEntradasEnviar(); }
     nuvemStatus();
   }
   function nuvemEntrar(){
@@ -2617,7 +2677,7 @@
       else if(err && err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') alert('Não foi possível entrar: ' + (err.message || err.code));
     });
   }
-  function nuvemSair(){ if(nuvem.auth) nuvem.auth.signOut(); }
+  function nuvemSair(){ if(nuvem.auth) nuvem.auth.signOut().then(() => location.reload(), () => location.reload()); else location.reload(); }
   async function nuvemEditoresAbrir(){
     if(!nuvem.dono) return;
     let emails = [];
@@ -2664,6 +2724,7 @@
   }
   async function nuvemEntrarSenha(usuario, senha){
     if(!nuvem.auth) throw new Error('A nuvem ainda não carregou. Aguarde um instante.');
+    try{ localStorage.setItem('dob:ult_acesso', '0'); }catch(e){ /* ignora */ } // força o registro do acesso
     await nuvem.auth.signInWithEmailAndPassword(usuarioParaEmail(usuario), senha);
   }
   async function nuvemCadastrar(usuario, nome, senha){
@@ -2672,63 +2733,66 @@
     try{ await cred.user.updateProfile({ displayName: nome }); }catch(e){ /* o nome também vai no cadastro abaixo */ }
     await nuvem.db.doc('usuarios/' + cred.user.uid).set({ usuario, nome, papel: 'visualizador', criadoEm: Date.now() });
     await nuvemAtualizarPapel();
+    registrarHistorico('cadastro', 'criou uma conta nova: ' + nome + ' (@' + usuario + ')', 1000);
+    try{ localStorage.setItem('dob:ult_acesso', String(Date.now())); }catch(e){ /* ignora */ }
   }
-  function abrirLogin(aba){
-    if(document.getElementById('dob-popup-conectar')) return;
-    const ov = document.createElement('div');
-    ov.id = 'dob-popup-conectar';
-    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(22,35,61,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;overflow:auto;';
-    const inp = 'width:100%;box-sizing:border-box;padding:10px;border:1px solid #c8cdd6;border-radius:8px;font:15px inherit;margin:4px 0 10px;';
-    const lab = 'font-size:13px;font-weight:600;';
-    const dica = 'display:block;font-size:12px;color:var(--muted,#767e8c);font-weight:400;margin-top:2px;';
-    ov.innerHTML = `<div style="background:var(--card,#fff);color:var(--ink-text,#232a35);max-width:400px;width:100%;border-radius:14px;padding:22px;box-shadow:0 20px 50px -12px rgba(0,0,0,.4);">
-      <h3 style="margin:0 0 4px;font-family:Georgia,serif;font-size:21px;">Diário de Obra</h3>
-      <p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--muted,#767e8c);">Você já pode ver tudo sem entrar. Com uma conta você é identificado; quem o dono liberar como <b>editor</b> também consegue salvar.</p>
-      <div style="display:flex;gap:6px;margin-bottom:12px;">
-        <button type="button" class="dob-btn" id="dob-lg-tab-entrar" style="flex:1;">Entrar</button>
-        <button type="button" class="dob-btn secundario" id="dob-lg-tab-criar" style="flex:1;">Criar conta</button>
-      </div>
-      <form id="dob-lg-form-entrar" autocomplete="on">
-        <label style="${lab}">Usuário<input id="dob-lg-usuario" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" style="${inp}" /></label>
-        <label style="${lab}">Senha<input id="dob-lg-senha" name="password" type="password" autocomplete="current-password" style="${inp}" /></label>
-        <div class="dob-lg-msg" id="dob-lg-msg-entrar" style="min-height:18px;font-size:13px;margin-bottom:6px;"></div>
-        <button type="submit" class="dob-btn" style="width:100%;">Entrar</button>
-      </form>
-      <form id="dob-lg-form-criar" autocomplete="on" style="display:none;">
-        <label style="${lab}">Como devemos te chamar?<span style="${dica}">Esse nome aparece na saudação ("Bom dia, ...").</span><input id="dob-lg-nome" autocomplete="name" style="${inp}" /></label>
-        <label style="${lab}">Nome de usuário<span style="${dica}">3 a 20 caracteres: letras minúsculas, números, ponto, traço ou sublinhado. Sem espaço nem acento. Tem que ser único.</span><input id="dob-lg-novo-usuario" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" style="${inp}" /></label>
-        <label style="${lab}">Senha<span style="${dica}">Mínimo de 8 caracteres.</span><input id="dob-lg-nova-senha" type="password" autocomplete="new-password" style="${inp}" /></label>
-        <label style="${lab}">Repita a senha<input id="dob-lg-nova-senha2" type="password" autocomplete="new-password" style="${inp}" /></label>
-        <div class="dob-lg-msg" id="dob-lg-msg-criar" style="min-height:18px;font-size:13px;margin-bottom:6px;"></div>
-        <button type="submit" class="dob-btn" style="width:100%;">Criar conta</button>
-        <p style="margin:10px 0 0;font-size:12px;line-height:1.5;color:var(--muted,#767e8c);">Conta nova só <b>visualiza</b>. O dono libera a edição depois. Como não usamos e-mail, <b>não há recuperação automática de senha</b>: anote a sua; se esquecer, fale com o dono.</p>
-      </form>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin:12px 0 4px;"><input type="checkbox" id="dob-lg-ver" /> Mostrar senha</label>
-      <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:8px;">
-        <button type="button" class="dob-btn secundario pequeno" id="dob-lg-google">Sou o dono: entrar com Google</button>
-        <button type="button" class="dob-btn secundario pequeno" id="dob-popup-agora-nao">Só visualizar</button>
+  var LG_SVG = '<svg viewBox="0 0 340 260" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+    + '<rect x="0" y="228" width="340" height="6" rx="3" fill="#c99a3d" opacity=".55"/>'
+    + '<g stroke="#8fa3c4" stroke-width="2.2" fill="none" opacity=".9"><path d="M214 228V28h8v200"/><path d="M200 28h100l-6 12H206z" fill="#2c3c5c"/><path d="M222 28l-6-14M300 28l-20-14M222 14h58"/><path d="M286 40v40" stroke-dasharray="3 4"/></g>'
+    + '<rect x="278" y="80" width="16" height="12" rx="2" fill="#d9662f"/>'
+    + '<g fill="#2c3c5c" stroke="#8fa3c4" stroke-width="2"><rect x="228" y="128" width="84" height="100"/><rect x="246" y="100" width="48" height="28"/></g>'
+    + '<g fill="#16233d" opacity=".9"><rect x="238" y="140" width="14" height="14"/><rect x="262" y="140" width="14" height="14"/><rect x="286" y="140" width="14" height="14"/><rect x="238" y="168" width="14" height="14"/><rect x="262" y="168" width="14" height="14"/><rect x="286" y="168" width="14" height="14"/><rect x="238" y="196" width="14" height="14"/><rect x="262" y="196" width="14" height="14"/></g>'
+    + '<rect x="30" y="204" width="150" height="24" rx="4" fill="#24395c" stroke="#8fa3c4" stroke-width="2"/><path d="M42 204v24M70 204v24M98 204v24M126 204v24M154 204v24" stroke="#8fa3c4" stroke-width="1.5" opacity=".6"/>'
+    + '<path d="M70 118V92a40 40 0 0 1 80 0v26" fill="none" stroke="#f0c777" stroke-width="13" stroke-linecap="round"/>'
+    + '<rect x="46" y="112" width="128" height="96" rx="16" fill="#d9662f"/><rect x="46" y="112" width="128" height="30" rx="16" fill="#e47a45"/>'
+    + '<circle cx="110" cy="154" r="13" fill="#16233d"/><rect x="104" y="158" width="12" height="28" rx="5" fill="#16233d"/>'
+    + '<path d="M232 228c0-18 8-26 22-26s22 8 22 26z" fill="#f0c777"/><rect x="230" y="224" width="48" height="5" rx="2" fill="#c99a3d"/></svg>';
+  function esconderGate(){ const g = document.getElementById('dob-gate'); if(g) g.style.display = 'none'; }
+  function abrirLogin(aba, aviso){
+    const g = document.getElementById('dob-gate'); if(!g) return;
+    g.style.display = 'flex';
+    g.innerHTML = `<div class="lg-card" role="dialog" aria-label="Entrar no Diário de Obra">
+      <div class="lg-arte">${LG_SVG}<h2>Diário de Obra</h2><p>SOLAR DOS PEQUIS &amp; SOLAR DOS BURITIS</p></div>
+      <div class="lg-form">
+        <h1>Acesso ao diário</h1>
+        <p class="lg-sub">Entre com seu usuário e senha para ver a obra.</p>
+        <div class="lg-abas"><button type="button" id="dob-lg-tab-entrar" class="on">Entrar</button><button type="button" id="dob-lg-tab-criar">Criar conta</button></div>
+        <form id="dob-lg-form-entrar" autocomplete="on">
+          <label>Usuário<input type="text" id="dob-lg-usuario" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="seu usuário" /></label>
+          <label>Senha<input type="password" id="dob-lg-senha" name="password" autocomplete="current-password" placeholder="sua senha" /></label>
+          <div class="lg-msg" id="dob-lg-msg-entrar">${aviso || ''}</div>
+          <button type="submit" class="lg-btn">Entrar</button>
+        </form>
+        <form id="dob-lg-form-criar" autocomplete="on" style="display:none;">
+          <label>Como devemos te chamar?<span class="lg-dica">Aparece na saudação ("Bom dia, ...").</span><input type="text" id="dob-lg-nome" autocomplete="name" placeholder="seu nome" /></label>
+          <label>Nome de usuário<span class="lg-dica">3 a 20 caracteres: letras minúsculas, números, ponto, traço ou sublinhado. Sem espaço nem acento. Tem que ser único.</span><input type="text" id="dob-lg-novo-usuario" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ex.: maria.silva" /></label>
+          <label>Senha<span class="lg-dica">Mínimo de 8 caracteres.</span><input type="password" id="dob-lg-nova-senha" autocomplete="new-password" /></label>
+          <label>Repita a senha<input type="password" id="dob-lg-nova-senha2" autocomplete="new-password" /></label>
+          <div class="lg-msg" id="dob-lg-msg-criar"></div>
+          <button type="submit" class="lg-btn">Criar conta</button>
+          <p class="lg-nota">Conta nova só <b>visualiza</b>; o dono libera a edição depois. Sem e-mail, <b>não há recuperação automática de senha</b>: anote a sua e, se esquecer, fale com o dono.</p>
+        </form>
+        <label class="lg-ver" style="margin-top:12px;"><input type="checkbox" id="dob-lg-ver" /> Mostrar senha</label>
       </div></div>`;
-    document.body.appendChild(ov);
-    const $ = (id) => ov.querySelector('#' + id);
+    const $ = (id) => g.querySelector('#' + id);
     const mostrarAba = (qual) => {
       $('dob-lg-form-entrar').style.display = qual === 'entrar' ? '' : 'none';
       $('dob-lg-form-criar').style.display = qual === 'criar' ? '' : 'none';
-      $('dob-lg-tab-entrar').className = 'dob-btn' + (qual === 'entrar' ? '' : ' secundario');
-      $('dob-lg-tab-criar').className = 'dob-btn' + (qual === 'criar' ? '' : ' secundario');
+      $('dob-lg-tab-entrar').className = qual === 'entrar' ? 'on' : '';
+      $('dob-lg-tab-criar').className = qual === 'criar' ? 'on' : '';
       setTimeout(() => { const f = $(qual === 'entrar' ? 'dob-lg-usuario' : 'dob-lg-nome'); if(f) f.focus(); }, 30);
     };
     $('dob-lg-tab-entrar').addEventListener('click', () => mostrarAba('entrar'));
     $('dob-lg-tab-criar').addEventListener('click', () => mostrarAba('criar'));
     mostrarAba(aba === 'criar' ? 'criar' : 'entrar');
-    $('dob-lg-ver').addEventListener('change', (e) => { ov.querySelectorAll('input[type=password],input[data-pw]').forEach(i => { i.type = e.target.checked ? 'text' : 'password'; i.setAttribute('data-pw', '1'); }); });
-    const erro = (id, t) => { const m = $(id); m.style.color = '#b3261e'; m.textContent = t; };
+    $('dob-lg-ver').addEventListener('change', (e) => { g.querySelectorAll('input[type=password],input[data-pw]').forEach(i => { i.type = e.target.checked ? 'text' : 'password'; i.setAttribute('data-pw', '1'); }); });
+    const erro = (id, t) => { $(id).textContent = t; };
     $('dob-lg-form-entrar').addEventListener('submit', async (ev) => {
       ev.preventDefault();
       const u = $('dob-lg-usuario').value.trim().toLowerCase(), sn = $('dob-lg-senha').value;
       if(!u || !sn){ erro('dob-lg-msg-entrar', 'Preencha usuário e senha.'); return; }
       const b = ev.target.querySelector('button[type=submit]'); b.disabled = true; erro('dob-lg-msg-entrar', '');
-      try{ await nuvemEntrarSenha(u, sn); ov.remove(); }
+      try{ await nuvemEntrarSenha(u, sn); }
       catch(e){ erro('dob-lg-msg-entrar', erroAuthTexto(e)); b.disabled = false; }
     });
     $('dob-lg-form-criar').addEventListener('submit', async (ev) => {
@@ -2740,17 +2804,26 @@
       if(s1.length < 8){ erro('dob-lg-msg-criar', 'A senha precisa ter pelo menos 8 caracteres.'); return; }
       if(s1 !== s2){ erro('dob-lg-msg-criar', 'As duas senhas não são iguais.'); return; }
       const b = ev.target.querySelector('button[type=submit]'); b.disabled = true; erro('dob-lg-msg-criar', '');
-      try{ await nuvemCadastrar(u, nome, s1); ov.remove(); mostrarToastSalvo('Conta criada! Você já pode visualizar tudo. O dono libera a edição.'); }
+      try{ await nuvemCadastrar(u, nome, s1); mostrarToastSalvo('Conta criada! Você já pode visualizar. O dono libera a edição.'); }
       catch(e){ erro('dob-lg-msg-criar', erroAuthTexto(e)); b.disabled = false; }
     });
-    $('dob-popup-agora-nao').addEventListener('click', () => { try{ sessionStorage.setItem('dob:popup_conectar_dispensado', '1'); }catch(e){ /* ignora */ } ov.remove(); });
-    $('dob-lg-google').addEventListener('click', () => { ov.remove(); if(tokenClient) tokenClient.requestAccessToken({ prompt: 'select_account' }); else nuvemEntrar(); });
   }
-  function mostrarPopupEntrar(forcar){
-    if(nuvem.user || document.getElementById('dob-popup-conectar')) return;
-    try{ if(!forcar && localStorage.getItem('dob:drive_conectado_antes') === '1') return; }catch(e){ /* ignora */ } // já entrou antes com Google: a reconexão silenciosa decide
-    try{ if(sessionStorage.getItem('dob:popup_conectar_dispensado') === '1') return; }catch(e){ /* ignora */ }
-    abrirLogin();
+  function mostrarPopupEntrar(){ if(!nuvem.user) abrirLogin(); }
+  async function historicoAbrir(){
+    if(!nuvem.dono) return;
+    let lista = [];
+    try{ const q = await nuvem.db.collection('historico').orderBy('em', 'desc').limit(150).get(); q.forEach(d => lista.push(d.data())); }
+    catch(e){ alert('Não foi possível carregar o histórico: ' + (e.message || e)); return; }
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(22,35,61,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+    const fmt = (t) => { const d = new Date(t); return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
+    ov.innerHTML = `<div style="background:var(--card,#fff);color:var(--ink-text,#232a35);max-width:640px;width:100%;max-height:88vh;overflow:auto;border-radius:14px;padding:22px;box-shadow:0 20px 50px -12px rgba(0,0,0,.4);">
+      <h3 style="margin:0 0 6px;font-family:Georgia,serif;font-size:20px;">Histórico de atividades</h3>
+      <p style="margin:0 0 10px;font-size:13px;color:var(--muted,#767e8c);">Cadastros, acessos e edições de outras pessoas (as suas não aparecem). Só você vê isto. Últimos ${lista.length} registros.</p>
+      ${lista.length ? lista.map(h => `<div style="padding:7px 0;border-top:1px solid #e4e7ec;font-size:13px;"><span style="color:var(--muted,#767e8c);">${fmt(h.em)}</span> · <b>${escapeHtmlSaud(h.nome || h.usuario || '?')}</b> <span style="color:var(--muted,#767e8c);">@${escapeHtmlSaud(h.usuario || '')} (${escapeHtmlSaud(h.papel || '')})</span><br>${escapeHtmlSaud(h.resumo || '')}</div>`).join('') : '<p style="font-size:13px;">Nada registrado ainda.</p>'}
+      <div style="display:flex;justify-content:flex-end;margin-top:12px;"><button type="button" class="dob-btn" id="dob-hi-fechar">Fechar</button></div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('#dob-hi-fechar').addEventListener('click', () => ov.remove());
   }
   // ---------- Usuários e permissões (dono / administrador) ----------
   async function usuariosAbrir(){
@@ -2767,14 +2840,14 @@
       <p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--muted,#767e8c);"><b>Visualizador</b> só vê. <b>Editor</b> também salva apontamentos, mapa, custos e fotos. <b>Administrador</b> edita e gerencia usuários. A mudança vale para a pessoa na próxima abertura (ou na hora, se ela estiver com o site aberto).</p>
       <div id="dob-us-lista">${lista.length ? lista.map(u => `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #e4e7ec;flex-wrap:wrap;">
           <div style="flex:1;min-width:140px;"><b>${escapeHtmlSaud(u.nome || '')}</b><br><span style="font-size:12px;color:var(--muted,#767e8c);">@${escapeHtmlSaud(u.usuario || '')}</span></div>
-          <select data-uid="${u.uid}" style="padding:7px;border:1px solid #c8cdd6;border-radius:8px;">${papeis.map(([v, t]) => `<option value="${v}"${(u.papel || 'visualizador') === v ? ' selected' : ''}>${t}</option>`).join('')}</select>
+          ${u.papel === 'dono' ? '<b style="font-size:13px;">Dono</b>' : ''}<select ${u.papel === 'dono' ? 'disabled style="display:none;" ' : ''}data-uid="${u.uid}" data-nome="${escapeHtmlSaud(u.nome || u.usuario || '')}" style="padding:7px;border:1px solid #c8cdd6;border-radius:8px;">${papeis.map(([v, t]) => `<option value="${v}"${(u.papel || 'visualizador') === v ? ' selected' : ''}>${t}</option>`).join('')}</select>
           <span data-st="${u.uid}" style="font-size:12px;min-width:48px;"></span></div>`).join('') : '<p style="font-size:13px;">Ninguém se cadastrou ainda.</p>'}</div>
       <div style="display:flex;justify-content:flex-end;margin-top:12px;"><button type="button" class="dob-btn" id="dob-us-fechar">Fechar</button></div></div>`;
     document.body.appendChild(ov);
     ov.querySelector('#dob-us-fechar').addEventListener('click', () => ov.remove());
     ov.querySelectorAll('select[data-uid]').forEach(sel => sel.addEventListener('change', async () => {
       const st = ov.querySelector('[data-st="' + sel.dataset.uid + '"]'); st.style.color = '#767e8c'; st.textContent = '…';
-      try{ await nuvem.db.doc('usuarios/' + sel.dataset.uid).update({ papel: sel.value }); st.style.color = '#1b6e3c'; st.textContent = 'salvo'; }
+      try{ await nuvem.db.doc('usuarios/' + sel.dataset.uid).update({ papel: sel.value }); st.style.color = '#1b6e3c'; st.textContent = 'salvo'; registrarHistorico('permissao', 'mudou a permissão de ' + (sel.dataset.nome || sel.dataset.uid) + ' para ' + sel.value, 1000); }
       catch(e){ st.style.color = '#b3261e'; st.textContent = 'erro'; }
     }));
   }
@@ -2805,6 +2878,7 @@
           escrito = { estado, rev: novo };
         });
         d.revEnviado = escrito.rev; d.rev = escrito.rev; d.existe = true; d.erro = '';
+        registrarHistorico('dados', 'alterou ' + (cfg.rotulo || cfg.path), 5 * 60000);
         if(escrito.estado !== cfg.ler()) cfg.aplicar(escrito.estado);
         if(d.seq === seqInicio) d.sujo = false; else { clearTimeout(d.timer); d.timer = setTimeout(d.gravar, 300); }
       }catch(e){
@@ -2830,7 +2904,7 @@
     };
     return d;
   }
-  var nuvemEquip = null, nuvemMao = null;
+  var nuvemEquip = null, nuvemMao = null, nuvemContr = null, nuvemUau = null;
   function mesclarPorId(remote, local, listas){
     const excl = Array.from(new Set([...(remote.excluidos || []), ...(local.excluidos || [])]));
     const out = Object.assign({}, remote, local, { excluidos: excl });
@@ -2844,20 +2918,35 @@
   }
   function nuvemIniciarDocs(){
     nuvemEquip = criarDocNuvem({
-      path: 'estado/equipamentos',
+      path: 'estado/equipamentos', rotulo: 'Equipamentos',
       ler: () => equipState,
       aplicar: (s) => { equipState = Object.assign({ equipamentos: [], previsoes: [], presencas: [], excluidos: [] }, s); try{ localStorage.setItem('dob:equip_state', JSON.stringify(equipState)); }catch(e){ /* ignora */ } },
       mesclar: (r, l) => mesclarPorId(Object.assign({ equipamentos: [], presencas: [] }, r), Object.assign({ equipamentos: [], presencas: [] }, l), [['equipamentos', x => x.id], ['presencas', x => x.equipamentoId + '|' + x.date, 'equipamentoId']]),
       temDados: (s) => ((s.equipamentos || []).length + (s.presencas || []).length) > 0
     });
     nuvemMao = criarDocNuvem({
-      path: 'estado/maodeobra',
+      path: 'estado/maodeobra', rotulo: 'Mão de obra',
       ler: () => maoObraState,
       aplicar: (s) => { maoObraState = Object.assign({ pessoas: [], presencas: [], excluidos: [] }, s); try{ localStorage.setItem('dob:maoobra_state', JSON.stringify(maoObraState)); }catch(e){ /* ignora */ } },
       mesclar: (r, l) => mesclarPorId(Object.assign({ pessoas: [], presencas: [] }, r), Object.assign({ pessoas: [], presencas: [] }, l), [['pessoas', x => x.id], ['presencas', x => x.pessoaId + '|' + x.date, 'pessoaId']]),
       temDados: (s) => ((s.pessoas || []).length + (s.presencas || []).length) > 0
     });
+    nuvemContr = criarDocNuvem({
+      path: 'estado/contratos', rotulo: 'Contratos',
+      ler: () => contratosState,
+      aplicar: (st) => { contratosState = Object.assign({ contratos: [], itens: [] }, st); try{ localStorage.setItem('dob:contratos_state', JSON.stringify(contratosState)); }catch(e){ /* ignora */ } },
+      mesclar: (r, l) => mesclarPorId(Object.assign({ contratos: [], itens: [] }, r), Object.assign({ contratos: [], itens: [] }, l), [['contratos', x => x.id], ['itens', x => x.id]]),
+      temDados: (st) => ((st.contratos || []).length + (st.itens || []).length) > 0
+    });
+    nuvemUau = criarDocNuvem({
+      path: 'estado/uaubee', rotulo: 'UAU → BEE',
+      ler: () => uauBeeState,
+      aplicar: (st) => { uauBeeState = Object.assign({ items: [], contratos: [] }, st); try{ localStorage.setItem('dob:uaubee_state', JSON.stringify(uauBeeState)); }catch(e){ /* ignora */ } },
+      mesclar: (r, l) => mesclarPorId(Object.assign({ items: [], contratos: [] }, r), Object.assign({ items: [], contratos: [] }, l), [['items', x => x.key], ['contratos', x => x.key]]),
+      temDados: (st) => ((st.items || []).length + (st.contratos || []).length) > 0
+    });
     nuvemEquip.ouvir(); nuvemMao.ouvir();
+    if(nuvem.editor){ nuvemContr.ouvir(); nuvemUau.ouvir(); } // contratos e UAU: só editores (valores de fornecedores)
   }
 
   // ---------- Nuvem: apontamentos (um documento por apontamento) ----------
@@ -2933,7 +3022,9 @@
           const json = JSON.stringify(nuvemEntradaPayload(e));
           if(json.length > 900000){ nuvemEnt.erro = 'apontamento grande demais: ' + e.id; continue; }
           await nuvem.db.doc('entradas/' + e.id).set({ json, atualizadoEm: atu, por: nuvem.user.email || '' });
+          const jaExistia = nuvemEnt.cloud[e.id] !== undefined;
           nuvemEnt.cloud[e.id] = atu;
+          registrarHistorico('apontamento', (jaExistia ? 'editou' : 'criou') + ' o apontamento de ' + (e.date || '?') + (e.obra ? ' (' + e.obra + ')' : '') + ' — ' + ((e.fotos || []).length) + ' foto(s)', 2 * 60000);
         }
         nuvemEnt.erro = '';
       }catch(err){ nuvemEnt.erro = String(err && err.message || err); setTimeout(nuvemEntradasEnviar, 15000); }
@@ -2942,7 +3033,7 @@
   }
   async function nuvemEntradaExcluir(id){
     if(!nuvem.db || !nuvem.editor) return;
-    try{ const atu = Date.now(); await nuvem.db.doc('entradas/' + id).set({ excluido: true, atualizadoEm: atu, por: nuvem.user.email || '' }); nuvemEnt.cloud[id] = atu; }catch(e){ /* fica só local */ }
+    try{ const atu = Date.now(); await nuvem.db.doc('entradas/' + id).set({ excluido: true, atualizadoEm: atu, por: nuvem.user.email || '' }); nuvemEnt.cloud[id] = atu; registrarHistorico('apontamento', 'excluiu um apontamento'); }catch(e){ /* fica só local */ }
   }
   function nuvemEntradasOuvir(){
     nuvem.db.collection('entradas').onSnapshot(snap => {
@@ -2991,26 +3082,28 @@
   function nuvemIniciar(tentativa){
     if(!window.firebase || !firebase.firestore || !firebase.auth){
       if((tentativa || 0) < 20) setTimeout(() => nuvemIniciar((tentativa || 0) + 1), 500);
-      else nuvemStatus();
+      else { nuvemStatus(); abrirLogin('entrar', 'Não foi possível carregar o serviço de login. Verifique a internet e recarregue.'); }
       return;
     }
     try{
       firebase.initializeApp(FIREBASE_CONFIG);
       nuvem.auth = firebase.auth(); nuvem.db = firebase.firestore();
       try{ nuvem.db.enablePersistence({ synchronizeTabs: true }).catch(() => { /* sem cache offline */ }); }catch(e){ /* ignora */ }
-      nuvemOuvir(); nuvemIniciarDocs(); nuvemEntradasOuvir();
       nuvem.auth.onAuthStateChanged(async u => {
         nuvem.user = u; nuvem.authPronto = true;
+        if(u && !nuvem.iniciado){ nuvem.iniciado = true; nuvemOuvir(); nuvemIniciarDocs(); nuvemEntradasOuvir(); } // só lê o banco depois de entrar
         await nuvemAtualizarPapel();
-        if(u){ const pp = document.getElementById('dob-popup-conectar'); if(pp) pp.remove(); }
-        else setTimeout(mostrarPopupEntrar, 500);
+        if(u){
+          esconderGate();
+          try{ const ult = parseInt(localStorage.getItem('dob:ult_acesso') || '0', 10) || 0; if(Date.now() - ult > 6 * 3600000){ localStorage.setItem('dob:ult_acesso', String(Date.now())); registrarHistorico('acesso', 'entrou no app (' + (nuvem.editor ? 'editor' : 'visualização') + ')', 1000); } }catch(e){ /* ignora */ }
+        } else abrirLogin();
       });
       const b1 = document.getElementById('dob-btn-nuvem-login'), b2 = document.getElementById('dob-btn-nuvem-sair'), b3 = document.getElementById('dob-btn-nuvem-editores');
       if(b1) b1.addEventListener('click', () => abrirLogin());
       if(b2) b2.addEventListener('click', nuvemSair);
       if(b3) b3.addEventListener('click', nuvemEditoresAbrir);
       nuvemStatus();
-    }catch(e){ nuvem.db = null; nuvem.erro = String(e && e.message || e); nuvemStatus(); }
+    }catch(e){ nuvem.db = null; nuvem.erro = String(e && e.message || e); nuvemStatus(); abrirLogin('entrar', 'Erro ao iniciar o login: ' + nuvem.erro); }
   }
 
   // ---------- Custo por etapa: orçamento executivo (insumos) × avanço do Mapa ----------
@@ -5552,7 +5645,7 @@
 
   // ---------- Configuração inicial (Client ID) ----------
   function renderSetup(){
-    if(clientId){ setupContainer.innerHTML=''; statusBar.style.display='flex'; initGis(); nuvemIniciar(); return; }
+    if(true){ setupContainer.innerHTML=''; statusBar.style.display='flex'; nuvemIniciar(); return; } // Drive desligado: tudo fica no banco
     setupContainer.innerHTML = `
       <div class="dob-setup">
         <h3>Configurar integração com o Google Drive</h3>
@@ -5885,9 +5978,7 @@
     try{ sessionStorage.removeItem('dob:popup_conectar_dispensado'); }catch(e){ /* ignora */ }
     accessToken = null; nomeConta = '';
     try{ localStorage.removeItem('dob:drive_conectado_antes'); localStorage.removeItem('dob:nome_conta'); }catch(e){ /* ignora */ }
-    updateStatus(); renderSaudacao();
-    const depois = () => abrirLogin();
-    if(nuvem.auth && nuvem.user) nuvem.auth.signOut().then(depois, depois); else depois();
+    nuvemSair();
   }
   function abrirConfiguracoes(){
     if(document.getElementById('dob-config-modal')) return;
@@ -5910,9 +6001,8 @@
         ${nuvem.user ? '<button type="button" class="dob-btn secundario" id="dob-cfg-sair">Sair da conta</button>' : ''}
         ${senhaUser ? '<button type="button" class="dob-btn secundario" id="dob-cfg-senha">🔑 Alterar minha senha</button><div id="dob-cfg-senha-box" style="display:none;"><input id="dob-cfg-senha-nova" type="password" autocomplete="new-password" placeholder="Nova senha (mín. 8 caracteres)" style="' + inp + '" /><button type="button" class="dob-btn pequeno" id="dob-cfg-senha-ok">Salvar nova senha</button></div>' : ''}
         ${nuvem.admin ? '<button type="button" class="dob-btn secundario" id="dob-cfg-usuarios">👥 Usuários e permissões</button>' : ''}
-        ${nuvem.dono ? '<button type="button" class="dob-btn secundario" id="dob-cfg-editores">Editores por e-mail Google (antigo)</button>' : ''}
-        ${(nuvem.editor && driveFotos) ? '<button type="button" class="dob-btn secundario" id="dob-cfg-migrar">☁️ Mover ' + driveFotos + ' foto(s) do Drive para o banco</button>' : ''}
-        <button type="button" class="dob-btn secundario" id="dob-cfg-client">Avançado: trocar o Client ID do Drive</button>
+        ${nuvem.dono ? '<button type="button" class="dob-btn secundario" id="dob-cfg-historico">📜 Histórico de atividades</button>' : ''}
+        ${(nuvem.editor && driveFotos && accessToken) ? '<button type="button" class="dob-btn secundario" id="dob-cfg-migrar">☁️ Mover ' + driveFotos + ' foto(s) do Drive para o banco</button>' : ''}
         <button type="button" class="dob-btn secundario" id="dob-cfg-fechar">Fechar</button>
       </div></div>`;
     document.body.appendChild(ov);
@@ -5921,8 +6011,8 @@
     const msg = (t, ok) => { const m = $('dob-cfg-msg'); if(m){ m.style.color = ok ? '#1b6e3c' : '#b3261e'; m.textContent = t; } };
     $('dob-cfg-fechar').addEventListener('click', fechar);
     $('dob-cfg-trocar').addEventListener('click', () => { fechar(); trocarConta(); });
-    const sr = $('dob-cfg-sair'); if(sr) sr.addEventListener('click', () => { fechar(); try{ sessionStorage.setItem('dob:popup_conectar_dispensado', '1'); }catch(e){ /* ignora */ } nuvemSair(); });
-    const ed = $('dob-cfg-editores'); if(ed) ed.addEventListener('click', () => { fechar(); nuvemEditoresAbrir(); });
+    const sr = $('dob-cfg-sair'); if(sr) sr.addEventListener('click', () => { fechar(); nuvemSair(); });
+    const hi = $('dob-cfg-historico'); if(hi) hi.addEventListener('click', () => { fechar(); historicoAbrir(); });
     const us = $('dob-cfg-usuarios'); if(us) us.addEventListener('click', () => { fechar(); usuariosAbrir(); });
     const ns = $('dob-cfg-nome-salvar');
     if(ns) ns.addEventListener('click', async () => {
@@ -5952,15 +6042,6 @@
         const r = await migrarFotosDriveParaNuvem((a, t) => { mg.textContent = 'Movendo ' + a + '/' + t + '…'; });
         mg.textContent = '✔ ' + r.ok + ' movida(s)' + (r.falhas ? ', ' + r.falhas + ' falharam (tente de novo)' : '');
       }catch(e){ mg.textContent = 'Erro: ' + (e.message || e); mg.disabled = false; }
-    });
-    $('dob-cfg-client').addEventListener('click', () => {
-      fechar();
-      if(confirm('Deseja trocar o Client ID configurado?')){
-        localStorage.removeItem('dob:client_id');
-        clientId = '';
-        statusBar.style.display = 'none';
-        renderSetup();
-      }
     });
   }
   document.getElementById('dob-btn-config').addEventListener('click', abrirConfiguracoes);

@@ -2,29 +2,24 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function logado() { return request.auth != null; }
-    function dono() {
-      return logado()
-        && request.auth.token.email_verified == true
-        && request.auth.token.email == 'alexandrevazvaladao@gmail.com';
-    }
     function papel() {
       return exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
         ? get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.papel
         : '';
     }
-    function admin() { return logado() && (dono() || papel() == 'admin'); }
-    function editor() {
-      return logado() && (dono() || papel() in ['editor', 'admin']
-        || (request.auth.token.email_verified == true
-            && exists(/databases/$(database)/documents/config/editores)
-            && request.auth.token.email in get(/databases/$(database)/documents/config/editores).data.emails));
+    // dono: o Gmail original (reserva) ou a conta de usuário/senha marcada com papel 'dono'
+    function dono() {
+      return logado() && ((request.auth.token.email_verified == true
+        && request.auth.token.email == 'alexandrevazvaladao@gmail.com') || papel() == 'dono');
     }
-    // lista antiga de e-mails Google: só o dono altera; qualquer pessoa logada lê
+    function admin() { return logado() && (dono() || papel() == 'admin'); }
+    function editor() { return logado() && (dono() || papel() in ['editor', 'admin']); }
+
     match /config/{doc} {
       allow read: if logado();
       allow write: if dono();
     }
-    // cadastro de usuários (usuário/senha): qualquer um cria o próprio como visualizador; só dono/admin mudam o papel
+    // cadastro: qualquer um cria o próprio como visualizador; só dono/admin mudam o papel (só o dono dá 'dono')
     match /usuarios/{uid} {
       allow read: if logado() && (request.auth.uid == uid || admin());
       allow create: if logado() && request.auth.uid == uid
@@ -32,16 +27,27 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['usuario', 'nome', 'papel', 'criadoEm'])
         && request.resource.data.usuario is string && request.resource.data.usuario.size() <= 20
         && request.resource.data.nome is string && request.resource.data.nome.size() <= 60;
-      allow update: if admin() || (logado() && request.auth.uid == uid
-        && request.resource.data.papel == resource.data.papel
-        && request.resource.data.usuario == resource.data.usuario
-        && request.resource.data.nome is string && request.resource.data.nome.size() <= 60);
+      allow update: if (admin() && (request.resource.data.papel != 'dono' || dono()))
+        || (logado() && request.auth.uid == uid
+            && request.resource.data.papel == resource.data.papel
+            && request.resource.data.usuario == resource.data.usuario
+            && request.resource.data.nome is string && request.resource.data.nome.size() <= 60);
       allow delete: if dono();
     }
-    // dados da obra: qualquer pessoa lê; só dono/editores gravam
-    match /mapa/{doc} { allow read: if true; allow write: if editor(); }
-    match /estado/{doc} { allow read: if true; allow write: if editor(); }
-    match /entradas/{doc} { allow read: if true; allow write: if editor(); }
-    match /fotos/{doc} { allow read: if true; allow write: if editor(); }
+    // histórico de atividades: qualquer pessoa logada registra a própria ação; só o dono lê
+    match /historico/{id} {
+      allow create: if logado() && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid', 'usuario', 'nome', 'papel', 'tipo', 'resumo', 'em', 'enviado'])
+        && request.resource.data.resumo.size() <= 300;
+      allow read, update, delete: if dono();
+    }
+    // dados da obra: só quem entrou lê; só dono/editores gravam
+    match /mapa/{doc} { allow read: if logado(); allow write: if editor(); }
+    match /estado/{doc} {
+      allow read: if logado() && (doc in ['equipamentos', 'maodeobra'] || editor()); // contratos e UAU: só editores
+      allow write: if editor();
+    }
+    match /entradas/{doc} { allow read: if logado(); allow write: if editor(); }
+    match /fotos/{doc} { allow read: if logado(); allow write: if editor(); }
   }
 }
