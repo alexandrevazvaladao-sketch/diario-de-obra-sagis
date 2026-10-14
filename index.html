@@ -947,7 +947,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.23';
+  const APP_VERSION = 'v2026.10.14.24';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -3226,9 +3226,11 @@
     try{
       firebase.initializeApp(FIREBASE_CONFIG);
       nuvem.auth = firebase.auth(); nuvem.db = firebase.firestore();
+      try{ nuvem.db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); }catch(e){ /* ignora */ } // redes/proxies que bloqueiam o canal normal: cai para long polling
       try{ nuvem.db.enablePersistence({ synchronizeTabs: true }).catch(() => { /* sem cache offline */ }); }catch(e){ /* ignora */ }
       nuvem.auth.onAuthStateChanged(async u => {
         nuvem.user = u; nuvem.authPronto = true;
+        if(u) esconderGate(); // o login já foi reconhecido: não deixa a tela de carregamento esperando o banco
         if(u && !nuvem.iniciado){ nuvem.iniciado = true; nuvemOuvir(); nuvemIniciarDocs(); nuvemEntradasOuvir(); nuvem.db.doc('config/visibilidade').onSnapshot(sn => { nuvem.vis = (sn.exists && sn.data().niveis) || {}; aplicarVisibilidade(); }, () => { /* usa o padrão */ }); } // só lê o banco depois de entrar
         await nuvemAtualizarPapel();
         if(u){
