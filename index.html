@@ -843,7 +843,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.2';
+  const APP_VERSION = 'v2026.10.14.3';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -5024,11 +5024,35 @@
     // sozinho, em silêncio (sem abrir nenhuma tela de login) assim que o app
     // abre — assim, na prática, só pede login de novo se você sair da conta
     // do Google no navegador ou revogar o acesso.
+    let jaConectou = false;
     try{
       if(localStorage.getItem('dob:drive_conectado_antes') === '1'){
+        jaConectou = true;
         tokenClient.requestAccessToken({ prompt: '' });
       }
     }catch(err){ /* ignora */ }
+    // Quem ainda não conectou vê um aviso pedindo para conectar. Quem já conectou antes só o vê se a
+    // reconexão silenciosa não funcionar em alguns segundos.
+    setTimeout(mostrarPopupConectar, jaConectou ? 6000 : 700);
+  }
+  function mostrarPopupConectar(){
+    if(accessToken || document.getElementById('dob-popup-conectar')) return;
+    try{ if(sessionStorage.getItem('dob:popup_conectar_dispensado') === '1') return; }catch(e){ /* ignora */ }
+    const ov = document.createElement('div');
+    ov.id = 'dob-popup-conectar';
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(22,35,61,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+    ov.innerHTML = `<div style="background:var(--card,#fff);color:var(--ink-text,#232a35);max-width:420px;width:100%;border-radius:14px;padding:24px;box-shadow:0 20px 50px -12px rgba(0,0,0,.4);">
+      <h3 style="margin:0 0 8px;font-family:Georgia,serif;font-size:21px;">Conecte ao Google Drive</h3>
+      <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--muted,#767e8c);">Para ver e salvar seus apontamentos, fotos e mapas, conecte sua conta do Google. O app só acessa os arquivos que ele mesmo cria no seu Drive.</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+        <button type="button" class="dob-btn secundario" id="dob-popup-agora-nao">Agora não</button>
+        <button type="button" class="dob-btn" id="dob-popup-conectar-btn">Conectar ao Google Drive</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    const fechar = () => { ov.remove(); };
+    document.getElementById('dob-popup-agora-nao').addEventListener('click', () => { try{ sessionStorage.setItem('dob:popup_conectar_dispensado', '1'); }catch(e){ /* ignora */ } fechar(); });
+    document.getElementById('dob-popup-conectar-btn').addEventListener('click', () => { fechar(); if(tokenClient) tokenClient.requestAccessToken({ prompt: '' }); });
   }
 
   function contarFotosLocaisPendentes(){
@@ -5205,6 +5229,7 @@
       statusDot.className = 'dob-dot on';
       statusTexto.textContent = 'Drive conectado';
       document.getElementById('dob-btn-conectar').textContent = 'Reconectar';
+      { const pp = document.getElementById('dob-popup-conectar'); if(pp) pp.remove(); }
       if(!updateStatus._nomeBuscado){ updateStatus._nomeBuscado = true; buscarNomeConta(); }
       if(typeof renderSaudacao === 'function') renderSaudacao();
     }else{
