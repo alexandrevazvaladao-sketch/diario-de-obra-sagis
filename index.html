@@ -947,7 +947,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.28';
+  const APP_VERSION = 'v2026.10.14.29';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2773,7 +2773,7 @@
       try{
         let cacheP = null; try{ cacheP = JSON.parse(localStorage.getItem('dob:papel:' + u.uid) || 'null'); }catch(e){ /* sem cache */ }
         if(cacheP && cacheP.papel){ nuvem.papel = cacheP.papel; nuvem.usuario = cacheP.usuario || ''; nuvem.nomeCad = cacheP.nome || ''; } // papel da última vez: abre já certo, mesmo se a rede demorar (o banco continua validando cada gravação)
-        const sp = await Promise.race([nuvem.db.doc('usuarios/' + u.uid).get(), new Promise((_, rej) => setTimeout(() => rej(new Error('tempo esgotado ao ler o cadastro')), 7000))]);
+        const sp = await Promise.race([nuvem.db.doc('usuarios/' + u.uid).get(), new Promise((_, rej) => setTimeout(() => rej(new Error('tempo esgotado ao ler o cadastro')), 3000))]);
         nuvem.papelFalhou = 0;
         if(sp.exists){ const dd = sp.data(); nuvem.papel = dd.papel || 'visualizador'; nuvem.usuario = dd.usuario || ''; nuvem.nomeCad = dd.nome || ''; try{ localStorage.setItem('dob:papel:' + u.uid, JSON.stringify({ papel: nuvem.papel, usuario: nuvem.usuario, nome: nuvem.nomeCad })); }catch(e){ /* ignora */ } }
         else{ try{ localStorage.removeItem('dob:papel:' + u.uid); }catch(e){ /* ignora */ } }
