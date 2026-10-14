@@ -585,6 +585,9 @@
   @media (max-width: 980px){
     .dob-mapa-layout{ flex-direction:column; gap:14px; }
     .dob-mapa-coluna-selecao{ width:100%; position:static; max-height:none; }
+    .dob-mapa-layout{ align-items:stretch; }
+    .dob-mapa-coluna-mapa{ width:100%; max-width:100%; overflow:hidden; }
+    #dob-mapa-grid{ max-width:100%; }
   }
   .dob-mapa-svg-bloco path{ transition:opacity .1s ease; }
   .dob-mapa-svg-bloco:hover path{ opacity:0.75; }
@@ -762,6 +765,8 @@
     .dob-app-shell{ display:block; }
     body{ padding:0 !important; }
     #dob-root{ padding:14px 12px 84px; }
+    html, body{ max-width:100vw; overflow-x:hidden; }
+    #dob-root > *{ max-width:100%; }
     #dob-sidebar, #dob-sidebar.recolhida{
       position:fixed; top:0; left:0; bottom:0; width:min(82vw,300px); min-height:0; height:100%; overflow-y:auto; -webkit-overflow-scrolling:touch;
       transform:translateX(-102%); transition:transform .22s ease; z-index:1200; padding:14px 0 90px; box-shadow:none;
@@ -939,7 +944,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.20';
+  const APP_VERSION = 'v2026.10.14.21';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
