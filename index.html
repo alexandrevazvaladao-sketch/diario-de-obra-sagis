@@ -852,7 +852,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.4';
+  const APP_VERSION = 'v2026.10.14.5';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2624,6 +2624,7 @@
   }
   function mostrarPopupEntrar(){
     if(nuvem.user || document.getElementById('dob-popup-conectar')) return;
+    try{ if(localStorage.getItem('dob:drive_conectado_antes') === '1') return; }catch(e){ /* ignora */ } // já conectou antes: o Google mostra a tela de escolher conta sozinho
     try{ if(sessionStorage.getItem('dob:popup_conectar_dispensado') === '1') return; }catch(e){ /* ignora */ }
     const ov = document.createElement('div');
     ov.id = 'dob-popup-conectar';
@@ -2631,14 +2632,14 @@
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(22,35,61,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
     ov.innerHTML = `<div style="background:var(--card,#fff);color:var(--ink-text,#232a35);max-width:420px;width:100%;border-radius:14px;padding:24px;box-shadow:0 20px 50px -12px rgba(0,0,0,.4);">
       <h3 style="margin:0 0 8px;font-family:Georgia,serif;font-size:21px;">Entre com o Google</h3>
-      <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--muted,#767e8c);">Você já pode ver todos os dados da obra sem entrar. Para <b>editar e salvar</b>, entre com sua conta Google — só e-mails autorizados pelo dono conseguem alterar. Fotos e apontamentos continuam no seu Google Drive (menu "⋯ Mais opções").</p>
+      <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--muted,#767e8c);">Você já pode ver todos os dados da obra sem entrar. Para <b>editar e salvar</b>, entre com sua conta Google (um login só: já conecta também o seu Drive para fotos e apontamentos). Só e-mails autorizados pelo dono conseguem alterar os dados compartilhados.</p>
       <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
         <button type="button" class="dob-btn secundario" id="dob-popup-agora-nao">Só visualizar</button>
         <button type="button" class="dob-btn" id="dob-popup-conectar-btn">Entrar com Google</button>
       </div></div>`;
     document.body.appendChild(ov);
     document.getElementById('dob-popup-agora-nao').addEventListener('click', () => { try{ sessionStorage.setItem('dob:popup_conectar_dispensado', '1'); }catch(e){ /* ignora */ } ov.remove(); });
-    document.getElementById('dob-popup-conectar-btn').addEventListener('click', () => { ov.remove(); nuvemEntrar(); });
+    document.getElementById('dob-popup-conectar-btn').addEventListener('click', () => { ov.remove(); if(tokenClient) tokenClient.requestAccessToken({ prompt: '' }); else nuvemEntrar(); });
   }
   window.__dob = { nuvem, get mapa(){ return mapaState; }, set mapa(v){ mapaState = v; }, salvar: (x) => saveMapaState(x) }; // gancho de diagnóstico/testes
   function nuvemIniciar(tentativa){
@@ -2659,7 +2660,7 @@
         else setTimeout(mostrarPopupEntrar, 500);
       });
       const b1 = document.getElementById('dob-btn-nuvem-login'), b2 = document.getElementById('dob-btn-nuvem-sair'), b3 = document.getElementById('dob-btn-nuvem-editores');
-      if(b1) b1.addEventListener('click', nuvemEntrar);
+      if(b1) b1.addEventListener('click', () => { if(tokenClient) tokenClient.requestAccessToken({ prompt: 'select_account' }); else nuvemEntrar(); });
       if(b2) b2.addEventListener('click', nuvemSair);
       if(b3) b3.addEventListener('click', nuvemEditoresAbrir);
       nuvemStatus();
@@ -5243,10 +5244,12 @@
     }
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: 'https://www.googleapis.com/auth/drive.file',
+      scope: 'https://www.googleapis.com/auth/drive.file openid email profile',
       callback: (resp) => {
         if(resp && resp.access_token){
           accessToken = resp.access_token;
+          // Um único login: o mesmo token do Google também entra na nuvem (dados compartilhados).
+          try{ if(nuvem.auth && !nuvem.user) nuvem.auth.signInWithCredential(firebase.auth.GoogleAuthProvider.credential(null, resp.access_token)).catch(() => { /* segue só com o Drive */ }); }catch(e){ /* ignora */ }
           // Lembra que já conectou uma vez, pra poder reconectar sozinho (sem
           // precisar clicar) nas próximas vezes que abrir o app.
           try{ localStorage.setItem('dob:drive_conectado_antes', '1'); }catch(err){ /* ignora */ }
@@ -5502,14 +5505,47 @@
   document.getElementById('dob-btn-sync-fotos').addEventListener('click', () => { sincronizarFotosLocaisPendentes(); });
   document.getElementById('dob-btn-reparar-thumbs').addEventListener('click', () => { repararMiniaturas(); });
   document.getElementById('dob-btn-recuperar-fotos').addEventListener('click', () => { recuperarFotosOrfasDrive(); });
-  document.getElementById('dob-btn-config').addEventListener('click', () => {
-    if(confirm('Deseja trocar o Client ID configurado?')){
-      localStorage.removeItem('dob:client_id');
-      clientId = '';
-      statusBar.style.display = 'none';
-      renderSetup();
-    }
-  });
+  function trocarConta(){
+    try{ sessionStorage.setItem('dob:popup_conectar_dispensado', '1'); }catch(e){ /* ignora */ }
+    accessToken = null; nomeConta = '';
+    try{ localStorage.removeItem('dob:drive_conectado_antes'); localStorage.removeItem('dob:nome_conta'); }catch(e){ /* ignora */ }
+    updateStatus(); renderSaudacao();
+    const depois = () => { if(tokenClient) tokenClient.requestAccessToken({ prompt: 'select_account' }); else nuvemEntrar(); };
+    if(nuvem.auth && nuvem.user) nuvem.auth.signOut().then(depois, depois); else depois();
+  }
+  function abrirConfiguracoes(){
+    if(document.getElementById('dob-config-modal')) return;
+    const ov = document.createElement('div');
+    ov.id = 'dob-config-modal';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(22,35,61,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+    const email = nuvem.user ? escapeHtmlSaud(nuvem.user.email || '') : '';
+    ov.innerHTML = `<div style="background:var(--card,#fff);color:var(--ink-text,#232a35);max-width:420px;width:100%;border-radius:14px;padding:22px;box-shadow:0 20px 50px -12px rgba(0,0,0,.4);">
+      <h3 style="margin:0 0 6px;font-family:Georgia,serif;font-size:20px;">Configurações</h3>
+      <p style="margin:0 0 14px;font-size:13px;color:var(--muted,#767e8c);">${email ? 'Conta: <b>' + email + '</b>' + (nuvem.dono ? ' (dono)' : nuvem.editor ? ' (editor)' : ' (somente visualização)') : 'Você não está logado (somente visualização).'}</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button type="button" class="dob-btn" id="dob-cfg-trocar">🔄 Sair e entrar com outra conta Google</button>
+        ${nuvem.user ? '<button type="button" class="dob-btn secundario" id="dob-cfg-sair">Sair da conta</button>' : ''}
+        ${nuvem.dono ? '<button type="button" class="dob-btn secundario" id="dob-cfg-editores">👥 Quem pode editar</button>' : ''}
+        <button type="button" class="dob-btn secundario" id="dob-cfg-client">Avançado: trocar o Client ID do Drive</button>
+        <button type="button" class="dob-btn secundario" id="dob-cfg-fechar">Fechar</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    const fechar = () => ov.remove();
+    document.getElementById('dob-cfg-fechar').addEventListener('click', fechar);
+    document.getElementById('dob-cfg-trocar').addEventListener('click', () => { fechar(); trocarConta(); });
+    const sr = document.getElementById('dob-cfg-sair'); if(sr) sr.addEventListener('click', () => { fechar(); try{ sessionStorage.setItem('dob:popup_conectar_dispensado', '1'); }catch(e){ /* ignora */ } nuvemSair(); });
+    const ed = document.getElementById('dob-cfg-editores'); if(ed) ed.addEventListener('click', () => { fechar(); nuvemEditoresAbrir(); });
+    document.getElementById('dob-cfg-client').addEventListener('click', () => {
+      fechar();
+      if(confirm('Deseja trocar o Client ID configurado?')){
+        localStorage.removeItem('dob:client_id');
+        clientId = '';
+        statusBar.style.display = 'none';
+        renderSetup();
+      }
+    });
+  }
+  document.getElementById('dob-btn-config').addEventListener('click', abrirConfiguracoes);
 
   // ---------- Compressão de imagem ----------
   function compressDataUrl(dataUrl, maxDim, quality){
