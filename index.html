@@ -947,7 +947,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.24';
+  const APP_VERSION = 'v2026.10.14.25';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -1947,6 +1947,17 @@
     { v: 'outro', t: 'Outro' },
   ];
 
+  // Ligação entre os serviços do Mapa e os itens do Cronograma (para sugerir marcar como "feito" quando o Mapa já mostra tudo concluído).
+  const CRONO_SERVICOS_MAPA = {
+    '02.02.03': ['FUNDAÇÃO PROFUNDA'],
+    '02.02.04': ['ARRASAMENTO DE ESTACAS/ BLOCOS DE COROAMENTO'],
+    '02.02.05': ['PREPARAÇÃO/CONCRETAGEM LAJÃO'],
+    '02.02.06': ['ALVENARIA DE 1º FIADA']
+  };
+  function cronogramaMapaConcluido(obra, cod){
+    const lista = CRONO_SERVICOS_MAPA[cod]; if(!lista) return false;
+    return lista.every(sv => { if(!(mapaState.servicos || []).includes(sv)) return false; const a = custoEtapaAvancoDoServico(sv, obra); return !!(a && a.total > 0 && a.concluidos >= a.total); });
+  }
   function cronogramaSemanalLer(){
     try{ return JSON.parse(localStorage.getItem('dob:cronograma_semanal') || '{}'); }catch(e){ return {}; }
   }
@@ -2126,7 +2137,7 @@
           const mostrarCausa = comprometido && semanaFechada && !cumprido;
           const causaHtml = mostrarCausa ? `<select class="dob-pd-causa" data-crono-causa-chave="${chave}"><option value="">causa…</option>${CRONOGRAMA_CAUSAS.map(c => `<option value="${c.v}" ${reg.causa===c.v?'selected':''}>${c.t}</option>`).join('')}</select>` : '';
           const sit = !comprometido ? '<span class="dob-pd-sit-vazio">–</span>' :
-            `<label class="dob-pd-sit"><input type="checkbox" data-crono-chave="${chave}" ${cumprido ? 'checked' : ''} /><span class="${cumprido ? 'ok' : (semanaFechada ? 'atraso' : 'plan')}">${cumprido ? 'Cumprido' : (semanaFechada ? 'Não cump.' : 'Planejado')}</span></label>${causaHtml}`;
+            `<label class="dob-pd-sit"><input type="checkbox" data-crono-chave="${chave}" ${cumprido ? 'checked' : ''} /><span class="${cumprido ? 'ok' : (semanaFechada ? 'atraso' : 'plan')}">${cumprido ? 'Cumprido' : (semanaFechada ? 'Não cump.' : 'Planejado')}</span></label>${causaHtml}${(!cumprido && cronogramaMapaConcluido(cronogramaObraAtual, it.cod)) ? `<button type="button" class="dob-btn secundario pequeno" data-crono-sug="${chave}" title="O Mapa mostra este serviço 100% concluído" style="margin-top:4px;white-space:normal;">💡 Mapa: concluído · marcar</button>` : ''}`;
           const tip = `${it.cod} ${it.desc}${it.inicio && it.termino ? ' — prazo ' + fmtDate(it.inicio) + ' → ' + fmtDate(it.termino) : ''}`;
           linhasHtml += `<tr class="dob-pd-item ${cumprido?'concluido':''} ${mostrarCausa && !reg.causa ? 'nao-cumprido':''} ${comprometido?'comprometido':''}">
             <td class="desc" title="${tip.replace(/"/g,'&quot;')}"><span class="cod">${it.cod}</span> ${it.desc}</td>
@@ -2247,6 +2258,10 @@
         renderCronograma();
       });
     });
+    container.querySelectorAll('[data-crono-sug]').forEach(btn => btn.addEventListener('click', () => {
+      const chave = btn.dataset.cronoSug, atuais = cronogramaSemanalLer(), reg = atuais[chave] || {};
+      reg.feito = true; delete reg.causa; atuais[chave] = reg; cronogramaSemanalSalvar(atuais); renderCronograma();
+    }));
     container.querySelectorAll('[data-crono-causa-chave]').forEach(sel => {
       sel.addEventListener('change', (ev) => {
         const chave = ev.target.dataset.cronoCausaChave;
@@ -3268,15 +3283,16 @@
     }catch(e){ custoEtapaDados = null; }
     custoEtapaCarregando = false;
   }
-  function custoEtapaAvancoDoServico(servico){
+  function custoEtapaAvancoDoServico(servico, obraFiltro){
     const tipo = mapaState.tipoPorServico[servico];
     const noEscopo = b => {
+      if(obraFiltro && b.obra !== obraFiltro) return false;
       const ids = escopoDoServico(servico, b.obra);
       if(!ids) return true;
       return ids[0] !== '__nenhum__' && ids.includes(b.id);
     };
     const base = tipo === 'bloco' ? BLOCOS_MAPA.filter(b => b.cat === 'bloco' && noEscopo(b))
-               : tipo === 'area_comum' ? BLOCOS_MAPA.filter(b => b.cat === 'area_comum') : null;
+               : tipo === 'area_comum' ? BLOCOS_MAPA.filter(b => b.cat === 'area_comum' && (!obraFiltro || b.obra === obraFiltro)) : null;
     if(!base || !base.length) return null;
     const ids = new Set(base.map(b => b.id));
     const estados = mapaState.estados.filter(e => e.servico === servico && ids.has(e.bloco));
@@ -3576,16 +3592,12 @@
       atras.sort((a, b) => b.n - a.n);
       const listaAtr = atras.length ? atras.slice(0, 15).map(a => `<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line);font-size:13px;"><span style="color:var(--clay);font-weight:700;min-width:62px;">${a.it.cod}</span><span style="flex:1;">${a.it.desc}${a.causa ? ` <span style="color:var(--muted);">· ${causaTxt(a.causa)}</span>` : ''}</span><b>${a.n} sem.</b></div>`).join('') + (atras.length > 15 ? `<p class="dob-dica">+ ${atras.length - 15} itens</p>` : '') : '<p class="dob-dica">Nada em atraso nas semanas fechadas. 🎉</p>';
       const listaCausas = Object.keys(causas).length ? Object.entries(causas).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span class="pill" style="margin-right:6px;">${causaTxt(k)}: ${v}</span>`).join('') : '<p class="dob-dica">Nenhuma causa registrada ainda.</p>';
-      // Mapa: blocos concluídos por serviço
+      // Mapa: blocos concluídos por serviço (nesta obra)
       const linhasMapa = (mapaState.servicos || []).map(sv => {
-        const nb = Number(mapaState.blocosPorObra && mapaState.blocosPorObra[obra]) || 0, todos = Array.from({ length: nb }, (_, i) => i + 1);
-        const esc = mapaState.escopoPorServico && mapaState.escopoPorServico[sv] && mapaState.escopoPorServico[sv][obra];
-        const ids = (esc && esc.length ? esc : todos).map(b => (b && typeof b === 'object') ? (b.id != null ? b.id : b.nome) : b);
-        if(!ids.length) return null;
-        const est = (mapaState.estados || []).filter(e => e.servico === sv && e.obra === obra && ids.map(String).includes(String(e.bloco)));
-        const v = est.filter(e => e.cor === 'verde').length, a = est.filter(e => e.cor === 'amarelo').length;
-        return { sv, v, a, tot: ids.length, pct: Math.round(v / ids.length * 100) };
-      }).filter(x => x && (x.v || x.a)).sort((x, y) => y.pct - x.pct);
+        const a = custoEtapaAvancoDoServico(sv, obra);
+        if(!a || !a.total || !(a.concluidos || a.andamento)) return null;
+        return { sv, v: a.concluidos, a: a.andamento, tot: a.total, pct: Math.round(a.concluidos / a.total * 100) };
+      }).filter(Boolean).sort((x, y) => y.pct - x.pct);
       const listaMapa = linhasMapa.length ? linhasMapa.map(x => `<div style="display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12.5px;"><span style="flex:1.4;min-width:0;">${x.sv}</span><div style="flex:1;background:#eceae1;border-radius:99px;height:12px;overflow:hidden;display:flex;"><div style="width:${x.pct}%;background:#2f7d4f;"></div><div style="width:${Math.round(x.a / x.tot * 100)}%;background:#c9a24a;"></div></div><b style="width:92px;text-align:right;">${x.v}/${x.tot} <span style="font-weight:400;color:var(--muted);">+${x.a} exec.</span></b></div>`).join('') : '<p class="dob-dica">Sem marcações no Mapa para esta obra.</p>';
       html += bloco('Solar dos ' + obra + ' — PPC das últimas semanas <span style="font-size:13px;color:var(--muted);font-weight:400;">(acumulado: ' + ppcAll + '%)</span>', barras)
         + bloco('Solar dos ' + obra + ' — itens em atraso', listaAtr + '<div style="margin-top:10px;">' + listaCausas + '</div>')
