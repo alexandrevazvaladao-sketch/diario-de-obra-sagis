@@ -947,7 +947,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.27';
+  const APP_VERSION = 'v2026.10.14.28';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2771,9 +2771,12 @@
     nuvem.rotulo = u ? (((u.email || '').endsWith(NUVEM_DOMINIO)) ? (u.email || '').split('@')[0] : (u.email || '')) : '';
     if(u && !nuvem.dono){
       try{
-        const sp = await nuvem.db.doc('usuarios/' + u.uid).get();
+        let cacheP = null; try{ cacheP = JSON.parse(localStorage.getItem('dob:papel:' + u.uid) || 'null'); }catch(e){ /* sem cache */ }
+        if(cacheP && cacheP.papel){ nuvem.papel = cacheP.papel; nuvem.usuario = cacheP.usuario || ''; nuvem.nomeCad = cacheP.nome || ''; } // papel da última vez: abre já certo, mesmo se a rede demorar (o banco continua validando cada gravação)
+        const sp = await Promise.race([nuvem.db.doc('usuarios/' + u.uid).get(), new Promise((_, rej) => setTimeout(() => rej(new Error('tempo esgotado ao ler o cadastro')), 7000))]);
         nuvem.papelFalhou = 0;
-        if(sp.exists){ const dd = sp.data(); nuvem.papel = dd.papel || 'visualizador'; nuvem.usuario = dd.usuario || ''; nuvem.nomeCad = dd.nome || ''; }
+        if(sp.exists){ const dd = sp.data(); nuvem.papel = dd.papel || 'visualizador'; nuvem.usuario = dd.usuario || ''; nuvem.nomeCad = dd.nome || ''; try{ localStorage.setItem('dob:papel:' + u.uid, JSON.stringify({ papel: nuvem.papel, usuario: nuvem.usuario, nome: nuvem.nomeCad })); }catch(e){ /* ignora */ } }
+        else{ try{ localStorage.removeItem('dob:papel:' + u.uid); }catch(e){ /* ignora */ } }
       }catch(e){ nuvem.papelFalhou = (nuvem.papelFalhou || 0) + 1; if(nuvem.papelFalhou <= 12){ clearTimeout(nuvem.papelTimer); nuvem.papelTimer = setTimeout(nuvemAtualizarPapel, 2500 * nuvem.papelFalhou); } } // leitura falhou (rede lenta/offline): tenta de novo em vez de ficar como visualizador
       nuvem.editor = (nuvem.papel === 'editor' || nuvem.papel === 'admin' || nuvem.papel === 'dono');
       nuvem.admin = (nuvem.papel === 'admin' || nuvem.papel === 'dono');
