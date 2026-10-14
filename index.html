@@ -15,6 +15,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Diário de Obra" />
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --ink:#16233d;
@@ -775,9 +778,13 @@
 
   <div class="dob-status-bar" id="dob-status-bar" style="display:none;">
     <span><span class="dob-dot off" id="dob-dot"></span><span id="dob-status-texto">Drive não conectado</span></span>
+    <span class="dob-nuvem-texto" id="dob-nuvem-texto" style="margin-left:14px;font-size:13px;"></span>
     <details class="dob-status-mais" id="dob-status-mais">
       <summary>⋯ Mais opções</summary>
       <div class="dob-status-mais-botoes">
+        <button class="dob-btn secundario pequeno" id="dob-btn-nuvem-login">Entrar com Google (editar)</button>
+        <button class="dob-btn secundario pequeno" id="dob-btn-nuvem-sair" style="display:none;">Sair da conta</button>
+        <button class="dob-btn secundario pequeno" id="dob-btn-nuvem-editores" style="display:none;">👥 Quem pode editar</button>
         <button class="dob-btn secundario pequeno" id="dob-btn-conectar">Conectar ao Google Drive</button>
         <button class="dob-btn secundario pequeno" id="dob-btn-sync-fotos" style="display:none;">📤 Sincronizar fotos locais</button>
         <button class="dob-btn secundario pequeno" id="dob-btn-reparar-thumbs" style="display:none;">🔧 Reparar miniaturas</button>
@@ -786,6 +793,8 @@
       </div>
     </details>
   </div>
+
+  <div id="dob-nuvem-faixa" style="display:none;margin:8px 0;padding:10px 14px;border-radius:10px;background:#fff6dd;color:#5a4300;font-size:14px;line-height:1.4;"></div>
 
   <div class="dob-stats dob-home-only" id="dob-stats"></div>
   <div class="dob-stats-resumo dob-home-only" id="dob-stats-resumo" title="Toque pra ver os números completos"></div>
@@ -843,7 +852,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.3';
+  const APP_VERSION = 'v2026.10.14.4';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2346,6 +2355,7 @@
   })();
   function saveMapaState(sincronizar){
     localStorage.setItem('dob:mapa_state', JSON.stringify(mapaState));
+    if(sincronizar !== false && typeof nuvemAgendarGravacao === 'function') nuvemAgendarGravacao();
     if(sincronizar !== false && accessToken) return syncMapaToDrive();
     return null;
   }
@@ -2377,6 +2387,7 @@
     return syncMapaPromise;
   }
   async function syncMapaFromDriveOnConnect(){
+    if(nuvem.db) return; // com a nuvem ativa, ela é a fonte dos dados do Mapa (o Drive fica só como cópia)
     try{
       const id = await ensureMapaFile();
       const remoteText = await driveReadDataFile(id);
@@ -2414,6 +2425,245 @@
       await driveWriteDataFile(id, JSON.stringify(mapaState));
       if(mapaAberto) renderMapa();
     }catch(e){ /* segue só com os dados locais se a sincronização falhar */ }
+  }
+
+  // ---------- Nuvem (Firebase): dados compartilhados do Mapa, Catálogo, Método e Custos ----------
+  // Qualquer pessoa VÊ os dados (sem login). Só o dono e os e-mails que ele autoriza EDITAM (regras no Firestore).
+  // Um único documento (mapa/estado) guarda o mapaState inteiro; cada gravação sobe o número da revisão ("rev") e,
+  // se outra pessoa gravou antes, as duas versões são mescladas em vez de uma apagar a outra.
+  const FIREBASE_CONFIG = { apiKey: 'AIzaSyAekFo6-fje_PvROic75z_OErJBJNE05rg', authDomain: 'diario-de-obra-sagis-910fe.firebaseapp.com', projectId: 'diario-de-obra-sagis-910fe', storageBucket: 'diario-de-obra-sagis-910fe.firebasestorage.app', messagingSenderId: '1089016451128', appId: '1:1089016451128:web:3c3390d1403822aaf056cd' };
+  const NUVEM_DONO = 'alexandrevazvaladao@gmail.com';
+  var nuvem = { db: null, auth: null, user: null, editor: false, dono: false, rev: null, revEnviado: null, existe: false, sujo: false, seq: 0, timer: null, gravando: false, ok: false, erro: '', authPronto: false, primeiro: null, primeiroOk: null };
+
+  function normalizarMapa(o){
+    const base = { servicos: [], tipoPorServico: {}, blocosPorObra: {}, estados: [], desenhos: [], rotacoes: {}, servicosExcluidos: [], escopoPorServico: {}, prereqPorServico: {}, macroPorServico: {}, catalogoCustom: {}, metodoOrdem: {}, metodoPassos: [], custoEtapa: {}, producaoDia: {} };
+    return Object.assign(base, o || {});
+  }
+  // Une duas versões; em conflito, vale a "local" (quem está gravando agora).
+  function mesclarMapa(remote, local){
+    remote = normalizarMapa(remote); local = normalizarMapa(local);
+    const uniao = (a, b) => Array.from(new Set([...(a || []), ...(b || [])]));
+    const servicosExcluidos = uniao(remote.servicosExcluidos, local.servicosExcluidos);
+    const servicos = uniao(local.servicos, remote.servicos).filter(s => !servicosExcluidos.includes(s));
+    const mescla = (campo) => Object.assign({}, remote[campo], local[campo]);
+    const tipoPorServico = mescla('tipoPorServico');
+    const escopoPorServico = mescla('escopoPorServico');
+    const prereqPorServico = mescla('prereqPorServico');
+    servicosExcluidos.forEach(s => { delete tipoPorServico[s]; delete escopoPorServico[s]; delete prereqPorServico[s]; });
+    const chaveEstado = e => `${e.servico}|${e.obra}|${e.bloco}`;
+    const estadoPorChave = {};
+    (remote.estados || []).forEach(e => { if(!servicosExcluidos.includes(e.servico)) estadoPorChave[chaveEstado(e)] = e; });
+    (local.estados || []).forEach(e => { if(!servicosExcluidos.includes(e.servico)) estadoPorChave[chaveEstado(e)] = e; });
+    const desenhoPorId = {};
+    (remote.desenhos || []).forEach(d => { if(!servicosExcluidos.includes(d.servico)) desenhoPorId[d.id] = d; });
+    (local.desenhos || []).forEach(d => { if(servicosExcluidos.includes(d.servico)) return; const r = desenhoPorId[d.id]; if(!r || (d.atualizadoEm || '') >= (r.atualizadoEm || '')) desenhoPorId[d.id] = d; });
+    const extra = {};
+    Object.keys(remote).concat(Object.keys(local)).forEach(k => { if(!(k in extra)) extra[k] = k in local ? local[k] : remote[k]; });
+    return Object.assign(extra, {
+      servicos, tipoPorServico, escopoPorServico, prereqPorServico, servicosExcluidos,
+      blocosPorObra: mescla('blocosPorObra'), estados: Object.values(estadoPorChave), desenhos: Object.values(desenhoPorId),
+      rotacoes: mescla('rotacoes'), macroPorServico: mescla('macroPorServico'), catalogoCustom: mescla('catalogoCustom'),
+      metodoOrdem: mescla('metodoOrdem'), metodoPassos: (local.metodoPassos && local.metodoPassos.length) ? local.metodoPassos : (remote.metodoPassos || []),
+      custoEtapa: mescla('custoEtapa'), producaoDia: mescla('producaoDia')
+    });
+  }
+  function nuvemSalvarLocal(){ try{ localStorage.setItem('dob:mapa_state', JSON.stringify(mapaState)); }catch(e){ /* ignora */ } }
+  function nuvemRerender(){
+    const a = document.activeElement;
+    if(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)){ setTimeout(nuvemRerender, 3000); return; } // não tira o foco de quem está digitando
+    try{ if(mapaAberto) renderMapa(); }catch(e){ /* ignora */ }
+    try{ if(catalogoAberto) renderCatalogo(); }catch(e){ /* ignora */ }
+    try{ if(metodoAberto) renderMetodo(); }catch(e){ /* ignora */ }
+    try{ if(custoEtapaAberto) renderCustoEtapa(); }catch(e){ /* ignora */ }
+  }
+  function nuvemStatus(){
+    const t = document.getElementById('dob-nuvem-texto'); if(!t) return;
+    const login = document.getElementById('dob-btn-nuvem-login'), sair = document.getElementById('dob-btn-nuvem-sair'), ed = document.getElementById('dob-btn-nuvem-editores');
+    const faixa = document.getElementById('dob-nuvem-faixa');
+    if(!nuvem.db){ t.textContent = ''; if(login) login.style.display = 'none'; return; }
+    let txt = '☁️ ';
+    if(nuvem.erro) txt += 'erro ao salvar na nuvem — tentando de novo';
+    else if(!nuvem.ok) txt += 'conectando…';
+    else if(!nuvem.user) txt += 'só visualização';
+    else if(!nuvem.editor) txt += 'só visualização (' + (nuvem.user.email || '') + ')';
+    else if(nuvem.gravando || nuvem.sujo) txt += 'salvando…';
+    else txt += 'sincronizado (' + (nuvem.dono ? 'dono' : 'editor') + ')';
+    t.textContent = txt;
+    if(login) login.style.display = nuvem.user ? 'none' : '';
+    if(sair) sair.style.display = nuvem.user ? '' : 'none';
+    if(ed) ed.style.display = nuvem.dono ? '' : 'none';
+    if(faixa){
+      if(nuvem.authPronto && !nuvem.editor){
+        faixa.style.display = 'block';
+        faixa.innerHTML = nuvem.user
+          ? '👁 <b>Modo visualização.</b> Sua conta (' + escapeHtmlSaud(nuvem.user.email || '') + ') ainda não tem permissão para editar — peça ao dono para autorizar. O que você alterar aqui <b>não é salvo</b> na nuvem.'
+          : '👁 <b>Modo visualização.</b> Você vê todos os dados. Para editar, entre com o Google (menu "⋯ Mais opções") — só e-mails autorizados pelo dono conseguem salvar.';
+      }else faixa.style.display = 'none';
+    }
+  }
+  function nuvemAgendarGravacao(imediato){
+    if(!nuvem.db || !nuvem.editor) return;
+    nuvem.sujo = true; nuvem.seq++;
+    clearTimeout(nuvem.timer);
+    nuvem.timer = setTimeout(nuvemGravar, imediato ? 50 : 1500);
+    nuvemStatus();
+  }
+  async function nuvemGravar(){
+    if(!nuvem.db || !nuvem.editor || !nuvem.user) return;
+    if(nuvem.gravando){ nuvem.timer = setTimeout(nuvemGravar, 800); return; }
+    nuvem.gravando = true; const seqInicio = nuvem.seq; nuvemStatus();
+    try{
+      const ref = nuvem.db.doc('mapa/estado');
+      let escrito = null;
+      await nuvem.db.runTransaction(async tx => {
+        const snap = await tx.get(ref);
+        const remRev = snap.exists ? (snap.data().rev || 0) : 0;
+        let estado = mapaState;
+        if(snap.exists && nuvem.rev !== remRev){ // outra pessoa gravou desde a última leitura: junta as duas versões
+          try{ estado = mesclarMapa(JSON.parse(snap.data().json), mapaState); }catch(e){ /* grava a local */ }
+        }
+        const json = JSON.stringify(estado);
+        if(json.length > 900000) throw new Error('Dados grandes demais para a nuvem (' + json.length + ' caracteres)');
+        const novo = remRev + 1;
+        tx.set(ref, { json, rev: novo, atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(), por: nuvem.user.email || '' });
+        escrito = { estado, rev: novo };
+      });
+      nuvem.revEnviado = escrito.rev; nuvem.rev = escrito.rev; nuvem.existe = true; nuvem.erro = '';
+      if(escrito.estado !== mapaState){ mapaState = escrito.estado; nuvemSalvarLocal(); nuvemRerender(); }
+      if(nuvem.seq === seqInicio) nuvem.sujo = false;
+      else { clearTimeout(nuvem.timer); nuvem.timer = setTimeout(nuvemGravar, 300); }
+    }catch(e){
+      nuvem.erro = String(e && e.message || e);
+      clearTimeout(nuvem.timer); nuvem.timer = setTimeout(nuvemGravar, 15000);
+    }finally{
+      nuvem.gravando = false; nuvemStatus();
+    }
+  }
+  function nuvemAplicarRemoto(d){
+    let remoto;
+    try{ remoto = normalizarMapa(JSON.parse(d.json)); }catch(e){ return; }
+    try{ localStorage.setItem('dob:mapa_state_bak', JSON.stringify(mapaState)); }catch(e){ /* ignora */ }
+    if(nuvem.sujo && nuvem.editor){ mapaState = mesclarMapa(remoto, mapaState); nuvem.rev = d.rev || 0; nuvemSalvarLocal(); nuvemAgendarGravacao(); }
+    else { mapaState = remoto; nuvem.rev = d.rev || 0; nuvemSalvarLocal(); }
+    nuvemRerender();
+  }
+  function nuvemOuvir(){
+    nuvem.primeiro = new Promise(res => { nuvem.primeiroOk = res; setTimeout(res, 8000); });
+    nuvem.db.doc('mapa/estado').onSnapshot(snap => {
+      nuvem.ok = true; nuvem.erro = '';
+      if(nuvem.primeiroOk) nuvem.primeiroOk();
+      if(snap.metadata.hasPendingWrites) return;
+      if(!snap.exists){ nuvem.existe = false; if(nuvem.rev === null) nuvem.rev = 0; nuvemStatus(); return; }
+      const d = snap.data(); nuvem.existe = true;
+      if((d.rev || 0) === nuvem.rev || (d.rev || 0) === nuvem.revEnviado){ nuvemStatus(); return; } // eco da nossa própria gravação
+      nuvemAplicarRemoto(d);
+      nuvemStatus();
+    }, err => { nuvem.erro = String(err && err.message || err); nuvemStatus(); });
+  }
+  async function nuvemAtualizarPapel(){
+    const u = nuvem.user;
+    nuvem.dono = !!(u && u.emailVerified && (u.email || '').toLowerCase() === NUVEM_DONO);
+    nuvem.editor = nuvem.dono;
+    if(u && !nuvem.dono){
+      try{
+        const s = await nuvem.db.doc('config/editores').get();
+        const emails = (s.exists && s.data().emails) || [];
+        nuvem.editor = !!u.emailVerified && emails.map(x => String(x).toLowerCase()).includes((u.email || '').toLowerCase());
+      }catch(e){ nuvem.editor = false; }
+    }
+    if(u){
+      const nome = ((u.displayName || u.email || '').trim().split(/\s+/)[0]) || '';
+      if(nome){ nomeConta = nome; try{ localStorage.setItem('dob:nome_conta', nome); localStorage.setItem('dob:drive_conectado_antes', localStorage.getItem('dob:drive_conectado_antes') || '0'); }catch(e){ /* ignora */ } }
+    }
+    if(typeof renderSaudacao === 'function') renderSaudacao();
+    if(nuvem.editor){
+      await nuvem.primeiro; // espera a primeira leitura da nuvem antes de decidir se sobe os dados deste aparelho
+      // Só sobe os dados deste aparelho se houver algo de verdade neles (evita subir um estado vazio por cima de dados
+      // que ainda estão em outro aparelho/no Drive).
+      const m = normalizarMapa(mapaState);
+      const temDados = (m.estados.length + m.desenhos.length + Object.keys(m.catalogoCustom).length + m.metodoPassos.length + Object.keys(m.custoEtapa).length) > 0;
+      if((!nuvem.existe && temDados) || nuvem.sujo) nuvemAgendarGravacao(true);
+    }
+    nuvemStatus();
+  }
+  function nuvemEntrar(){
+    if(!nuvem.auth){ alert('A nuvem ainda não carregou. Aguarde um instante e tente de novo.'); return; }
+    const prov = new firebase.auth.GoogleAuthProvider();
+    prov.setCustomParameters({ prompt: 'select_account' });
+    nuvem.auth.signInWithPopup(prov).catch(err => {
+      if(err && (err.code === 'auth/popup-blocked' || err.code === 'auth/operation-not-supported-in-this-environment')) nuvem.auth.signInWithRedirect(prov);
+      else if(err && err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') alert('Não foi possível entrar: ' + (err.message || err.code));
+    });
+  }
+  function nuvemSair(){ if(nuvem.auth) nuvem.auth.signOut(); }
+  async function nuvemEditoresAbrir(){
+    if(!nuvem.dono) return;
+    let emails = [];
+    try{ const s = await nuvem.db.doc('config/editores').get(); emails = (s.exists && s.data().emails) || []; }catch(e){ /* lista vazia */ }
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(22,35,61,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+    ov.innerHTML = `<div style="background:var(--card,#fff);color:var(--ink-text,#232a35);max-width:460px;width:100%;border-radius:14px;padding:22px;box-shadow:0 20px 50px -12px rgba(0,0,0,.4);">
+      <h3 style="margin:0 0 6px;font-family:Georgia,serif;font-size:20px;">Quem pode editar</h3>
+      <p style="margin:0 0 10px;font-size:13px;line-height:1.5;color:var(--muted,#767e8c);">Um e-mail Google por linha. Quem estiver aqui consegue alterar Mapa, Catálogo, Método e Custos. Todos os outros só visualizam. Você (dono) sempre pode editar.</p>
+      <textarea id="dob-editores-txt" rows="7" style="width:100%;box-sizing:border-box;font:14px/1.4 inherit;padding:8px;border:1px solid #c8cdd6;border-radius:8px;" placeholder="nome@gmail.com"></textarea>
+      <div id="dob-editores-msg" style="min-height:18px;font-size:13px;margin:6px 0;"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;"><button type="button" class="dob-btn secundario" id="dob-editores-cancelar">Cancelar</button><button type="button" class="dob-btn" id="dob-editores-salvar">Salvar</button></div></div>`;
+    document.body.appendChild(ov);
+    document.getElementById('dob-editores-txt').value = emails.join('\n');
+    document.getElementById('dob-editores-cancelar').addEventListener('click', () => ov.remove());
+    document.getElementById('dob-editores-salvar').addEventListener('click', async () => {
+      const lista = Array.from(new Set(document.getElementById('dob-editores-txt').value.split(/[\s,;]+/).map(x => x.trim().toLowerCase()).filter(Boolean)));
+      const ruim = lista.filter(x => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
+      const msg = document.getElementById('dob-editores-msg');
+      if(ruim.length){ msg.style.color = '#b3261e'; msg.textContent = 'E-mail inválido: ' + ruim[0]; return; }
+      try{
+        await nuvem.db.doc('config/editores').set({ emails: lista, atualizadoEm: firebase.firestore.FieldValue.serverTimestamp() });
+        msg.style.color = '#1b6e3c'; msg.textContent = 'Salvo.'; setTimeout(() => ov.remove(), 700);
+      }catch(e){ msg.style.color = '#b3261e'; msg.textContent = 'Não foi possível salvar: ' + (e.message || e); }
+    });
+  }
+  function mostrarPopupEntrar(){
+    if(nuvem.user || document.getElementById('dob-popup-conectar')) return;
+    try{ if(sessionStorage.getItem('dob:popup_conectar_dispensado') === '1') return; }catch(e){ /* ignora */ }
+    const ov = document.createElement('div');
+    ov.id = 'dob-popup-conectar';
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(22,35,61,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+    ov.innerHTML = `<div style="background:var(--card,#fff);color:var(--ink-text,#232a35);max-width:420px;width:100%;border-radius:14px;padding:24px;box-shadow:0 20px 50px -12px rgba(0,0,0,.4);">
+      <h3 style="margin:0 0 8px;font-family:Georgia,serif;font-size:21px;">Entre com o Google</h3>
+      <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--muted,#767e8c);">Você já pode ver todos os dados da obra sem entrar. Para <b>editar e salvar</b>, entre com sua conta Google — só e-mails autorizados pelo dono conseguem alterar. Fotos e apontamentos continuam no seu Google Drive (menu "⋯ Mais opções").</p>
+      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+        <button type="button" class="dob-btn secundario" id="dob-popup-agora-nao">Só visualizar</button>
+        <button type="button" class="dob-btn" id="dob-popup-conectar-btn">Entrar com Google</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    document.getElementById('dob-popup-agora-nao').addEventListener('click', () => { try{ sessionStorage.setItem('dob:popup_conectar_dispensado', '1'); }catch(e){ /* ignora */ } ov.remove(); });
+    document.getElementById('dob-popup-conectar-btn').addEventListener('click', () => { ov.remove(); nuvemEntrar(); });
+  }
+  window.__dob = { nuvem, get mapa(){ return mapaState; }, set mapa(v){ mapaState = v; }, salvar: (x) => saveMapaState(x) }; // gancho de diagnóstico/testes
+  function nuvemIniciar(tentativa){
+    if(!window.firebase || !firebase.firestore || !firebase.auth){
+      if((tentativa || 0) < 20) setTimeout(() => nuvemIniciar((tentativa || 0) + 1), 500);
+      else nuvemStatus();
+      return;
+    }
+    try{
+      firebase.initializeApp(FIREBASE_CONFIG);
+      nuvem.auth = firebase.auth(); nuvem.db = firebase.firestore();
+      try{ nuvem.db.enablePersistence({ synchronizeTabs: true }).catch(() => { /* sem cache offline */ }); }catch(e){ /* ignora */ }
+      nuvemOuvir();
+      nuvem.auth.onAuthStateChanged(async u => {
+        nuvem.user = u; nuvem.authPronto = true;
+        await nuvemAtualizarPapel();
+        if(u){ const pp = document.getElementById('dob-popup-conectar'); if(pp) pp.remove(); }
+        else setTimeout(mostrarPopupEntrar, 500);
+      });
+      const b1 = document.getElementById('dob-btn-nuvem-login'), b2 = document.getElementById('dob-btn-nuvem-sair'), b3 = document.getElementById('dob-btn-nuvem-editores');
+      if(b1) b1.addEventListener('click', nuvemEntrar);
+      if(b2) b2.addEventListener('click', nuvemSair);
+      if(b3) b3.addEventListener('click', nuvemEditoresAbrir);
+      nuvemStatus();
+    }catch(e){ nuvem.db = null; nuvem.erro = String(e && e.message || e); nuvemStatus(); }
   }
 
   // ---------- Custo por etapa: orçamento executivo (insumos) × avanço do Mapa ----------
@@ -4950,7 +5200,7 @@
 
   // ---------- Configuração inicial (Client ID) ----------
   function renderSetup(){
-    if(clientId){ setupContainer.innerHTML=''; statusBar.style.display='flex'; initGis(); return; }
+    if(clientId){ setupContainer.innerHTML=''; statusBar.style.display='flex'; initGis(); nuvemIniciar(); return; }
     setupContainer.innerHTML = `
       <div class="dob-setup">
         <h3>Configurar integração com o Google Drive</h3>
@@ -5033,7 +5283,6 @@
     }catch(err){ /* ignora */ }
     // Quem ainda não conectou vê um aviso pedindo para conectar. Quem já conectou antes só o vê se a
     // reconexão silenciosa não funcionar em alguns segundos.
-    setTimeout(mostrarPopupConectar, jaConectou ? 6000 : 700);
   }
   function mostrarPopupConectar(){
     if(accessToken || document.getElementById('dob-popup-conectar')) return;
@@ -6977,7 +7226,7 @@
   function renderSaudacao(){
     const h = new Date().getHours();
     const saudacao = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
-    const conectado = !!accessToken;
+    const conectado = !!accessToken || !!(nuvem && nuvem.user);
     const nome = escapeHtmlSaud((conectado || nomeConta) && nomeConta ? nomeConta : 'visitante');
     const saud = (conectado || nomeConta) && nomeConta ? saudacao : 'Olá';
     const dataFmtRaw = new Intl.DateTimeFormat('pt-BR', { weekday:'long', day:'numeric', month:'long', year:'numeric' }).format(new Date());

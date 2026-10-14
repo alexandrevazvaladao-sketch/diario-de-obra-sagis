@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function dono() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'alexandrevazvaladao@gmail.com';
+    }
+    function editor() {
+      return dono() || (request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in get(/databases/$(database)/documents/config/editores).data.emails);
+    }
+    // lista de editores: só o dono altera; qualquer pessoa logada pode ler (para saber se é editora)
+    match /config/{doc} {
+      allow read: if request.auth != null;
+      allow write: if dono();
+    }
+    // dados da obra: qualquer pessoa lê; só dono/editores gravam
+    match /mapa/{doc} {
+      allow read: if true;
+      allow write: if editor();
+    }
+  }
+}
