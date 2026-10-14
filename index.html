@@ -947,7 +947,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.26';
+  const APP_VERSION = 'v2026.10.14.27';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2772,8 +2772,9 @@
     if(u && !nuvem.dono){
       try{
         const sp = await nuvem.db.doc('usuarios/' + u.uid).get();
+        nuvem.papelFalhou = 0;
         if(sp.exists){ const dd = sp.data(); nuvem.papel = dd.papel || 'visualizador'; nuvem.usuario = dd.usuario || ''; nuvem.nomeCad = dd.nome || ''; }
-      }catch(e){ /* sem cadastro: visualizador */ }
+      }catch(e){ nuvem.papelFalhou = (nuvem.papelFalhou || 0) + 1; if(nuvem.papelFalhou <= 12){ clearTimeout(nuvem.papelTimer); nuvem.papelTimer = setTimeout(nuvemAtualizarPapel, 2500 * nuvem.papelFalhou); } } // leitura falhou (rede lenta/offline): tenta de novo em vez de ficar como visualizador
       nuvem.editor = (nuvem.papel === 'editor' || nuvem.papel === 'admin' || nuvem.papel === 'dono');
       nuvem.admin = (nuvem.papel === 'admin' || nuvem.papel === 'dono');
       if(nuvem.papel === 'dono') nuvem.dono = true; // dono por usuário e senha (papel marcado pelo próprio dono no banco)
@@ -2788,7 +2789,7 @@
     if(u && (!nuvem.unsubPapel || nuvem.uidPapel !== u.uid)){
       if(nuvem.unsubPapel) nuvem.unsubPapel();
       nuvem.uidPapel = u.uid; let primeira = true;
-      nuvem.unsubPapel = nuvem.db.doc('usuarios/' + u.uid).onSnapshot(sn => { if(primeira){ primeira = false; return; } nuvemAtualizarPapel(); }, () => { /* ignora */ });
+      nuvem.unsubPapel = nuvem.db.doc('usuarios/' + u.uid).onSnapshot(sn => { if(primeira){ primeira = false; if(!(nuvem.papelFalhou > 0) || sn.metadata.fromCache) return; } nuvem.papelFalhou = 0; nuvemAtualizarPapel(); }, () => { /* ignora */ });
     }
     if(!u && nuvem.unsubPapel){ nuvem.unsubPapel(); nuvem.unsubPapel = null; nuvem.uidPapel = null; }
     if(u){
