@@ -881,7 +881,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.15';
+  const APP_VERSION = 'v2026.10.14.16';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2528,6 +2528,7 @@
       if(st) st.textContent = nuvem.ok ? 'Conectado ao banco de dados' : 'Conectando ao banco de dados…';
     }
     t.textContent = txt;
+    mapaSalvoAtualizar();
     if(login){ login.style.display = nuvem.user ? 'none' : ''; login.textContent = 'Entrar'; }
     if(sair) sair.style.display = nuvem.user ? '' : 'none';
     if(ed) ed.style.display = nuvem.dono ? '' : 'none';
@@ -2539,6 +2540,18 @@
           : '';
       }else faixa.style.display = 'none';
     }
+  }
+  // Indicador visível no Mapa: ✅ salvo / ⏳ salvando / ⚠️ erro / 👁 sem permissão, e botão "Salvar agora"
+  function mapaSalvoAtualizar(){
+    const bar = document.getElementById('dob-mapa-salvo'); if(!bar) return;
+    const txt = document.getElementById('dob-mapa-salvo-txt'), btn = document.getElementById('dob-mapa-salvar-agora');
+    let cor, fundo, msg, mostrarBtn = false;
+    if(!nuvem.editor){ cor = '#2c3c5c'; fundo = '#eef1f6'; msg = '👁 Somente visualização — alterações não são salvas'; }
+    else if(nuvem.erro){ cor = '#b3261e'; fundo = '#fdecea'; msg = '⚠️ Erro ao salvar — tentando de novo. Toque em Salvar agora'; mostrarBtn = true; }
+    else if(nuvem.gravando || nuvem.sujo){ cor = '#8a5a00'; fundo = '#fff4d6'; msg = '⏳ Salvando…'; mostrarBtn = true; }
+    else { cor = '#1b6e3c'; fundo = '#e6f4ea'; msg = '✅ Tudo salvo' + (nuvem.salvoEm ? ' às ' + nuvem.salvoEm : ''); }
+    bar.style.background = fundo; bar.style.color = cor; txt.textContent = msg;
+    if(btn){ btn.style.display = mostrarBtn ? '' : 'none'; btn.onclick = () => { nuvemSalvarLocal(); nuvemAgendarGravacao(true); }; }
   }
   function nuvemAgendarGravacao(imediato){
     if(!nuvem.db || !nuvem.editor) return;
@@ -2626,7 +2639,7 @@
         tx.set(ref, { json, rev: novo, atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(), por: nuvem.user.email || '' });
         escrito = { estado, rev: novo };
       });
-      nuvem.revEnviado = escrito.rev; nuvem.rev = escrito.rev; nuvem.existe = true; nuvem.erro = '';
+      nuvem.revEnviado = escrito.rev; nuvem.rev = escrito.rev; nuvem.existe = true; nuvem.erro = ''; nuvem.salvoEm = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       { const dep = contagemMapa(escrito.estado); registrarHistorico('mapa', resumoMudancaMapa(nuvem.contMapa, dep), 5 * 60000); nuvem.contMapa = dep; }
       if(escrito.estado !== mapaState){ mapaState = escrito.estado; nuvemSalvarLocal(); nuvemRerender(); }
       if(nuvem.seq === seqInicio) nuvem.sujo = false;
@@ -4367,6 +4380,7 @@
     container.innerHTML = `
       <div class="dob-card-form">
         <h3>Mapa de Acompanhamento</h3>
+        <div id="dob-mapa-salvo" style="position:sticky; top:0; z-index:61; display:flex; align-items:center; gap:10px; padding:7px 12px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:600;"><span id="dob-mapa-salvo-txt" style="flex:1;"></span><button type="button" class="dob-btn pequeno" id="dob-mapa-salvar-agora">💾 Salvar agora</button></div>
         ${dataForcadaMapa ? `
           <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#fdf2e6; border:1px solid #e8c48f; border-radius:8px; margin-bottom:10px;">
             <span style="font-size:13px;">📍 Marcando para o apontamento de <strong>${fmtDate(dataForcadaMapa)}</strong> — tudo que você marcar aqui fica datado desse dia.</span>
@@ -4449,6 +4463,7 @@
         </div>
       </div>
     `;
+    mapaSalvoAtualizar();
 
     function ordenarServicos(lista){
       return [...lista].sort((a, b) => {
