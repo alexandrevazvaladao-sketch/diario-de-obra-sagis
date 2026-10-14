@@ -852,7 +852,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.5';
+  const APP_VERSION = 'v2026.10.14.6';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -957,6 +957,7 @@
   })();
   function saveEquipState(sincronizar){
     localStorage.setItem('dob:equip_state', JSON.stringify(equipState));
+    if(sincronizar !== false && typeof nuvemEquip !== 'undefined' && nuvemEquip) nuvemEquip.agendar();
     if(sincronizar !== false && accessToken) return syncEquipToDrive();
     return null;
   }
@@ -991,6 +992,7 @@
   })();
   function saveMaoObraState(sincronizar){
     localStorage.setItem('dob:maoobra_state', JSON.stringify(maoObraState));
+    if(sincronizar !== false && typeof nuvemMao !== 'undefined' && nuvemMao) nuvemMao.agendar();
     if(sincronizar !== false && accessToken) return syncMaoObraToDrive();
     return null;
   }
@@ -2584,6 +2586,7 @@
       const temDados = (m.estados.length + m.desenhos.length + Object.keys(m.catalogoCustom).length + m.metodoPassos.length + Object.keys(m.custoEtapa).length) > 0;
       if((!nuvem.existe && temDados) || nuvem.sujo) nuvemAgendarGravacao(true);
     }
+    if(nuvem.editor){ [nuvemEquip, nuvemMao].forEach(x => { if(x) x.iniciarEditor(); }); nuvemEntradasEnviar(); nuvemPastaPublica(); }
     nuvemStatus();
   }
   function nuvemEntrar(){
@@ -2641,6 +2644,161 @@
     document.getElementById('dob-popup-agora-nao').addEventListener('click', () => { try{ sessionStorage.setItem('dob:popup_conectar_dispensado', '1'); }catch(e){ /* ignora */ } ov.remove(); });
     document.getElementById('dob-popup-conectar-btn').addEventListener('click', () => { ov.remove(); if(tokenClient) tokenClient.requestAccessToken({ prompt: '' }); else nuvemEntrar(); });
   }
+  // ---------- Nuvem: documentos pequenos (equipamentos, mão de obra) ----------
+  function criarDocNuvem(cfg){
+    const d = { rev: null, revEnviado: null, existe: false, sujo: false, seq: 0, timer: null, gravando: false, erro: '', primeiro: null, primeiroOk: null };
+    d.agendar = (imediato) => {
+      if(!nuvem.db || !nuvem.editor) return;
+      d.sujo = true; d.seq++; clearTimeout(d.timer);
+      d.timer = setTimeout(d.gravar, imediato ? 50 : 1500);
+    };
+    d.gravar = async () => {
+      if(!nuvem.db || !nuvem.editor || !nuvem.user) return;
+      if(d.gravando){ d.timer = setTimeout(d.gravar, 800); return; }
+      d.gravando = true; const seqInicio = d.seq;
+      try{
+        const ref = nuvem.db.doc(cfg.path);
+        let escrito = null;
+        await nuvem.db.runTransaction(async tx => {
+          const snap = await tx.get(ref);
+          const remRev = snap.exists ? (snap.data().rev || 0) : 0;
+          let estado = cfg.ler();
+          if(snap.exists && d.rev !== remRev){ try{ estado = cfg.mesclar(JSON.parse(snap.data().json), cfg.ler()); }catch(e){ /* grava a local */ } }
+          const json = JSON.stringify(estado);
+          if(json.length > 900000) throw new Error('Dados grandes demais para a nuvem');
+          const novo = remRev + 1;
+          tx.set(ref, { json, rev: novo, atualizadoEm: firebase.firestore.FieldValue.serverTimestamp(), por: nuvem.user.email || '' });
+          escrito = { estado, rev: novo };
+        });
+        d.revEnviado = escrito.rev; d.rev = escrito.rev; d.existe = true; d.erro = '';
+        if(escrito.estado !== cfg.ler()) cfg.aplicar(escrito.estado);
+        if(d.seq === seqInicio) d.sujo = false; else { clearTimeout(d.timer); d.timer = setTimeout(d.gravar, 300); }
+      }catch(e){
+        d.erro = String(e && e.message || e); clearTimeout(d.timer); d.timer = setTimeout(d.gravar, 15000);
+      }finally{ d.gravando = false; }
+    };
+    d.ouvir = () => {
+      d.primeiro = new Promise(res => { d.primeiroOk = res; setTimeout(res, 8000); });
+      nuvem.db.doc(cfg.path).onSnapshot(snap => {
+        if(d.primeiroOk) d.primeiroOk();
+        if(snap.metadata.hasPendingWrites) return;
+        if(!snap.exists){ d.existe = false; if(d.rev === null) d.rev = 0; return; }
+        const x = snap.data(); d.existe = true;
+        if((x.rev || 0) === d.rev || (x.rev || 0) === d.revEnviado) return;
+        let remoto; try{ remoto = JSON.parse(x.json); }catch(e){ return; }
+        if(d.sujo && nuvem.editor){ cfg.aplicar(cfg.mesclar(remoto, cfg.ler())); d.rev = x.rev || 0; d.agendar(); }
+        else { cfg.aplicar(remoto); d.rev = x.rev || 0; }
+      }, err => { d.erro = String(err && err.message || err); });
+    };
+    d.iniciarEditor = async () => {
+      await d.primeiro;
+      if((!d.existe && cfg.temDados(cfg.ler())) || d.sujo) d.agendar(true);
+    };
+    return d;
+  }
+  var nuvemEquip = null, nuvemMao = null;
+  function mesclarPorId(remote, local, listas){
+    const excl = Array.from(new Set([...(remote.excluidos || []), ...(local.excluidos || [])]));
+    const out = Object.assign({}, remote, local, { excluidos: excl });
+    listas.forEach(([campo, chave, donoId]) => {
+      const m = {};
+      (remote[campo] || []).forEach(x => { if(!excl.includes(donoId ? x[donoId] : x.id)) m[chave(x)] = x; });
+      (local[campo] || []).forEach(x => { if(!excl.includes(donoId ? x[donoId] : x.id)) m[chave(x)] = x; });
+      out[campo] = Object.values(m);
+    });
+    return out;
+  }
+  function nuvemIniciarDocs(){
+    nuvemEquip = criarDocNuvem({
+      path: 'estado/equipamentos',
+      ler: () => equipState,
+      aplicar: (s) => { equipState = Object.assign({ equipamentos: [], previsoes: [], presencas: [], excluidos: [] }, s); try{ localStorage.setItem('dob:equip_state', JSON.stringify(equipState)); }catch(e){ /* ignora */ } },
+      mesclar: (r, l) => mesclarPorId(Object.assign({ equipamentos: [], presencas: [] }, r), Object.assign({ equipamentos: [], presencas: [] }, l), [['equipamentos', x => x.id], ['presencas', x => x.equipamentoId + '|' + x.date, 'equipamentoId']]),
+      temDados: (s) => ((s.equipamentos || []).length + (s.presencas || []).length) > 0
+    });
+    nuvemMao = criarDocNuvem({
+      path: 'estado/maodeobra',
+      ler: () => maoObraState,
+      aplicar: (s) => { maoObraState = Object.assign({ pessoas: [], presencas: [], excluidos: [] }, s); try{ localStorage.setItem('dob:maoobra_state', JSON.stringify(maoObraState)); }catch(e){ /* ignora */ } },
+      mesclar: (r, l) => mesclarPorId(Object.assign({ pessoas: [], presencas: [] }, r), Object.assign({ pessoas: [], presencas: [] }, l), [['pessoas', x => x.id], ['presencas', x => x.pessoaId + '|' + x.date, 'pessoaId']]),
+      temDados: (s) => ((s.pessoas || []).length + (s.presencas || []).length) > 0
+    });
+    nuvemEquip.ouvir(); nuvemMao.ouvir();
+  }
+
+  // ---------- Nuvem: apontamentos (um documento por apontamento) ----------
+  var nuvemEnt = { ativo: false, cloud: {}, timer: null, enviando: false, erro: '' };
+  function nuvemEntradaPayload(e){
+    const c = JSON.parse(JSON.stringify(e));
+    c.fotos = (c.fotos || []).map(normalizeFoto).filter(f => f && f.type === 'drive'); // fotos só-locais (base64) não vão pra nuvem
+    return c;
+  }
+  function nuvemEntradasEnviar(){
+    if(!nuvem.db || !nuvem.editor || !nuvemEnt.ativo) return;
+    clearTimeout(nuvemEnt.timer);
+    nuvemEnt.timer = setTimeout(async () => {
+      if(nuvemEnt.enviando){ nuvemEntradasEnviar(); return; }
+      nuvemEnt.enviando = true;
+      try{
+        for(const e of entries.slice()){
+          const atu = e.atualizadoEm || 1;
+          if(nuvemEnt.cloud[e.id] !== undefined && atu <= nuvemEnt.cloud[e.id]) continue;
+          const json = JSON.stringify(nuvemEntradaPayload(e));
+          if(json.length > 900000){ nuvemEnt.erro = 'apontamento grande demais: ' + e.id; continue; }
+          await nuvem.db.doc('entradas/' + e.id).set({ json, atualizadoEm: atu, por: nuvem.user.email || '' });
+          nuvemEnt.cloud[e.id] = atu;
+        }
+        nuvemEnt.erro = '';
+      }catch(err){ nuvemEnt.erro = String(err && err.message || err); setTimeout(nuvemEntradasEnviar, 15000); }
+      finally{ nuvemEnt.enviando = false; }
+    }, 1200);
+  }
+  async function nuvemEntradaExcluir(id){
+    if(!nuvem.db || !nuvem.editor) return;
+    try{ const atu = Date.now(); await nuvem.db.doc('entradas/' + id).set({ excluido: true, atualizadoEm: atu, por: nuvem.user.email || '' }); nuvemEnt.cloud[id] = atu; }catch(e){ /* fica só local */ }
+  }
+  function nuvemEntradasOuvir(){
+    nuvem.db.collection('entradas').onSnapshot(snap => {
+      let mudou = false;
+      snap.docChanges().forEach(ch => {
+        if(ch.type === 'removed') return;
+        const d = ch.doc.data(), id = ch.doc.id;
+        nuvemEnt.cloud[id] = d.atualizadoEm || 0;
+        const local = entries.find(x => x.id === id);
+        if(d.excluido){
+          if(local){ entries = entries.filter(x => x.id !== id); db.remove('dob:entry:' + id); mudou = true; }
+          return;
+        }
+        let remoto; try{ remoto = JSON.parse(d.json); }catch(e){ return; }
+        if(!local || (d.atualizadoEm || 0) > (local.atualizadoEm || 0)){
+          if(local){ const soLocais = (local.fotos || []).map(normalizeFoto).filter(f => f && f.type !== 'drive'); remoto.fotos = (remoto.fotos || []).concat(soLocais); }
+          remoto.atualizadoEm = d.atualizadoEm || 0;
+          entries = entries.filter(x => x.id !== id); entries.push(remoto);
+          try{ db.set('dob:entry:' + id, JSON.stringify(remoto)); }catch(e){ /* armazenamento local cheio: segue só em memória */ }
+          mudou = true;
+        }
+      });
+      nuvemEnt.ativo = true;
+      if(mudou){
+        entries.sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt));
+        if(!formularioSujo){ try{ render(); }catch(e){ /* ignora */ } }
+      }
+      if(nuvem.editor) nuvemEntradasEnviar();
+    }, err => { nuvemEnt.erro = String(err && err.message || err); });
+  }
+  // Deixa a pasta do Drive com "qualquer pessoa com o link pode ver" — assim as fotos em tamanho original abrem para os visitantes.
+  async function nuvemPastaPublica(){
+    if(!accessToken || !nuvem.editor) return;
+    try{
+      const id = await ensureFolder();
+      const k = 'dob:pasta_publica:' + id;
+      if(localStorage.getItem(k) === '1') return;
+      const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}/permissions`, { method: 'POST', headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' }, body: JSON.stringify({ role: 'reader', type: 'anyone', allowFileDiscovery: false }) });
+      if(r.ok) localStorage.setItem(k, '1');
+    }catch(e){ /* tenta de novo na próxima conexão */ }
+  }
+  function urlFotoPublica(fileId, largura){ return 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(fileId) + '&sz=w' + (largura || 2000); }
+
   window.__dob = { nuvem, get mapa(){ return mapaState; }, set mapa(v){ mapaState = v; }, salvar: (x) => saveMapaState(x) }; // gancho de diagnóstico/testes
   function nuvemIniciar(tentativa){
     if(!window.firebase || !firebase.firestore || !firebase.auth){
@@ -2652,7 +2810,7 @@
       firebase.initializeApp(FIREBASE_CONFIG);
       nuvem.auth = firebase.auth(); nuvem.db = firebase.firestore();
       try{ nuvem.db.enablePersistence({ synchronizeTabs: true }).catch(() => { /* sem cache offline */ }); }catch(e){ /* ignora */ }
-      nuvemOuvir();
+      nuvemOuvir(); nuvemIniciarDocs(); nuvemEntradasOuvir();
       nuvem.auth.onAuthStateChanged(async u => {
         nuvem.user = u; nuvem.authPronto = true;
         await nuvemAtualizarPapel();
@@ -4847,6 +5005,7 @@
     // do Drive, o que podia descartar edições feitas localmente enquanto offline.
     entry.atualizadoEm = Date.now();
     db.set('dob:entry:' + entry.id, JSON.stringify(entry)); // lança erro se o armazenamento local estiver cheio
+    if(typeof nuvemEntradasEnviar === 'function') nuvemEntradasEnviar();
     // Devolve a Promise da sincronização (ou null se não tem Drive conectado) pra quem
     // precisar ter certeza de que terminou de verdade antes de avisar o usuário — quem não
     // precisar disso continua podendo só chamar saveEntry(entry) sem se preocupar com isso.
@@ -4855,6 +5014,7 @@
   }
   function deleteEntryLocal(id){
     db.remove('dob:entry:' + id);
+    if(typeof nuvemEntradaExcluir === 'function') nuvemEntradaExcluir(id);
     if(accessToken) syncEntriesToDrive();
   }
 
@@ -4960,6 +5120,7 @@
   // simultâneas compartilham a mesma Promise em vez de pular uma à outra.
   let syncEntriesPromise = null;
   function syncEntriesToDrive(){
+    if(typeof nuvemEntradasEnviar === 'function') nuvemEntradasEnviar();
     if(syncEntriesPromise) return syncEntriesPromise;
     syncEntriesPromise = (async () => {
       try{
@@ -5000,6 +5161,8 @@
       merged.forEach(e => db.set('dob:entry:' + e.id, JSON.stringify(e)));
       await driveWriteDataFile(id, JSON.stringify(merged));
       render();
+      if(typeof nuvemEntradasEnviar === 'function') nuvemEntradasEnviar();
+      if(typeof nuvemPastaPublica === 'function') nuvemPastaPublica();
     }catch(e){ /* segue só com os dados locais se a sincronização falhar */ }
   }
 
@@ -6285,6 +6448,15 @@
         }catch(e){
           const infoEl = document.getElementById('dob-lb-info');
           if(infoEl) infoEl.textContent = 'Não foi possível carregar a versão em alta resolução agora. Use "Abrir no Drive".';
+        }
+      }
+      if(foto.type === 'drive' && !accessToken){
+        const imgEl = document.getElementById('dob-lb-img'), infoEl = document.getElementById('dob-lb-info');
+        if(imgEl){
+          const antes = imgEl.src;
+          imgEl.onerror = () => { imgEl.onerror = null; imgEl.src = antes; if(infoEl) infoEl.textContent = 'Só a prévia está disponível agora.'; };
+          imgEl.onload = () => { if(infoEl && imgEl.src !== antes) infoEl.textContent = 'Imagem em alta resolução.'; };
+          imgEl.src = urlFotoPublica(foto.fileId, 2000);
         }
       }
       prefetchVizinhas();

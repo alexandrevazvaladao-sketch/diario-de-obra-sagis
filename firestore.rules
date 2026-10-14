@@ -21,5 +21,13 @@ service cloud.firestore {
       allow read: if true;
       allow write: if editor();
     }
+    match /estado/{doc} {
+      allow read: if true;
+      allow write: if editor();
+    }
+    match /entradas/{doc} {
+      allow read: if true;
+      allow write: if editor();
+    }
   }
 }
