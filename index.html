@@ -846,6 +846,7 @@
     <div class="dob-side-item" data-side="resumo-macro"><span class="ic">📊</span><span class="label">Resumo macro</span></div>
     <div class="dob-side-item" data-side="resumo-semana"><span class="ic">📅</span><span class="label">Resumo semana</span></div>
     <div class="dob-side-item" data-side="catalogo"><span class="ic">📐</span><span class="label">Catálogo de custos</span></div>
+    <div class="dob-side-item" data-side="painel"><span class="ic">📈</span><span class="label">Meu painel</span></div>
     <div class="dob-side-item" data-side="custo-etapa"><span class="ic">💰</span><span class="label">Custo por etapa</span></div>
     <div class="dob-side-item" data-side="relatorio"><span class="ic">📑</span><span class="label">Apresentação</span></div>
     <div class="dob-side-item" data-side="gamma"><span class="ic">🤖</span><span class="label">Comando Gamma</span></div>
@@ -899,6 +900,7 @@
     <button class="dob-btn secundario" id="dob-btn-gamma" style="display:none;">Comando para o Gamma</button>
     <button class="dob-btn secundario" id="dob-btn-resumo-macro" style="display:none;">Resumo por macro-serviço</button>
     <button class="dob-btn secundario" id="dob-btn-resumo-semana" style="display:none;">Resumo da semana</button>
+    <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-painel">Meu painel</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-custo-etapa">Custo por etapa</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-uaubee">UAU → BEE</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-catalogo">Catálogo de custos</button>
@@ -926,6 +928,7 @@
   <div id="dob-cronograma-container"></div>
   <div id="dob-resumo-macro-container"></div>
   <div id="dob-resumo-semana-container"></div>
+  <div id="dob-painel-container"></div>
   <div id="dob-custo-etapa-container"></div>
   <div id="dob-uaubee-container"></div>
   <div id="dob-catalogo-container"></div>
@@ -944,7 +947,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.22';
+  const APP_VERSION = 'v2026.10.14.23';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2578,6 +2581,7 @@
     try{ if(catalogoAberto) renderCatalogo(); }catch(e){ /* ignora */ }
     try{ if(metodoAberto) renderMetodo(); }catch(e){ /* ignora */ }
     try{ if(custoEtapaAberto) renderCustoEtapa(); }catch(e){ /* ignora */ }
+    try{ if(painelAberto) renderPainel(); }catch(e){ /* ignora */ }
     try{ if(cronogramaAberto) renderCronograma(); }catch(e){ /* ignora */ }
   }
   function nuvemStatus(){
@@ -2631,10 +2635,10 @@
     nuvemStatus();
   }
   // ---------- Visibilidade das seções (o dono decide quem vê cada parte do app) ----------
-  var VIS_PADRAO = { 'custo-etapa': 'dono', 'uaubee': 'dono', 'gamma': 'dono' }; // em desenvolvimento: só o dono, até liberar
+  var VIS_PADRAO = { 'painel': 'dono', 'custo-etapa': 'dono', 'uaubee': 'dono', 'gamma': 'dono' }; // em desenvolvimento: só o dono, até liberar
   var VIS_SECOES = [['novo', 'Novo apontamento', 'dob-novo'], ['metodo', 'Método construtivo', 'dob-btn-metodo'], ['mapa', 'Mapa', 'dob-btn-mapa'], ['cronograma', 'Cronograma', 'dob-btn-cronograma'],
     ['campo', 'Modo Campo', 'dob-btn-campo'], ['resumo-macro', 'Resumo macro', 'dob-btn-resumo-macro'], ['resumo-semana', 'Resumo semana', 'dob-btn-resumo-semana'], ['catalogo', 'Catálogo de custos', 'dob-btn-catalogo'],
-    ['custo-etapa', 'Custo por etapa', 'dob-btn-custo-etapa'], ['relatorio', 'Apresentação', 'dob-btn-relatorio'], ['gamma', 'Comando Gamma', 'dob-btn-gamma'], ['uaubee', 'UAU → BEE', 'dob-btn-uaubee']];
+    ['painel', 'Meu painel', 'dob-btn-painel'], ['custo-etapa', 'Custo por etapa', 'dob-btn-custo-etapa'], ['relatorio', 'Apresentação', 'dob-btn-relatorio'], ['gamma', 'Comando Gamma', 'dob-btn-gamma'], ['uaubee', 'UAU → BEE', 'dob-btn-uaubee']];
   function nivelSecao(k){ return (nuvem.vis && nuvem.vis[k]) || VIS_PADRAO[k] || 'todos'; }
   function secaoVisivel(k){ const n = nivelSecao(k); if(nuvem.dono) return true; if(n === 'todos') return true; if(n === 'editores') return !!nuvem.editor; return false; }
   function aplicarVisibilidade(){
@@ -3528,6 +3532,70 @@
     document.getElementById('dob-btn-custo-etapa').textContent = custoEtapaAberto ? 'Fechar Custo por etapa' : 'Custo por etapa';
     renderCustoEtapa();
     if(custoEtapaAberto) document.getElementById('dob-custo-etapa-container').scrollIntoView({behavior:'smooth', block:'start'});
+  });
+
+
+  // ===== Meu painel (só o dono): acompanhamento pessoal — PPC por semana, atrasos, causas e avanço do Mapa =====
+  let painelAberto = false;
+  function renderPainel(){
+    const c = document.getElementById('dob-painel-container');
+    if(!painelAberto){ c.innerHTML = ''; return; }
+    if(!cronogramaDados){
+      c.innerHTML = '<div class="dob-card-form"><p class="dob-dica">Carregando…</p></div>';
+      cronogramaGarantirDados().then(() => { if(painelAberto) renderPainel(); });
+      return;
+    }
+    const feitos = cronogramaSemanalLer(), hoje = todayStr();
+    const fimSem = (sIso) => { const [y,m,d] = sIso.split('-').map(Number); const dt = new Date(y, m-1, d + 6); return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0'); };
+    const causaTxt = (v) => (CRONOGRAMA_CAUSAS.find(x => x.v === v) || { t: v }).t;
+    const cor = (pct) => pct >= 80 ? '#2f7d4f' : pct >= 60 ? '#c98a1b' : '#b4472e';
+    const bloco = (titulo, corpo) => `<div class="dob-card-form" style="margin-bottom:14px;"><h3 style="margin-top:0;">${titulo}</h3>${corpo}</div>`;
+    let html = '<div class="dob-card-form" style="margin-bottom:14px;"><h3 style="margin:0;">Meu painel</h3><p class="dob-dica" style="margin:6px 0 0;">Só você vê esta tela. Tudo vem dos dados que já estão no app (Cronograma e Mapa).</p></div>';
+    ['Buritis', 'Pequis'].forEach(obra => {
+      const dados = cronogramaDados[obra]; if(!dados) return;
+      const folhas = dados.itens.filter(i => i.nivel === 3 && i.semanal);
+      const fechadas = (dados.semanas || []).filter(sw => fimSem(sw) < hoje);
+      const porSemana = fechadas.map(sw => {
+        let tot = 0, ok = 0;
+        folhas.forEach(it => { if((it.semanal[sw] || 0) > 0){ tot++; const r = feitos[obra + '|' + it.cod + '|' + sw]; if(r && r.feito) ok++; } });
+        return { sw, tot, ok, pct: tot ? Math.round(ok / tot * 100) : null };
+      }).filter(x => x.tot > 0);
+      const ult = porSemana.slice(-10);
+      const totAll = porSemana.reduce((a, x) => a + x.tot, 0), okAll = porSemana.reduce((a, x) => a + x.ok, 0);
+      const ppcAll = totAll ? Math.round(okAll / totAll * 100) : 0;
+      const barras = ult.length ? ult.map(x => `<div style="display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12.5px;"><span style="width:62px;color:var(--muted);">${fmtDate(x.sw).slice(0,5)}</span><div style="flex:1;background:#eceae1;border-radius:99px;height:12px;overflow:hidden;"><div style="width:${x.pct}%;height:100%;background:${cor(x.pct)};"></div></div><b style="width:78px;text-align:right;">${x.pct}% <span style="font-weight:400;color:var(--muted);">(${x.ok}/${x.tot})</span></b></div>`).join('') : '<p class="dob-dica">Ainda não há semanas fechadas com compromissos.</p>';
+      // atrasados e causas
+      const atras = [], causas = {};
+      folhas.forEach(it => {
+        let n = 0, ultCausa = '';
+        fechadas.forEach(sw => { if((it.semanal[sw] || 0) > 0){ const r = feitos[obra + '|' + it.cod + '|' + sw]; if(!(r && r.feito)){ n++; if(r && r.causa){ ultCausa = r.causa; causas[r.causa] = (causas[r.causa] || 0) + 1; } } } });
+        if(n) atras.push({ it, n, causa: ultCausa });
+      });
+      atras.sort((a, b) => b.n - a.n);
+      const listaAtr = atras.length ? atras.slice(0, 15).map(a => `<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line);font-size:13px;"><span style="color:var(--clay);font-weight:700;min-width:62px;">${a.it.cod}</span><span style="flex:1;">${a.it.desc}${a.causa ? ` <span style="color:var(--muted);">· ${causaTxt(a.causa)}</span>` : ''}</span><b>${a.n} sem.</b></div>`).join('') + (atras.length > 15 ? `<p class="dob-dica">+ ${atras.length - 15} itens</p>` : '') : '<p class="dob-dica">Nada em atraso nas semanas fechadas. 🎉</p>';
+      const listaCausas = Object.keys(causas).length ? Object.entries(causas).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<span class="pill" style="margin-right:6px;">${causaTxt(k)}: ${v}</span>`).join('') : '<p class="dob-dica">Nenhuma causa registrada ainda.</p>';
+      // Mapa: blocos concluídos por serviço
+      const linhasMapa = (mapaState.servicos || []).map(sv => {
+        const nb = Number(mapaState.blocosPorObra && mapaState.blocosPorObra[obra]) || 0, todos = Array.from({ length: nb }, (_, i) => i + 1);
+        const esc = mapaState.escopoPorServico && mapaState.escopoPorServico[sv] && mapaState.escopoPorServico[sv][obra];
+        const ids = (esc && esc.length ? esc : todos).map(b => (b && typeof b === 'object') ? (b.id != null ? b.id : b.nome) : b);
+        if(!ids.length) return null;
+        const est = (mapaState.estados || []).filter(e => e.servico === sv && e.obra === obra && ids.map(String).includes(String(e.bloco)));
+        const v = est.filter(e => e.cor === 'verde').length, a = est.filter(e => e.cor === 'amarelo').length;
+        return { sv, v, a, tot: ids.length, pct: Math.round(v / ids.length * 100) };
+      }).filter(x => x && (x.v || x.a)).sort((x, y) => y.pct - x.pct);
+      const listaMapa = linhasMapa.length ? linhasMapa.map(x => `<div style="display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12.5px;"><span style="flex:1.4;min-width:0;">${x.sv}</span><div style="flex:1;background:#eceae1;border-radius:99px;height:12px;overflow:hidden;display:flex;"><div style="width:${x.pct}%;background:#2f7d4f;"></div><div style="width:${Math.round(x.a / x.tot * 100)}%;background:#c9a24a;"></div></div><b style="width:92px;text-align:right;">${x.v}/${x.tot} <span style="font-weight:400;color:var(--muted);">+${x.a} exec.</span></b></div>`).join('') : '<p class="dob-dica">Sem marcações no Mapa para esta obra.</p>';
+      html += bloco('Solar dos ' + obra + ' — PPC das últimas semanas <span style="font-size:13px;color:var(--muted);font-weight:400;">(acumulado: ' + ppcAll + '%)</span>', barras)
+        + bloco('Solar dos ' + obra + ' — itens em atraso', listaAtr + '<div style="margin-top:10px;">' + listaCausas + '</div>')
+        + bloco('Solar dos ' + obra + ' — avanço do Mapa (blocos concluídos)', listaMapa);
+    });
+    c.innerHTML = html;
+  }
+  document.getElementById('dob-btn-painel').addEventListener('click', () => {
+    painelAberto = !painelAberto;
+    document.getElementById('dob-btn-painel').textContent = painelAberto ? 'Fechar Meu painel' : 'Meu painel';
+    renderPainel();
+    if(painelAberto) document.getElementById('dob-painel-container').scrollIntoView({behavior:'smooth', block:'start'});
   });
 
   // ===== Método construtivo (passo a passo na ordem de execução) =====
@@ -8006,6 +8074,7 @@
       campo: 'dob-btn-campo',
       'resumo-macro': 'dob-btn-resumo-macro',
       'resumo-semana': 'dob-btn-resumo-semana',
+      painel: 'dob-btn-painel',
       'custo-etapa': 'dob-btn-custo-etapa',
       relatorio: 'dob-btn-relatorio',
       gamma: 'dob-btn-gamma',
@@ -8016,7 +8085,7 @@
       config: 'dob-btn-config',
       novo: 'dob-novo'
     };
-    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-cronograma', 'dob-btn-campo', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-custo-etapa', 'dob-btn-relatorio', 'dob-btn-gamma', 'dob-btn-uaubee', 'dob-btn-catalogo', 'dob-btn-metodo'];
+    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-cronograma', 'dob-btn-campo', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-painel', 'dob-btn-custo-etapa', 'dob-btn-relatorio', 'dob-btn-gamma', 'dob-btn-uaubee', 'dob-btn-catalogo', 'dob-btn-metodo'];
     function sincronizarSidebar(){
       let algumAberto = false;
       Object.entries(mapaBotoes).forEach(([side, btnId]) => {
