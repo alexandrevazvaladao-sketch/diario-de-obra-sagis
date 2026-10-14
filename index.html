@@ -852,7 +852,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.6';
+  const APP_VERSION = 'v2026.10.14.7';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2575,7 +2575,7 @@
     }
     if(u){
       const nome = ((u.displayName || u.email || '').trim().split(/\s+/)[0]) || '';
-      if(nome){ nomeConta = nome; try{ localStorage.setItem('dob:nome_conta', nome); localStorage.setItem('dob:drive_conectado_antes', localStorage.getItem('dob:drive_conectado_antes') || '0'); }catch(e){ /* ignora */ } }
+      if(nome){ nomeConta = nome; try{ localStorage.setItem('dob:nome_conta', nome); if(u.email) localStorage.setItem('dob:email_conta', u.email); localStorage.setItem('dob:drive_conectado_antes', localStorage.getItem('dob:drive_conectado_antes') || '0'); }catch(e){ /* ignora */ } }
     }
     if(typeof renderSaudacao === 'function') renderSaudacao();
     if(nuvem.editor){
@@ -2625,9 +2625,9 @@
       }catch(e){ msg.style.color = '#b3261e'; msg.textContent = 'Não foi possível salvar: ' + (e.message || e); }
     });
   }
-  function mostrarPopupEntrar(){
+  function mostrarPopupEntrar(forcar){
     if(nuvem.user || document.getElementById('dob-popup-conectar')) return;
-    try{ if(localStorage.getItem('dob:drive_conectado_antes') === '1') return; }catch(e){ /* ignora */ } // já conectou antes: o Google mostra a tela de escolher conta sozinho
+    try{ if(!forcar && localStorage.getItem('dob:drive_conectado_antes') === '1') return; }catch(e){ /* ignora */ } // já conectou antes: o Google mostra a tela de escolher conta sozinho
     try{ if(sessionStorage.getItem('dob:popup_conectar_dispensado') === '1') return; }catch(e){ /* ignora */ }
     const ov = document.createElement('div');
     ov.id = 'dob-popup-conectar';
@@ -5390,6 +5390,15 @@
 
   // ---------- Autenticação Google (GIS) ----------
   let renovacaoSilenciosaTimer = null;
+  // Reconexão sem nenhuma janela: prompt 'none' nunca abre popup/página do Google; se não der, falha em silêncio.
+  function pedirTokenSilencioso(abertura){
+    if(!tokenClient) return;
+    silencioso = true; silenciosoAbertura = !!abertura;
+    let hint = '';
+    try{ hint = (nuvem.user && nuvem.user.email) || localStorage.getItem('dob:email_conta') || ''; }catch(e){ /* ignora */ }
+    try{ tokenClient.requestAccessToken(hint ? { prompt: 'none', hint } : { prompt: 'none' }); }catch(e){ silencioso = false; }
+  }
+  var silencioso = false, silenciosoAbertura = false;
   function agendarRenovacaoSilenciosa(){
     // O token do Google dura ~1h. Em vez de deixar expirar e esperar o usuário
     // notar/clicar em "Reconectar", pede um token novo sozinho, em silêncio,
@@ -5397,7 +5406,7 @@
     // o navegador continuar logado na conta do Google.
     if(renovacaoSilenciosaTimer) clearTimeout(renovacaoSilenciosaTimer);
     renovacaoSilenciosaTimer = setTimeout(() => {
-      if(tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+      pedirTokenSilencioso();
     }, 50 * 60 * 1000); // 50 min
   }
   function initGis(){
@@ -5408,7 +5417,15 @@
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: 'https://www.googleapis.com/auth/drive.file openid email profile',
+      error_callback: () => { silencioso = false; },
       callback: (resp) => {
+        if(resp && resp.error){
+          // reconexão silenciosa não deu certo: nada de página externa; o login fica por conta do popup do app / botão
+          const eraAbertura = silenciosoAbertura; silencioso = false; silenciosoAbertura = false;
+          if(eraAbertura) setTimeout(() => { if(!accessToken && !(nuvem && nuvem.user)) mostrarPopupEntrar(true); }, 800);
+          return;
+        }
+        silencioso = false;
         if(resp && resp.access_token){
           accessToken = resp.access_token;
           // Um único login: o mesmo token do Google também entra na nuvem (dados compartilhados).
@@ -5444,7 +5461,7 @@
     try{
       if(localStorage.getItem('dob:drive_conectado_antes') === '1'){
         jaConectou = true;
-        tokenClient.requestAccessToken({ prompt: '' });
+        pedirTokenSilencioso(true);
       }
     }catch(err){ /* ignora */ }
     // Quem ainda não conectou vê um aviso pedindo para conectar. Quem já conectou antes só o vê se a
