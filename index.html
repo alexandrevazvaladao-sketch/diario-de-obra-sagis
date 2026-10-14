@@ -881,7 +881,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.14';
+  const APP_VERSION = 'v2026.10.14.15';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2321,7 +2321,8 @@
 };
   const MACRO_PADRAO_SERVICOS = {
     'FUNDAÇÃO PROFUNDA': '02.02', 'PREPARAÇÃO RADIER ( BLOCOS 1 A 7 PEQUIS)': '02.02', 'ARRASAMENTO DE ESTACAS/ BLOCOS DE COROAMENTO': '02.02',
-    'PREPARAÇÃO/CONCRETAGEM LAJÃO': '02.03', 'ALVENARIA DE 1º FIADA': '02.04', 'IMPERMEABILIZAÇÃO DA 1º FIADA': '02.11',
+    // Estrutura (lajão), alvenaria da 1ª fiada e impermeabilização foram contratadas junto com a Fundação (02.02)
+    'PREPARAÇÃO/CONCRETAGEM LAJÃO': '02.02', 'ALVENARIA DE 1º FIADA': '02.02', 'IMPERMEABILIZAÇÃO DA 1º FIADA': '02.02',
     'INTALAÇÕES HIDRAULICAS/ESGOTO INTERNO BLOCOS LAJÃO': '02.15', 'INFRA INTERNA E EXTERNA': '04.07',
     'FUNDAÇÃO - AREA COMUM': '06', 'ALVENARIA - AREA COMUM': '06', 'LAJE SUPERIOR - ÁREA COMUM': '06', 'TALISCAMENTO/REBOCO': '06'
   };
