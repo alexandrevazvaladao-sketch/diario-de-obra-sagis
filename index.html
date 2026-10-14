@@ -881,7 +881,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.17';
+  const APP_VERSION = 'v2026.10.14.18';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -1914,6 +1914,16 @@
     }catch(e){
       cronogramaDados = null;
     }
+    // carga única do "já feito" marcado em verde na planilha (não sobrescreve o que já foi marcado/desmarcado no app)
+    try{
+      if(localStorage.getItem('dob:crono_seed_v1') !== '1'){
+        const seed = await (await fetch('cronograma-feitos.json')).json();
+        const atuais = cronogramaSemanalLer();
+        Object.keys(seed).forEach(k => { if(!(k in atuais)) atuais[k] = seed[k]; });
+        cronogramaSemanalSalvar(atuais);
+        localStorage.setItem('dob:crono_seed_v1', '1');
+      }
+    }catch(e){ /* tenta de novo na próxima abertura */ }
     cronogramaCarregando = false;
   }
 
