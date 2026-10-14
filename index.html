@@ -778,7 +778,7 @@
   <div class="dob-status-bar" id="dob-status-bar" style="display:none;">
     <span><span class="dob-dot off" id="dob-dot"></span><span id="dob-status-texto">Drive não conectado</span></span>
     <span class="dob-nuvem-texto" id="dob-nuvem-texto" style="margin-left:14px;font-size:13px;"></span>
-    <button class="dob-btn pequeno" id="dob-btn-nuvem-login" style="margin-left:14px;">Entrar com Google</button>
+    <button class="dob-btn pequeno" id="dob-btn-nuvem-login" style="margin-left:14px;">Entrar / Cadastrar</button>
     <button class="dob-btn secundario pequeno" id="dob-btn-conectar" style="display:none;">Conectar ao Google Drive</button>
     <details class="dob-status-mais" id="dob-status-mais">
       <summary>⋯ Mais opções</summary>
@@ -849,7 +849,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.9';
+  const APP_VERSION = 'v2026.10.14.10';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -887,7 +887,7 @@
     const el = document.getElementById('dob-stats');
     if(!el) return;
     const totalFotos = entries.reduce((n,e) => n + ((e.fotos||[]).length), 0);
-    const fotosDrive = entries.reduce((n,e) => n + ((e.fotos||[]).filter(f => (typeof f==='object'?f.type:'local')==='drive').length), 0);
+    const fotosDrive = entries.reduce((n,e) => n + ((e.fotos||[]).filter(f => ['drive','nuvem'].includes(typeof f==='object'?f.type:'local')).length), 0);
     const seteDiasAtras = new Date(); seteDiasAtras.setDate(seteDiasAtras.getDate()-7);
     const registrosSemana = entries.filter(e => new Date(e.date+'T00:00:00') >= seteDiasAtras).length;
     const obras = new Set(entries.map(e => e.obra)).size;
@@ -895,7 +895,7 @@
       { num: entries.length, label: 'Apontamentos totais' },
       { num: registrosSemana, label: 'Últimos 7 dias' },
       { num: totalFotos, label: 'Fotos' },
-      { num: fotosDrive, label: 'No Drive' },
+      { num: fotosDrive, label: 'Na nuvem' },
     ];
     el.innerHTML = stats.map(s => `
       <div class="dob-stat-card">
@@ -2484,23 +2484,24 @@
     if(nuvem.erro) txt += 'erro ao salvar na nuvem — tentando de novo';
     else if(!nuvem.ok) txt += 'conectando…';
     else if(!nuvem.user) txt += 'só visualização';
-    else if(!nuvem.editor) txt += 'só visualização (' + (nuvem.user.email || '') + ')';
+    else if(!nuvem.editor) txt += 'só visualização (' + (nuvem.rotulo || '') + ')';
     else if(nuvem.gravando || nuvem.sujo) txt += 'salvando…';
-    else txt += 'sincronizado (' + (nuvem.dono ? 'dono' : 'editor') + ')';
-    t.textContent = txt;
-    if(login){
-      // um só botão: entra na conta (nuvem + Drive). Some quando já está tudo conectado.
-      login.style.display = (nuvem.user && accessToken) ? 'none' : '';
-      login.textContent = nuvem.user ? 'Reconectar Google Drive' : 'Entrar com Google';
+    else txt += 'sincronizado (' + (nuvem.rotulo || '') + ' · ' + (nuvem.dono ? 'dono' : nuvem.papel === 'admin' ? 'administrador' : 'editor') + ')';
+    if(!accessToken){
+      const dot = document.getElementById('dob-dot'), st = document.getElementById('dob-status-texto');
+      if(dot) dot.className = 'dob-dot ' + (nuvem.ok ? 'on' : 'off');
+      if(st) st.textContent = nuvem.ok ? 'Conectado ao banco de dados' : 'Conectando ao banco de dados…';
     }
+    t.textContent = txt;
+    if(login){ login.style.display = nuvem.user ? 'none' : ''; login.textContent = 'Entrar / Cadastrar'; }
     if(sair) sair.style.display = nuvem.user ? '' : 'none';
     if(ed) ed.style.display = nuvem.dono ? '' : 'none';
     if(faixa){
       if(nuvem.authPronto && !nuvem.editor){
         faixa.style.display = 'block';
         faixa.innerHTML = nuvem.user
-          ? '👁 <b>Modo visualização.</b> Sua conta (' + escapeHtmlSaud(nuvem.user.email || '') + ') ainda não tem permissão para editar — peça ao dono para autorizar. O que você alterar aqui <b>não é salvo</b> na nuvem.'
-          : '👁 <b>Modo visualização.</b> Você vê todos os dados. Para editar, clique em "Entrar com Google" — só e-mails autorizados pelo dono conseguem salvar.';
+          ? '👁 <b>Modo visualização.</b> Sua conta (' + escapeHtmlSaud(nuvem.rotulo || '') + ') só pode visualizar — peça ao dono para liberar a edição. O que você alterar aqui <b>não é salvo</b> na nuvem.'
+          : '👁 <b>Modo visualização.</b> Você vê todos os dados. Clique em "Entrar / Cadastrar" para criar sua conta ou entrar; só quem o dono liberar como editor consegue salvar.';
       }else faixa.style.display = 'none';
     }
   }
@@ -2566,16 +2567,33 @@
   async function nuvemAtualizarPapel(){
     const u = nuvem.user;
     nuvem.dono = !!(u && u.emailVerified && (u.email || '').toLowerCase() === NUVEM_DONO);
-    nuvem.editor = nuvem.dono;
+    nuvem.papel = nuvem.dono ? 'dono' : 'visualizador';
+    nuvem.editor = nuvem.dono; nuvem.admin = nuvem.dono;
+    nuvem.usuario = ''; nuvem.nomeCad = '';
+    nuvem.rotulo = u ? (((u.email || '').endsWith(NUVEM_DOMINIO)) ? (u.email || '').split('@')[0] : (u.email || '')) : '';
     if(u && !nuvem.dono){
       try{
-        const s = await nuvem.db.doc('config/editores').get();
-        const emails = (s.exists && s.data().emails) || [];
-        nuvem.editor = !!u.emailVerified && emails.map(x => String(x).toLowerCase()).includes((u.email || '').toLowerCase());
-      }catch(e){ nuvem.editor = false; }
+        const sp = await nuvem.db.doc('usuarios/' + u.uid).get();
+        if(sp.exists){ const dd = sp.data(); nuvem.papel = dd.papel || 'visualizador'; nuvem.usuario = dd.usuario || ''; nuvem.nomeCad = dd.nome || ''; }
+      }catch(e){ /* sem cadastro: visualizador */ }
+      nuvem.editor = (nuvem.papel === 'editor' || nuvem.papel === 'admin');
+      nuvem.admin = nuvem.papel === 'admin';
+      if(!nuvem.editor && u.emailVerified){ // lista antiga de e-mails Google
+        try{
+          const s = await nuvem.db.doc('config/editores').get();
+          const emails = (s.exists && s.data().emails) || [];
+          if(emails.map(x => String(x).toLowerCase()).includes((u.email || '').toLowerCase())){ nuvem.editor = true; nuvem.papel = 'editor'; }
+        }catch(e){ /* ignora */ }
+      }
     }
+    if(u && (!nuvem.unsubPapel || nuvem.uidPapel !== u.uid)){
+      if(nuvem.unsubPapel) nuvem.unsubPapel();
+      nuvem.uidPapel = u.uid; let primeira = true;
+      nuvem.unsubPapel = nuvem.db.doc('usuarios/' + u.uid).onSnapshot(sn => { if(primeira){ primeira = false; return; } nuvemAtualizarPapel(); }, () => { /* ignora */ });
+    }
+    if(!u && nuvem.unsubPapel){ nuvem.unsubPapel(); nuvem.unsubPapel = null; nuvem.uidPapel = null; }
     if(u){
-      const nome = ((u.displayName || u.email || '').trim().split(/\s+/)[0]) || '';
+      const nome = ((nuvem.nomeCad || u.displayName || nuvem.rotulo || '').trim().split(/\s+/)[0]) || '';
       if(nome){ nomeConta = nome; try{ localStorage.setItem('dob:nome_conta', nome); if(u.email) localStorage.setItem('dob:email_conta', u.email); localStorage.setItem('dob:drive_conectado_antes', localStorage.getItem('dob:drive_conectado_antes') || '0'); }catch(e){ /* ignora */ } }
     }
     if(typeof renderSaudacao === 'function') renderSaudacao();
@@ -2587,7 +2605,7 @@
       const temDados = (m.estados.length + m.desenhos.length + Object.keys(m.catalogoCustom).length + m.metodoPassos.length + Object.keys(m.custoEtapa).length) > 0;
       if((!nuvem.existe && temDados) || nuvem.sujo) nuvemAgendarGravacao(true);
     }
-    if(nuvem.editor){ [nuvemEquip, nuvemMao].forEach(x => { if(x) x.iniciarEditor(); }); nuvemEntradasEnviar(); nuvemPastaPublica(); }
+    if(nuvem.editor){ [nuvemEquip, nuvemMao].forEach(x => { if(x) x.iniciarEditor(); }); nuvemEntradasEnviar(); }
     nuvemStatus();
   }
   function nuvemEntrar(){
@@ -2626,24 +2644,139 @@
       }catch(e){ msg.style.color = '#b3261e'; msg.textContent = 'Não foi possível salvar: ' + (e.message || e); }
     });
   }
-  function mostrarPopupEntrar(forcar){
-    if(nuvem.user || document.getElementById('dob-popup-conectar')) return;
-    try{ if(!forcar && localStorage.getItem('dob:drive_conectado_antes') === '1') return; }catch(e){ /* ignora */ } // já conectou antes: o Google mostra a tela de escolher conta sozinho
-    try{ if(sessionStorage.getItem('dob:popup_conectar_dispensado') === '1') return; }catch(e){ /* ignora */ }
+  // ---------- Login por usuário e senha (sem e-mail) ----------
+  // O Firebase exige um e-mail por trás de cada senha; usamos "<usuario>@diario-sagis.invalid" (nunca é enviado nada para ele).
+  // Nome de usuário repetido é barrado pelo próprio Firebase (e-mail já em uso).
+  var NUVEM_DOMINIO = '@diario-sagis.invalid';
+  function usuarioParaEmail(u){ return String(u || '').trim().toLowerCase() + NUVEM_DOMINIO; }
+  function usuarioValido(u){ return /^[a-z0-9._-]{3,20}$/.test(u); }
+  function erroAuthTexto(err){
+    const c = (err && err.code) || '';
+    if(c === 'auth/email-already-in-use') return 'Esse nome de usuário já está em uso. Escolha outro.';
+    if(c === 'auth/weak-password') return 'Senha fraca demais. Use pelo menos 8 caracteres.';
+    if(['auth/wrong-password', 'auth/user-not-found', 'auth/invalid-credential', 'auth/invalid-login-credentials', 'auth/invalid-email'].includes(c)) return 'Usuário ou senha incorretos.';
+    if(c === 'auth/too-many-requests') return 'Muitas tentativas. Aguarde alguns minutos e tente de novo.';
+    if(c === 'auth/network-request-failed') return 'Sem internet. Confira a conexão e tente de novo.';
+    if(c === 'auth/operation-not-allowed') return 'O login por usuário e senha ainda não foi ativado no Firebase (avise o dono).';
+    if(c === 'auth/requires-recent-login') return 'Por segurança, saia da conta, entre de novo e repita.';
+    if(c === 'permission-denied') return 'Sem permissão para gravar o cadastro. Avise o dono.';
+    return 'Não foi possível concluir: ' + ((err && (err.message || err.code)) || 'erro desconhecido');
+  }
+  async function nuvemEntrarSenha(usuario, senha){
+    if(!nuvem.auth) throw new Error('A nuvem ainda não carregou. Aguarde um instante.');
+    await nuvem.auth.signInWithEmailAndPassword(usuarioParaEmail(usuario), senha);
+  }
+  async function nuvemCadastrar(usuario, nome, senha){
+    if(!nuvem.auth) throw new Error('A nuvem ainda não carregou. Aguarde um instante.');
+    const cred = await nuvem.auth.createUserWithEmailAndPassword(usuarioParaEmail(usuario), senha);
+    try{ await cred.user.updateProfile({ displayName: nome }); }catch(e){ /* o nome também vai no cadastro abaixo */ }
+    await nuvem.db.doc('usuarios/' + cred.user.uid).set({ usuario, nome, papel: 'visualizador', criadoEm: Date.now() });
+    await nuvemAtualizarPapel();
+  }
+  function abrirLogin(aba){
+    if(document.getElementById('dob-popup-conectar')) return;
     const ov = document.createElement('div');
     ov.id = 'dob-popup-conectar';
     ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(22,35,61,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
-    ov.innerHTML = `<div style="background:var(--card,#fff);color:var(--ink-text,#232a35);max-width:420px;width:100%;border-radius:14px;padding:24px;box-shadow:0 20px 50px -12px rgba(0,0,0,.4);">
-      <h3 style="margin:0 0 8px;font-family:Georgia,serif;font-size:21px;">Entre com o Google</h3>
-      <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--muted,#767e8c);">Você já pode ver todos os dados da obra sem entrar. Para <b>editar e salvar</b>, entre com sua conta Google (um login só: já conecta também o seu Drive para fotos e apontamentos). Só e-mails autorizados pelo dono conseguem alterar os dados compartilhados.</p>
-      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
-        <button type="button" class="dob-btn secundario" id="dob-popup-agora-nao">Só visualizar</button>
-        <button type="button" class="dob-btn" id="dob-popup-conectar-btn">Entrar com Google</button>
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(22,35,61,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;overflow:auto;';
+    const inp = 'width:100%;box-sizing:border-box;padding:10px;border:1px solid #c8cdd6;border-radius:8px;font:15px inherit;margin:4px 0 10px;';
+    const lab = 'font-size:13px;font-weight:600;';
+    const dica = 'display:block;font-size:12px;color:var(--muted,#767e8c);font-weight:400;margin-top:2px;';
+    ov.innerHTML = `<div style="background:var(--card,#fff);color:var(--ink-text,#232a35);max-width:400px;width:100%;border-radius:14px;padding:22px;box-shadow:0 20px 50px -12px rgba(0,0,0,.4);">
+      <h3 style="margin:0 0 4px;font-family:Georgia,serif;font-size:21px;">Diário de Obra</h3>
+      <p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--muted,#767e8c);">Você já pode ver tudo sem entrar. Com uma conta você é identificado; quem o dono liberar como <b>editor</b> também consegue salvar.</p>
+      <div style="display:flex;gap:6px;margin-bottom:12px;">
+        <button type="button" class="dob-btn" id="dob-lg-tab-entrar" style="flex:1;">Entrar</button>
+        <button type="button" class="dob-btn secundario" id="dob-lg-tab-criar" style="flex:1;">Criar conta</button>
+      </div>
+      <form id="dob-lg-form-entrar" autocomplete="on">
+        <label style="${lab}">Usuário<input id="dob-lg-usuario" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" style="${inp}" /></label>
+        <label style="${lab}">Senha<input id="dob-lg-senha" name="password" type="password" autocomplete="current-password" style="${inp}" /></label>
+        <div class="dob-lg-msg" id="dob-lg-msg-entrar" style="min-height:18px;font-size:13px;margin-bottom:6px;"></div>
+        <button type="submit" class="dob-btn" style="width:100%;">Entrar</button>
+      </form>
+      <form id="dob-lg-form-criar" autocomplete="on" style="display:none;">
+        <label style="${lab}">Como devemos te chamar?<span style="${dica}">Esse nome aparece na saudação ("Bom dia, ...").</span><input id="dob-lg-nome" autocomplete="name" style="${inp}" /></label>
+        <label style="${lab}">Nome de usuário<span style="${dica}">3 a 20 caracteres: letras minúsculas, números, ponto, traço ou sublinhado. Sem espaço nem acento. Tem que ser único.</span><input id="dob-lg-novo-usuario" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" style="${inp}" /></label>
+        <label style="${lab}">Senha<span style="${dica}">Mínimo de 8 caracteres.</span><input id="dob-lg-nova-senha" type="password" autocomplete="new-password" style="${inp}" /></label>
+        <label style="${lab}">Repita a senha<input id="dob-lg-nova-senha2" type="password" autocomplete="new-password" style="${inp}" /></label>
+        <div class="dob-lg-msg" id="dob-lg-msg-criar" style="min-height:18px;font-size:13px;margin-bottom:6px;"></div>
+        <button type="submit" class="dob-btn" style="width:100%;">Criar conta</button>
+        <p style="margin:10px 0 0;font-size:12px;line-height:1.5;color:var(--muted,#767e8c);">Conta nova só <b>visualiza</b>. O dono libera a edição depois. Como não usamos e-mail, <b>não há recuperação automática de senha</b>: anote a sua; se esquecer, fale com o dono.</p>
+      </form>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin:12px 0 4px;"><input type="checkbox" id="dob-lg-ver" /> Mostrar senha</label>
+      <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:8px;">
+        <button type="button" class="dob-btn secundario pequeno" id="dob-lg-google">Sou o dono: entrar com Google</button>
+        <button type="button" class="dob-btn secundario pequeno" id="dob-popup-agora-nao">Só visualizar</button>
       </div></div>`;
     document.body.appendChild(ov);
-    document.getElementById('dob-popup-agora-nao').addEventListener('click', () => { try{ sessionStorage.setItem('dob:popup_conectar_dispensado', '1'); }catch(e){ /* ignora */ } ov.remove(); });
-    document.getElementById('dob-popup-conectar-btn').addEventListener('click', () => { ov.remove(); if(tokenClient) tokenClient.requestAccessToken({ prompt: '' }); else nuvemEntrar(); });
+    const $ = (id) => ov.querySelector('#' + id);
+    const mostrarAba = (qual) => {
+      $('dob-lg-form-entrar').style.display = qual === 'entrar' ? '' : 'none';
+      $('dob-lg-form-criar').style.display = qual === 'criar' ? '' : 'none';
+      $('dob-lg-tab-entrar').className = 'dob-btn' + (qual === 'entrar' ? '' : ' secundario');
+      $('dob-lg-tab-criar').className = 'dob-btn' + (qual === 'criar' ? '' : ' secundario');
+      setTimeout(() => { const f = $(qual === 'entrar' ? 'dob-lg-usuario' : 'dob-lg-nome'); if(f) f.focus(); }, 30);
+    };
+    $('dob-lg-tab-entrar').addEventListener('click', () => mostrarAba('entrar'));
+    $('dob-lg-tab-criar').addEventListener('click', () => mostrarAba('criar'));
+    mostrarAba(aba === 'criar' ? 'criar' : 'entrar');
+    $('dob-lg-ver').addEventListener('change', (e) => { ov.querySelectorAll('input[type=password],input[data-pw]').forEach(i => { i.type = e.target.checked ? 'text' : 'password'; i.setAttribute('data-pw', '1'); }); });
+    const erro = (id, t) => { const m = $(id); m.style.color = '#b3261e'; m.textContent = t; };
+    $('dob-lg-form-entrar').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const u = $('dob-lg-usuario').value.trim().toLowerCase(), sn = $('dob-lg-senha').value;
+      if(!u || !sn){ erro('dob-lg-msg-entrar', 'Preencha usuário e senha.'); return; }
+      const b = ev.target.querySelector('button[type=submit]'); b.disabled = true; erro('dob-lg-msg-entrar', '');
+      try{ await nuvemEntrarSenha(u, sn); ov.remove(); }
+      catch(e){ erro('dob-lg-msg-entrar', erroAuthTexto(e)); b.disabled = false; }
+    });
+    $('dob-lg-form-criar').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const nome = $('dob-lg-nome').value.trim().replace(/\s+/g, ' '), u = $('dob-lg-novo-usuario').value.trim().toLowerCase();
+      const s1 = $('dob-lg-nova-senha').value, s2 = $('dob-lg-nova-senha2').value;
+      if(!nome){ erro('dob-lg-msg-criar', 'Diga como devemos te chamar.'); return; }
+      if(!usuarioValido(u)){ erro('dob-lg-msg-criar', 'Nome de usuário inválido: use 3 a 20 letras minúsculas, números, ponto, traço ou sublinhado.'); return; }
+      if(s1.length < 8){ erro('dob-lg-msg-criar', 'A senha precisa ter pelo menos 8 caracteres.'); return; }
+      if(s1 !== s2){ erro('dob-lg-msg-criar', 'As duas senhas não são iguais.'); return; }
+      const b = ev.target.querySelector('button[type=submit]'); b.disabled = true; erro('dob-lg-msg-criar', '');
+      try{ await nuvemCadastrar(u, nome, s1); ov.remove(); mostrarToastSalvo('Conta criada! Você já pode visualizar tudo. O dono libera a edição.'); }
+      catch(e){ erro('dob-lg-msg-criar', erroAuthTexto(e)); b.disabled = false; }
+    });
+    $('dob-popup-agora-nao').addEventListener('click', () => { try{ sessionStorage.setItem('dob:popup_conectar_dispensado', '1'); }catch(e){ /* ignora */ } ov.remove(); });
+    $('dob-lg-google').addEventListener('click', () => { ov.remove(); if(tokenClient) tokenClient.requestAccessToken({ prompt: 'select_account' }); else nuvemEntrar(); });
+  }
+  function mostrarPopupEntrar(forcar){
+    if(nuvem.user || document.getElementById('dob-popup-conectar')) return;
+    try{ if(!forcar && localStorage.getItem('dob:drive_conectado_antes') === '1') return; }catch(e){ /* ignora */ } // já entrou antes com Google: a reconexão silenciosa decide
+    try{ if(sessionStorage.getItem('dob:popup_conectar_dispensado') === '1') return; }catch(e){ /* ignora */ }
+    abrirLogin();
+  }
+  // ---------- Usuários e permissões (dono / administrador) ----------
+  async function usuariosAbrir(){
+    if(!nuvem.admin) return;
+    let lista = [];
+    try{ const q = await nuvem.db.collection('usuarios').get(); q.forEach(d => lista.push(Object.assign({ uid: d.id }, d.data()))); }
+    catch(e){ alert('Não foi possível carregar os usuários: ' + (e.message || e)); return; }
+    lista.sort((a, b) => String(a.nome || a.usuario).localeCompare(String(b.nome || b.usuario)));
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(22,35,61,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+    const papeis = [['visualizador', 'Visualizador'], ['editor', 'Editor'], ['admin', 'Administrador']];
+    ov.innerHTML = `<div style="background:var(--card,#fff);color:var(--ink-text,#232a35);max-width:520px;width:100%;max-height:88vh;overflow:auto;border-radius:14px;padding:22px;box-shadow:0 20px 50px -12px rgba(0,0,0,.4);">
+      <h3 style="margin:0 0 6px;font-family:Georgia,serif;font-size:20px;">Usuários e permissões</h3>
+      <p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--muted,#767e8c);"><b>Visualizador</b> só vê. <b>Editor</b> também salva apontamentos, mapa, custos e fotos. <b>Administrador</b> edita e gerencia usuários. A mudança vale para a pessoa na próxima abertura (ou na hora, se ela estiver com o site aberto).</p>
+      <div id="dob-us-lista">${lista.length ? lista.map(u => `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #e4e7ec;flex-wrap:wrap;">
+          <div style="flex:1;min-width:140px;"><b>${escapeHtmlSaud(u.nome || '')}</b><br><span style="font-size:12px;color:var(--muted,#767e8c);">@${escapeHtmlSaud(u.usuario || '')}</span></div>
+          <select data-uid="${u.uid}" style="padding:7px;border:1px solid #c8cdd6;border-radius:8px;">${papeis.map(([v, t]) => `<option value="${v}"${(u.papel || 'visualizador') === v ? ' selected' : ''}>${t}</option>`).join('')}</select>
+          <span data-st="${u.uid}" style="font-size:12px;min-width:48px;"></span></div>`).join('') : '<p style="font-size:13px;">Ninguém se cadastrou ainda.</p>'}</div>
+      <div style="display:flex;justify-content:flex-end;margin-top:12px;"><button type="button" class="dob-btn" id="dob-us-fechar">Fechar</button></div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('#dob-us-fechar').addEventListener('click', () => ov.remove());
+    ov.querySelectorAll('select[data-uid]').forEach(sel => sel.addEventListener('change', async () => {
+      const st = ov.querySelector('[data-st="' + sel.dataset.uid + '"]'); st.style.color = '#767e8c'; st.textContent = '…';
+      try{ await nuvem.db.doc('usuarios/' + sel.dataset.uid).update({ papel: sel.value }); st.style.color = '#1b6e3c'; st.textContent = 'salvo'; }
+      catch(e){ st.style.color = '#b3261e'; st.textContent = 'erro'; }
+    }));
   }
   // ---------- Nuvem: documentos pequenos (equipamentos, mão de obra) ----------
   function criarDocNuvem(cfg){
@@ -2729,9 +2862,62 @@
 
   // ---------- Nuvem: apontamentos (um documento por apontamento) ----------
   var nuvemEnt = { ativo: false, cloud: {}, timer: null, enviando: false, erro: '' };
+  // ---------- Nuvem: fotos (um documento por foto, no tamanho de hoje: 1600 px) ----------
+  var fotoNuvemCache = {};
+  async function reduzirDataUrlAteCaber(dataUrl){
+    let d = dataUrl, q = 0.78, lado = 1600;
+    for(let i = 0; i < 8 && d.length > 950000; i++){
+      d = await compressDataUrl(dataUrl, lado, q);
+      q -= 0.06; if(q < 0.5){ q = 0.72; lado = Math.round(lado * 0.88); }
+    }
+    if(d.length > 1000000) throw new Error('foto grande demais para o banco');
+    return d;
+  }
+  async function uploadFotoNuvem(dataUrl, idFixo){
+    if(!nuvem.db || !nuvem.editor || !nuvem.user) throw new Error('sem permissão para salvar fotos');
+    const dados = dataUrl.length > 950000 ? await reduzirDataUrlAteCaber(dataUrl) : dataUrl;
+    const id = idFixo || ('f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
+    await nuvem.db.doc('fotos/' + id).set({ dados, por: nuvem.rotulo || '', atualizadoEm: Date.now() });
+    fotoNuvemCache[id] = dados;
+    return id;
+  }
+  async function carregarFotoNuvem(id){
+    if(fotoNuvemCache[id]) return fotoNuvemCache[id];
+    const sn = await nuvem.db.doc('fotos/' + id).get();
+    if(!sn.exists) return null;
+    fotoNuvemCache[id] = sn.data().dados;
+    return fotoNuvemCache[id];
+  }
+  async function migrarFotosDriveParaNuvem(onProgresso){
+    if(!nuvem.editor) throw new Error('só editores podem migrar');
+    if(!accessToken) throw new Error('sem Drive');
+    const alvos = [];
+    entries.forEach(e => (e.fotos || []).forEach((f, i) => { const nf = normalizeFoto(f); if(nf && nf.type === 'drive' && nf.fileId) alvos.push({ e, i, nf }); }));
+    let ok = 0, falhas = 0; const sujas = new Set();
+    for(const { e, i, nf } of alvos){
+      try{
+        const ex = await nuvem.db.doc('fotos/' + nf.fileId).get();
+        if(!ex.exists){
+          const blobUrl = await driveFetchImageBlobUrl(nf.fileId);
+          const blob = await (await fetch(blobUrl)).blob();
+          const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob); });
+          await uploadFotoNuvem(dataUrl, nf.fileId);
+        }
+        e.fotos[i] = { type: 'nuvem', id: nf.fileId, thumb: nf.thumb, legenda: nf.legenda };
+        sujas.add(e); ok++;
+      }catch(err){ falhas++; }
+      if(onProgresso) onProgresso(ok + falhas, alvos.length);
+      if(sujas.size >= 3 || (ok + falhas) === alvos.length){
+        sujas.forEach(x => { x.atualizadoEm = Date.now(); try{ db.set('dob:entry:' + x.id, JSON.stringify(x)); }catch(er){ /* ignora */ } });
+        sujas.clear(); nuvemEntradasEnviar();
+      }
+    }
+    render();
+    return { ok, falhas, total: alvos.length };
+  }
   function nuvemEntradaPayload(e){
     const c = JSON.parse(JSON.stringify(e));
-    c.fotos = (c.fotos || []).map(normalizeFoto).filter(f => f && f.type === 'drive'); // fotos só-locais (base64) não vão pra nuvem
+    c.fotos = (c.fotos || []).map(normalizeFoto).filter(f => f && (f.type === 'drive' || f.type === 'nuvem')); // fotos só-locais (base64) não vão pra nuvem
     return c;
   }
   function nuvemEntradasEnviar(){
@@ -2772,7 +2958,7 @@
         }
         let remoto; try{ remoto = JSON.parse(d.json); }catch(e){ return; }
         if(!local || (d.atualizadoEm || 0) > (local.atualizadoEm || 0)){
-          if(local){ const soLocais = (local.fotos || []).map(normalizeFoto).filter(f => f && f.type !== 'drive'); remoto.fotos = (remoto.fotos || []).concat(soLocais); }
+          if(local){ const soLocais = (local.fotos || []).map(normalizeFoto).filter(f => f && f.type !== 'drive' && f.type !== 'nuvem'); remoto.fotos = (remoto.fotos || []).concat(soLocais); }
           remoto.atualizadoEm = d.atualizadoEm || 0;
           entries = entries.filter(x => x.id !== id); entries.push(remoto);
           try{ db.set('dob:entry:' + id, JSON.stringify(remoto)); }catch(e){ /* armazenamento local cheio: segue só em memória */ }
@@ -2789,6 +2975,7 @@
   }
   // Deixa a pasta do Drive com "qualquer pessoa com o link pode ver" — assim as fotos em tamanho original abrem para os visitantes.
   async function nuvemPastaPublica(){
+    return; // não usado mais: as fotos novas ficam no banco, a pasta do Drive não precisa ser pública
     if(!accessToken || !nuvem.editor) return;
     try{
       const id = await ensureFolder();
@@ -2819,7 +3006,7 @@
         else setTimeout(mostrarPopupEntrar, 500);
       });
       const b1 = document.getElementById('dob-btn-nuvem-login'), b2 = document.getElementById('dob-btn-nuvem-sair'), b3 = document.getElementById('dob-btn-nuvem-editores');
-      if(b1) b1.addEventListener('click', () => { if(tokenClient) tokenClient.requestAccessToken({ prompt: 'select_account' }); else nuvemEntrar(); });
+      if(b1) b1.addEventListener('click', () => abrirLogin());
       if(b2) b2.addEventListener('click', nuvemSair);
       if(b3) b3.addEventListener('click', nuvemEditoresAbrir);
       nuvemStatus();
@@ -5490,14 +5677,15 @@
 
   function contarFotosLocaisPendentes(){
     let n = 0;
-    entries.forEach(e => (e.fotos || []).forEach(f => { if(normalizeFoto(f).type !== 'drive') n++; }));
+    entries.forEach(e => (e.fotos || []).forEach(f => { const t = normalizeFoto(f).type; if(t !== 'drive' && t !== 'nuvem') n++; }));
     return n;
   }
   async function sincronizarFotosLocaisPendentes(){
-    if(!accessToken) return;
+    if(!accessToken && !nuvem.editor) return;
     const pendentes = [];
     entries.forEach(e => (e.fotos || []).forEach((f, i) => {
-      if(normalizeFoto(f).type !== 'drive') pendentes.push({ entry: e, index: i });
+      const t = normalizeFoto(f).type;
+      if(t !== 'drive' && t !== 'nuvem') pendentes.push({ entry: e, index: i });
     }));
     if(!pendentes.length) return;
     const btn = document.getElementById('dob-btn-sync-fotos');
@@ -5509,18 +5697,24 @@
         const filename = `${entry.date}_${entry.id}_${index}.jpg`;
         let thumb;
         try{ thumb = await compressDataUrl(foto.data, 180, 0.5); }catch(err){ /* segue sem thumb se não der */ }
-        const fileId = await uploadToDrive(foto.data, filename);
-        entry.fotos[index] = { type: 'drive', fileId, thumb, legenda: foto.legenda };
+        if(nuvem.editor){
+          const idFoto = await uploadFotoNuvem(foto.data);
+          entry.fotos[index] = { type: 'nuvem', id: idFoto, thumb, legenda: foto.legenda };
+        }else{
+          const fileId = await uploadToDrive(foto.data, filename);
+          entry.fotos[index] = { type: 'drive', fileId, thumb, legenda: foto.legenda };
+        }
         ok++;
       }catch(e){ falhas++; }
       if(btn) btn.textContent = `📤 Sincronizando ${ok + falhas}/${pendentes.length}...`;
     }
     entries.forEach(e => { e.atualizadoEm = Date.now(); db.set('dob:entry:' + e.id, JSON.stringify(e)); });
-    await syncEntriesToDrive();
+    if(accessToken) await syncEntriesToDrive();
+    nuvemEntradasEnviar();
     if(btn){ btn.disabled = false; }
     updateStatus();
     render();
-    mostrarToastSalvo(`${ok} foto${ok === 1 ? '' : 's'} sincronizada${ok === 1 ? '' : 's'} no Drive${falhas ? ` — ${falhas} falharam, tenta de novo` : ''}`);
+    mostrarToastSalvo(`${ok} foto${ok === 1 ? '' : 's'} sincronizada${ok === 1 ? '' : 's'}${falhas ? ` — ${falhas} falharam, tenta de novo` : ''}`);
   }
 
   function contarFotosSemThumb(){
@@ -5666,13 +5860,13 @@
       if(!updateStatus._nomeBuscado){ updateStatus._nomeBuscado = true; buscarNomeConta(); }
       if(typeof renderSaudacao === 'function') renderSaudacao();
     }else{
-      statusDot.className = 'dob-dot off';
-      statusTexto.textContent = 'Drive não conectado — fotos serão salvas só localmente';
+      statusDot.className = 'dob-dot ' + (nuvem.ok ? 'on' : 'off');
+      statusTexto.textContent = nuvem.ok ? 'Conectado ao banco de dados' : 'Conectando ao banco de dados…';
       document.getElementById('dob-btn-conectar').textContent = 'Conectar ao Google Drive';
     }
     const btnSync = document.getElementById('dob-btn-sync-fotos');
     if(btnSync){
-      const pendentes = accessToken ? contarFotosLocaisPendentes() : 0;
+      const pendentes = (accessToken || nuvem.editor) ? contarFotosLocaisPendentes() : 0;
       btnSync.style.display = pendentes > 0 ? 'inline-flex' : 'none';
       btnSync.textContent = `📤 Sincronizar ${pendentes} foto${pendentes === 1 ? '' : 's'} local${pendentes === 1 ? '' : 'is'}`;
     }
@@ -5688,36 +5882,78 @@
   document.getElementById('dob-btn-reparar-thumbs').addEventListener('click', () => { repararMiniaturas(); });
   document.getElementById('dob-btn-recuperar-fotos').addEventListener('click', () => { recuperarFotosOrfasDrive(); });
   function trocarConta(){
-    try{ sessionStorage.setItem('dob:popup_conectar_dispensado', '1'); }catch(e){ /* ignora */ }
+    try{ sessionStorage.removeItem('dob:popup_conectar_dispensado'); }catch(e){ /* ignora */ }
     accessToken = null; nomeConta = '';
     try{ localStorage.removeItem('dob:drive_conectado_antes'); localStorage.removeItem('dob:nome_conta'); }catch(e){ /* ignora */ }
     updateStatus(); renderSaudacao();
-    const depois = () => { if(tokenClient) tokenClient.requestAccessToken({ prompt: 'select_account' }); else nuvemEntrar(); };
+    const depois = () => abrirLogin();
     if(nuvem.auth && nuvem.user) nuvem.auth.signOut().then(depois, depois); else depois();
   }
   function abrirConfiguracoes(){
     if(document.getElementById('dob-config-modal')) return;
     const ov = document.createElement('div');
     ov.id = 'dob-config-modal';
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(22,35,61,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
-    const email = nuvem.user ? escapeHtmlSaud(nuvem.user.email || '') : '';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(22,35,61,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;overflow:auto;';
+    const quem = nuvem.user ? escapeHtmlSaud(nuvem.rotulo || '') : '';
+    const papelTxt = nuvem.dono ? 'dono' : nuvem.papel === 'admin' ? 'administrador' : nuvem.editor ? 'editor' : 'somente visualização';
+    const senhaUser = !!(nuvem.user && (nuvem.user.email || '').endsWith(NUVEM_DOMINIO));
+    let driveFotos = 0; try{ entries.forEach(e => (e.fotos || []).forEach(f => { const nf = normalizeFoto(f); if(nf && nf.type === 'drive') driveFotos++; })); }catch(e){ /* ignora */ }
+    const inp = 'width:100%;box-sizing:border-box;padding:9px;border:1px solid #c8cdd6;border-radius:8px;font:14px inherit;margin:4px 0;';
     ov.innerHTML = `<div style="background:var(--card,#fff);color:var(--ink-text,#232a35);max-width:420px;width:100%;border-radius:14px;padding:22px;box-shadow:0 20px 50px -12px rgba(0,0,0,.4);">
       <h3 style="margin:0 0 6px;font-family:Georgia,serif;font-size:20px;">Configurações</h3>
-      <p style="margin:0 0 14px;font-size:13px;color:var(--muted,#767e8c);">${email ? 'Conta: <b>' + email + '</b>' + (nuvem.dono ? ' (dono)' : nuvem.editor ? ' (editor)' : ' (somente visualização)') : 'Você não está logado (somente visualização).'}</p>
+      <p style="margin:0 0 14px;font-size:13px;color:var(--muted,#767e8c);">${quem ? 'Conta: <b>' + quem + '</b> (' + papelTxt + ')' : 'Você não está logado (somente visualização).'}</p>
+      ${nuvem.user ? `<div style="margin-bottom:12px;"><label style="font-size:13px;font-weight:600;">Meu nome (saudação)</label>
+        <div style="display:flex;gap:6px;"><input id="dob-cfg-nome" value="${escapeHtmlSaud(nuvem.nomeCad || (nuvem.user.displayName || ''))}" style="${inp}flex:1;" /><button type="button" class="dob-btn secundario pequeno" id="dob-cfg-nome-salvar">Salvar</button></div>
+        <div id="dob-cfg-msg" style="min-height:16px;font-size:12px;"></div></div>` : ''}
       <div style="display:flex;flex-direction:column;gap:8px;">
-        <button type="button" class="dob-btn" id="dob-cfg-trocar">🔄 Sair e entrar com outra conta Google</button>
+        <button type="button" class="dob-btn" id="dob-cfg-trocar">${nuvem.user ? '🔄 Trocar de conta' : 'Entrar / Cadastrar'}</button>
         ${nuvem.user ? '<button type="button" class="dob-btn secundario" id="dob-cfg-sair">Sair da conta</button>' : ''}
-        ${nuvem.dono ? '<button type="button" class="dob-btn secundario" id="dob-cfg-editores">👥 Quem pode editar</button>' : ''}
+        ${senhaUser ? '<button type="button" class="dob-btn secundario" id="dob-cfg-senha">🔑 Alterar minha senha</button><div id="dob-cfg-senha-box" style="display:none;"><input id="dob-cfg-senha-nova" type="password" autocomplete="new-password" placeholder="Nova senha (mín. 8 caracteres)" style="' + inp + '" /><button type="button" class="dob-btn pequeno" id="dob-cfg-senha-ok">Salvar nova senha</button></div>' : ''}
+        ${nuvem.admin ? '<button type="button" class="dob-btn secundario" id="dob-cfg-usuarios">👥 Usuários e permissões</button>' : ''}
+        ${nuvem.dono ? '<button type="button" class="dob-btn secundario" id="dob-cfg-editores">Editores por e-mail Google (antigo)</button>' : ''}
+        ${(nuvem.editor && driveFotos) ? '<button type="button" class="dob-btn secundario" id="dob-cfg-migrar">☁️ Mover ' + driveFotos + ' foto(s) do Drive para o banco</button>' : ''}
         <button type="button" class="dob-btn secundario" id="dob-cfg-client">Avançado: trocar o Client ID do Drive</button>
         <button type="button" class="dob-btn secundario" id="dob-cfg-fechar">Fechar</button>
       </div></div>`;
     document.body.appendChild(ov);
     const fechar = () => ov.remove();
-    document.getElementById('dob-cfg-fechar').addEventListener('click', fechar);
-    document.getElementById('dob-cfg-trocar').addEventListener('click', () => { fechar(); trocarConta(); });
-    const sr = document.getElementById('dob-cfg-sair'); if(sr) sr.addEventListener('click', () => { fechar(); try{ sessionStorage.setItem('dob:popup_conectar_dispensado', '1'); }catch(e){ /* ignora */ } nuvemSair(); });
-    const ed = document.getElementById('dob-cfg-editores'); if(ed) ed.addEventListener('click', () => { fechar(); nuvemEditoresAbrir(); });
-    document.getElementById('dob-cfg-client').addEventListener('click', () => {
+    const $ = (id) => ov.querySelector('#' + id);
+    const msg = (t, ok) => { const m = $('dob-cfg-msg'); if(m){ m.style.color = ok ? '#1b6e3c' : '#b3261e'; m.textContent = t; } };
+    $('dob-cfg-fechar').addEventListener('click', fechar);
+    $('dob-cfg-trocar').addEventListener('click', () => { fechar(); trocarConta(); });
+    const sr = $('dob-cfg-sair'); if(sr) sr.addEventListener('click', () => { fechar(); try{ sessionStorage.setItem('dob:popup_conectar_dispensado', '1'); }catch(e){ /* ignora */ } nuvemSair(); });
+    const ed = $('dob-cfg-editores'); if(ed) ed.addEventListener('click', () => { fechar(); nuvemEditoresAbrir(); });
+    const us = $('dob-cfg-usuarios'); if(us) us.addEventListener('click', () => { fechar(); usuariosAbrir(); });
+    const ns = $('dob-cfg-nome-salvar');
+    if(ns) ns.addEventListener('click', async () => {
+      const n = $('dob-cfg-nome').value.trim().replace(/\s+/g, ' ');
+      if(!n){ msg('Digite um nome.', false); return; }
+      try{
+        await nuvem.user.updateProfile({ displayName: n });
+        try{ await nuvem.db.doc('usuarios/' + nuvem.user.uid).update({ nome: n }); }catch(e){ /* conta Google sem cadastro: só o perfil */ }
+        nuvem.nomeCad = n; nomeConta = n.split(/\s+/)[0];
+        try{ localStorage.setItem('dob:nome_conta', nomeConta); }catch(e){ /* ignora */ }
+        renderSaudacao(); msg('Salvo.', true);
+      }catch(e){ msg(erroAuthTexto(e), false); }
+    });
+    const sb = $('dob-cfg-senha'); if(sb) sb.addEventListener('click', () => { const b = $('dob-cfg-senha-box'); b.style.display = b.style.display === 'none' ? '' : 'none'; });
+    const so = $('dob-cfg-senha-ok');
+    if(so) so.addEventListener('click', async () => {
+      const nv = $('dob-cfg-senha-nova').value;
+      if(nv.length < 8){ msg('A senha precisa ter pelo menos 8 caracteres.', false); return; }
+      try{ await nuvem.user.updatePassword(nv); $('dob-cfg-senha-nova').value = ''; msg('Senha alterada.', true); }
+      catch(e){ msg(erroAuthTexto(e), false); }
+    });
+    const mg = $('dob-cfg-migrar');
+    if(mg) mg.addEventListener('click', async () => {
+      if(!accessToken){ if(tokenClient) tokenClient.requestAccessToken({ prompt: '' }); mostrarToastSalvo('Autorize o Google e abra Configurações para mover as fotos de novo.'); fechar(); return; }
+      mg.disabled = true;
+      try{
+        const r = await migrarFotosDriveParaNuvem((a, t) => { mg.textContent = 'Movendo ' + a + '/' + t + '…'; });
+        mg.textContent = '✔ ' + r.ok + ' movida(s)' + (r.falhas ? ', ' + r.falhas + ' falharam (tente de novo)' : '');
+      }catch(e){ mg.textContent = 'Erro: ' + (e.message || e); mg.disabled = false; }
+    });
+    $('dob-cfg-client').addEventListener('click', () => {
       fechar();
       if(confirm('Deseja trocar o Client ID configurado?')){
         localStorage.removeItem('dob:client_id');
@@ -6229,7 +6465,7 @@
       previewEl.innerHTML = draft.fotos.map((foto, idx) => `
         <div class="dob-thumb-wrap">
           <img class="dob-thumb" src="${foto.thumb || foto.data}" data-idx="${idx}" />
-          <span class="dob-thumb-badge ${foto.type === 'drive' ? 'drive' : 'local'}">${foto.type === 'drive' ? 'Drive' : 'Local'}</span>
+          <span class="dob-thumb-badge ${(foto.type === 'drive' || foto.type === 'nuvem') ? 'drive' : 'local'}">${foto.type === 'drive' ? 'Drive' : foto.type === 'nuvem' ? 'Nuvem' : 'Local'}</span>
           <button class="dob-thumb-del" data-idx="${idx}">×</button>
         </div>
       `).join('');
@@ -6244,12 +6480,21 @@
       for(const f of files){
         const placeholder = document.createElement('div');
         placeholder.className = 'dob-thumb-uploading';
-        placeholder.textContent = accessToken ? 'Enviando ao Drive...' : 'Salvando localmente...';
+        placeholder.textContent = (nuvem.editor || accessToken) ? 'Enviando...' : 'Salvando localmente...';
         previewEl.appendChild(placeholder);
         try{
           const [fullRes, thumbRes] = await Promise.all([ compressImage(f, 1600, 0.82), compressImage(f, 180, 0.5) ]);
           const filename = `diario_${draft.date}_${fmtTimestamp()}.jpg`;
-          if(accessToken){
+          if(nuvem.editor){
+            try{
+              const idFoto = await uploadFotoNuvem(fullRes);
+              draft.fotos.push({ type: 'nuvem', id: idFoto, thumb: thumbRes });
+            }catch(nErr){
+              statusEl.innerHTML = `<div class="dob-status-msg erro">Não foi possível enviar ao banco agora (${nErr.message}). A foto foi salva localmente.</div>`;
+              const localRes = await compressImage(f, 1100, 0.6);
+              draft.fotos.push({ type: 'local', data: localRes });
+            }
+          }else if(accessToken){
             try{
               const fileId = await uploadToDrive(fullRes, filename);
               draft.fotos.push({ type: 'drive', fileId, thumb: thumbRes });
@@ -6369,10 +6614,11 @@
     document.addEventListener('keydown', onKey);
 
     function prefetchVizinhas(){
-      if(!accessToken || fotosArr.length < 2) return;
+      if(fotosArr.length < 2) return;
       [1, -1].forEach(offset => {
         const viz = normalizeFoto(fotosArr[(idx + offset + fotosArr.length) % fotosArr.length]);
-        if(viz.type === 'drive' && !driveBlobCache[viz.fileId]){
+        if(viz.type === 'nuvem' && viz.id){ carregarFotoNuvem(viz.id).catch(() => {}); return; }
+        if(accessToken && viz.type === 'drive' && !driveBlobCache[viz.fileId]){
           getDriveBlobCached(viz.fileId).catch(() => {}); // silencioso, é só uma otimização
         }
       });
@@ -6389,7 +6635,7 @@
         ${total > 1 ? `<button class="dob-lightbox-nav next" aria-label="Próxima foto">›</button>` : ''}
         <div class="dob-lb-img-wrap"><img id="dob-lb-img" src="${jaEmCache ? driveBlobCache[foto.fileId] : (foto.thumb || foto.data)}" title="Clique esquerdo pra aumentar, clique direito pra diminuir" /></div>
         <input class="dob-input dob-lb-legenda" id="dob-lb-legenda-input" placeholder="+ adicionar legenda..." value="${(foto.legenda || '').replace(/"/g,'&quot;')}" />
-        <div class="dob-lightbox-info" id="dob-lb-info">${jaEmCache ? 'Imagem em alta resolução (carregada rápido do cache).' : foto.type==='drive' ? (accessToken ? 'Carregando versão em alta resolução do Drive...' : 'Prévia local. Conecte ao Drive para ver em alta resolução.') : 'Foto salva apenas localmente neste navegador.'}</div>
+        <div class="dob-lightbox-info" id="dob-lb-info">${jaEmCache ? 'Imagem em alta resolução (carregada rápido do cache).' : foto.type==='nuvem' ? 'Carregando a foto em tamanho completo...' : foto.type==='drive' ? (accessToken ? 'Carregando versão em alta resolução do Drive...' : 'Prévia local. Conecte ao Drive para ver em alta resolução.') : 'Foto salva apenas localmente neste navegador.'}</div>
         ${driveViewUrl ? `<a class="dob-lightbox-drivelink" href="${driveViewUrl}" target="_blank">Abrir no Drive →</a>` : ''}
         ${total > 1 ? `<div class="dob-lightbox-contador">${idx+1} / ${total}</div>` : ''}
       `;
@@ -6477,6 +6723,15 @@
           imgEl.onload = () => { if(infoEl && imgEl.src !== antes) infoEl.textContent = 'Imagem em alta resolução.'; };
           imgEl.src = urlFotoPublica(foto.fileId, 2000);
         }
+      }
+      if(foto.type === 'nuvem' && foto.id){
+        const meuIdx = idx;
+        carregarFotoNuvem(foto.id).then(dados => {
+          if(meuIdx !== idx) return;
+          const imgEl = document.getElementById('dob-lb-img'), infoEl = document.getElementById('dob-lb-info');
+          if(imgEl && dados){ imgEl.src = dados; if(infoEl) infoEl.textContent = 'Foto em tamanho completo.'; }
+          else if(infoEl) infoEl.textContent = 'Só a prévia está disponível agora.';
+        }).catch(() => { const infoEl = document.getElementById('dob-lb-info'); if(infoEl) infoEl.textContent = 'Só a prévia está disponível agora.'; });
       }
       prefetchVizinhas();
     }
@@ -7277,6 +7532,7 @@
     renderModoCampo();
     render();
     mostrarToastSalvo('Foto excluída');
+    if(foto.type === 'nuvem' && foto.id && nuvem.editor){ try{ await nuvem.db.doc('fotos/' + foto.id).delete(); delete fotoNuvemCache[foto.id]; }catch(e){ /* fica órfã, sem efeito */ } }
     if(foto.type === 'drive' && foto.fileId && accessToken){
       try{
         await fetch(`https://www.googleapis.com/drive/v3/files/${foto.fileId}`, {
@@ -7368,7 +7624,16 @@
         const filename = `diario_${entry.date}_${fmtTimestamp()}.jpg`;
         let fotoNova;
         let salvouNoDrive = false;
-        if(accessToken){
+        if(nuvem.editor){
+          try{
+            const idFoto = await uploadFotoNuvem(fullRes);
+            fotoNova = { type: 'nuvem', id: idFoto, thumb: thumbRes };
+            salvouNoDrive = true;
+          }catch(nErr){
+            const localRes = await compressImage(file, 1100, 0.6);
+            fotoNova = { type: 'local', data: localRes };
+          }
+        }else if(accessToken){
           try{
             const fileId = await uploadToDrive(fullRes, filename);
             fotoNova = { type: 'drive', fileId, thumb: thumbRes };
