@@ -961,7 +961,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.15.30';
+  const APP_VERSION = 'v2026.10.15.32';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2345,6 +2345,7 @@
   let mapaModoEdicao = false;
   let mapaMostrarSeletorCompleto = false; // no modo edição focado (veio de "abrir no mapa"), começa escondendo obra/serviço/reordenar
   let mapaObraAtual = null, mapaServicoAtual = null; // lembrados entre re-renders pra não perder a seleção ao trocar de modo
+  let voltarDiarioCtx = null; // de onde o mapa foi aberto no Diário (pra voltar ao mesmo ponto)
   let dataForcadaMapa = null; // quando marcado a partir de um registro específico, força a data das marcações pra esse dia
  // planta real (Arrasamento de estaca), recortada e comprimida
   const BLOCOS_MAPA = [{"num":"1","obra":"Buritis","x":48.09,"y":16.46,"w":5.41,"h":4.67,"id":"Buritis_1_0","cat":"bloco"},{"num":"2","obra":"Buritis","x":47.66,"y":22.96,"w":5.84,"h":3.37,"id":"Buritis_2_1","cat":"bloco"},{"num":"3","obra":"Buritis","x":47.65,"y":26.64,"w":6.06,"h":3.21,"id":"Buritis_3_2","cat":"bloco"},{"num":"4","obra":"Buritis","x":47.77,"y":31.0,"w":5.73,"h":3.29,"id":"Buritis_4_3","cat":"bloco"},{"num":"5","obra":"Buritis","x":47.87,"y":34.6,"w":5.84,"h":3.29,"id":"Buritis_5_4","cat":"bloco"},{"num":"6","obra":"Buritis","x":47.88,"y":38.89,"w":5.62,"h":3.67,"id":"Buritis_6_5","cat":"bloco"},{"num":"7","obra":"Buritis","x":47.77,"y":42.63,"w":5.73,"h":3.37,"id":"Buritis_7_6","cat":"bloco"},{"num":"8","obra":"Buritis","x":47.76,"y":47.15,"w":5.84,"h":3.37,"id":"Buritis_8_7","cat":"bloco"},{"num":"10","obra":"Buritis","x":61.29,"y":14.47,"w":5.62,"h":3.14,"id":"Buritis_10_8","cat":"bloco"},{"num":"11","obra":"Buritis","x":61.18,"y":17.91,"w":5.84,"h":3.37,"id":"Buritis_11_9","cat":"bloco"},{"num":"12","obra":"Buritis","x":61.18,"y":22.81,"w":5.73,"h":3.44,"id":"Buritis_12_10","cat":"bloco"},{"num":"15","obra":"Buritis","x":66.26,"y":31.54,"w":4.97,"h":4.13,"id":"Buritis_15_11","cat":"bloco"},{"num":"16","obra":"Buritis","x":61.28,"y":37.43,"w":4.76,"h":3.98,"id":"Buritis_16_12","cat":"bloco"},{"num":"19","obra":"Buritis","x":66.26,"y":43.01,"w":4.76,"h":4.29,"id":"Buritis_19_13","cat":"bloco"},{"num":"18","obra":"Buritis","x":61.28,"y":43.01,"w":4.76,"h":4.29,"id":"Buritis_18_14","cat":"bloco"},{"num":"17","obra":"Buritis","x":66.37,"y":37.43,"w":4.65,"h":3.98,"id":"Buritis_17_15","cat":"bloco"},{"num":"14","obra":"Buritis","x":61.39,"y":31.54,"w":4.54,"h":4.13,"id":"Buritis_14_16","cat":"bloco"},{"num":"13","obra":"Buritis","x":61.4,"y":26.49,"w":5.62,"h":3.21,"id":"Buritis_13_17","cat":"bloco"},{"num":"9","obra":"Buritis","x":47.76,"y":50.97,"w":5.95,"h":3.14,"id":"Buritis_9_18","cat":"bloco"},{"num":"1","obra":"Pequis","x":26.35,"y":17.15,"w":6.6,"h":3.98,"id":"Pequis_1_19","cat":"bloco"},{"num":"2","obra":"Pequis","x":26.25,"y":22.66,"w":5.73,"h":3.44,"id":"Pequis_2_20","cat":"bloco"},{"num":"3","obra":"Pequis","x":26.35,"y":26.41,"w":5.73,"h":3.21,"id":"Pequis_3_21","cat":"bloco"},{"num":"4","obra":"Pequis","x":26.36,"y":30.77,"w":5.62,"h":3.52,"id":"Pequis_4_22","cat":"bloco"},{"num":"5","obra":"Pequis","x":26.46,"y":34.6,"w":5.62,"h":3.21,"id":"Pequis_5_23","cat":"bloco"},{"num":"6","obra":"Pequis","x":26.35,"y":39.04,"w":5.52,"h":3.29,"id":"Pequis_6_24","cat":"bloco"},{"num":"7","obra":"Pequis","x":26.46,"y":42.71,"w":5.41,"h":3.14,"id":"Pequis_7_25","cat":"bloco"},{"num":"8","obra":"Pequis","x":26.35,"y":47.22,"w":5.73,"h":3.37,"id":"Pequis_8_26","cat":"bloco"},{"num":"9","obra":"Pequis","x":26.46,"y":50.83,"w":5.41,"h":3.21,"id":"Pequis_9_27","cat":"bloco"},{"num":"10","obra":"Pequis","x":39.65,"y":22.81,"w":5.84,"h":3.37,"id":"Pequis_10_28","cat":"bloco"},{"num":"11","obra":"Pequis","x":39.87,"y":26.49,"w":5.62,"h":3.29,"id":"Pequis_11_29","cat":"bloco"},{"num":"12","obra":"Pequis","x":39.66,"y":31.0,"w":5.73,"h":3.44,"id":"Pequis_12_30","cat":"bloco"},{"num":"13","obra":"Pequis","x":39.65,"y":34.6,"w":5.84,"h":3.14,"id":"Pequis_13_31","cat":"bloco"},{"num":"14","obra":"Pequis","x":39.65,"y":39.11,"w":5.84,"h":3.29,"id":"Pequis_14_32","cat":"bloco"},{"num":"15","obra":"Pequis","x":39.87,"y":42.71,"w":5.52,"h":3.21,"id":"Pequis_15_33","cat":"bloco"},{"num":"16","obra":"Pequis","x":39.76,"y":47.0,"w":5.73,"h":3.44,"id":"Pequis_16_34","cat":"bloco"},{"num":"17","obra":"Pequis","x":39.87,"y":50.75,"w":5.62,"h":3.29,"id":"Pequis_17_35","cat":"bloco"},{"num":"Gás","obra":"Pequis","x":34.47,"y":10.41,"w":2.05,"h":1.07,"id":"Pequis_Gás_36","cat":"area_comum"},{"num":"Lixo","obra":"Pequis","x":37.71,"y":10.26,"w":1.3,"h":1.38,"id":"Pequis_Lixo_37","cat":"area_comum"},{"num":"Guarita","obra":"Pequis","x":43.22,"y":10.18,"w":2.92,"h":1.15,"id":"Pequis_Guarita_38","cat":"area_comum"},{"num":"Guarita","obra":"Buritis","x":47.22,"y":10.49,"w":2.49,"h":1.15,"id":"Buritis_Guarita_39","cat":"area_comum"},{"num":"Gás","obra":"Buritis","x":58.25,"y":11.48,"w":2.6,"h":1.15,"id":"Buritis_Gás_40","cat":"area_comum"},{"num":"Lixo","obra":"Buritis","x":56.09,"y":11.33,"w":1.08,"h":1.38,"id":"Buritis_Lixo_41","cat":"area_comum"},{"num":"Caixa D'agua","obra":"Pequis","x":25.49,"y":7.2,"w":2.38,"h":3.14,"id":"Pequis_Caixa D'agua_42","cat":"area_comum"},{"num":"Caixa D'agua","obra":"Buritis","x":52.95,"y":11.94,"w":2.6,"h":1.53,"id":"Buritis_Caixa D'agua_43","cat":"area_comum"}]; // posições reais (%) calibradas manualmente pelo usuário
@@ -3978,6 +3979,15 @@
   }
   function empresaPadraoLer(){ try{ return JSON.parse(localStorage.getItem('dob:empresa_padrao') || '{}'); }catch(e){ return {}; } }
   function empresaPadraoSalvar(servico, obra, empresa){ try{ const m = empresaPadraoLer(); m[servico + '|' + obra] = empresa; localStorage.setItem('dob:empresa_padrao', JSON.stringify(m)); }catch(e){} }
+  // Corrige início/conclusão de um bloco já apontado (não salva: quem chama salva logo em seguida)
+  function aplicarDatasBloco(servico, obra, bloco, datas){
+    if(!datas) return;
+    const e = mapaState.estados.find(x => x.servico === servico && x.obra === obra && x.bloco === bloco);
+    if(!e) return;
+    if(datas.dataInicio !== undefined){ if(datas.dataInicio) e.dataInicio = datas.dataInicio; else delete e.dataInicio; }
+    if(datas.dataConclusao !== undefined){ if(datas.dataConclusao) e.dataConclusao = datas.dataConclusao; else delete e.dataConclusao; }
+    e.atualizadoEm = Date.now();
+  }
   function definirEmpresaBloco(servico, obra, bloco, empresa){
     const e = mapaState.estados.find(x => x.servico === servico && x.obra === obra && x.bloco === bloco);
     if(!e) return;
@@ -4180,8 +4190,32 @@
     const alvo = ev.target.closest('[data-ir-mapa]');
     if(!alvo) return;
     const [obra, servico, planta, dataApontamento] = alvo.dataset.irMapa.split('|||');
+    // guarda onde o Diário estava (dia, cartão aberto e rolagem) pra o botão "Voltar ao apontamento" cair no mesmo lugar
+    voltarDiarioCtx = { obra, servico, data: dataApontamento || '', scrollY: window.scrollY };
     abrirNoMapa(obra, servico, planta || null, dataApontamento || null);
   });
+  function voltarAoDiario(){
+    const ctx = voltarDiarioCtx; voltarDiarioCtx = null;
+    const home = document.querySelector('.dob-side-item[data-side="home"]');
+    if(home) home.click();
+    if(!ctx) return;
+    const restaurar = () => {
+      // o cartão pode ter mudado de coluna (status novo): acha pelo dia + obra + serviço, ignorando o status
+      const prefixo = `${ctx.data || 'x'}|||${ctx.obra}|||${ctx.servico}|||`;
+      const item = Array.from(document.querySelectorAll('.dob-kanban-item')).find(el => (el.dataset.itemKey || '').startsWith(prefixo));
+      if(item){
+        const wrap = item.closest('.dob-mapa-wrap') || document;
+        wrap.querySelectorAll('.dob-kanban-item.open').forEach(el => { if(el !== item) el.classList.remove('open'); });
+        item.classList.add('open');
+        const r = item.getBoundingClientRect();
+        window.scrollTo({ top: Math.max(0, window.scrollY + r.top - 90), behavior: 'instant' });
+      } else {
+        window.scrollTo({ top: ctx.scrollY, behavior: 'instant' });
+      }
+    };
+    setTimeout(restaurar, 80); setTimeout(restaurar, 450); // o 2º cobre a rolagem suave do botão "Diário"
+  }
+  document.addEventListener('click', (ev) => { if(ev.target.closest('[data-voltar-diario]')) voltarAoDiario(); });
   const CORES_TRACO = { amarelo: '#c99a3d', verde: '#3f7d5c' };
   function fmtCurto(iso){ if(!iso) return ''; const [y,m,d] = iso.split('-'); return `${d}/${m}`; }
   function pontosDoTraco(d){
@@ -4445,8 +4479,17 @@
       const obraLabel = obra === 'Pequis' ? 'Solar dos Pequis' : obra === 'Buritis' ? 'Solar dos Buritis' : obra;
 
       const linhas = [`<div class="dob-card-bloco-linha"><span>Obra</span><b>${obraLabel}</b></div>`];
-      if(estado?.dataInicio) linhas.push(`<div class="dob-card-bloco-linha"><span>Início</span><b>${fmtDate(estado.dataInicio)}</b></div>`);
-      if(estado?.dataConclusao) linhas.push(`<div class="dob-card-bloco-linha"><span>Concluído em</span><b>${fmtDate(estado.dataConclusao)}</b></div>`);
+      // No modo edição, as datas viram campos editáveis (corrigir quando o apontamento foi lançado em outro dia)
+      const editarDatas = !!(mapaModoEdicao && estado && atual !== '');
+      if(editarDatas){
+        linhas.push(`<div style="display:flex; gap:8px; margin:8px 0 2px;">
+          <div style="flex:1;"><label style="font-size:12px; color:#8a8272; display:block; margin-bottom:4px;">Início</label><input type="date" id="dob-card-dini" class="dob-input" value="${estado.dataInicio || ''}" style="width:100%;" /></div>
+          ${atual === 'verde' ? `<div style="flex:1;"><label style="font-size:12px; color:#8a8272; display:block; margin-bottom:4px;">Concluído em</label><input type="date" id="dob-card-dconc" class="dob-input" value="${estado.dataConclusao || ''}" style="width:100%;" /></div>` : ''}
+        </div>`);
+      } else {
+        if(estado?.dataInicio) linhas.push(`<div class="dob-card-bloco-linha"><span>Início</span><b>${fmtDate(estado.dataInicio)}</b></div>`);
+        if(estado?.dataConclusao) linhas.push(`<div class="dob-card-bloco-linha"><span>Concluído em</span><b>${fmtDate(estado.dataConclusao)}</b></div>`);
+      }
       if(estado?.empresa) linhas.push(`<div class="dob-card-bloco-linha"><span>Empresa</span><b>${estado.empresa}</b></div>`);
       if(estado?.responsavel) linhas.push(`<div class="dob-card-bloco-linha"><span>Responsável</span><b>${estado.responsavel}</b></div>`);
 
@@ -4488,7 +4531,7 @@
           </div>
           <div style="display:flex; gap:8px; padding:12px 18px; background:#f3ede1; border-top:1px solid #e7e3d8;">
             <button type="button" id="dob-card-cancelar" style="flex:1; padding:9px; border-radius:8px; border:1px solid #ccc; background:#fff; font-size:13px; cursor:pointer;">${mapaModoEdicao ? 'Cancelar' : 'Fechar'}</button>
-            ${mapaModoEdicao && atual !== '' ? `<button type="button" id="dob-card-so-empresa" style="flex:1; padding:9px; border-radius:8px; border:1px solid #c0522f; background:#fff; color:#c0522f; font-weight:600; font-size:12.5px; cursor:pointer;">Só salvar empresa</button>` : ''}
+            ${mapaModoEdicao && atual !== '' ? `<button type="button" id="dob-card-so-empresa" style="flex:1; padding:9px; border-radius:8px; border:1px solid #c0522f; background:#fff; color:#c0522f; font-weight:600; font-size:12.5px; cursor:pointer;">Só salvar (datas e empresa)</button>` : ''}
             ${mapaModoEdicao ? `<button type="button" id="dob-card-confirmar" style="flex:1; padding:9px; border-radius:8px; border:none; background:#c0522f; color:#fff; font-weight:600; font-size:13px; cursor:pointer;">${botaoLabel}</button>` : ''}
           </div>
         </div>`;
@@ -4499,15 +4542,31 @@
         const outra = (overlay.querySelector('#dob-card-emp-outra').value || '').trim();
         return (outra || sel.value || '');
       };
+      // Datas editadas no cartão: só devolve o que existe na tela; null = datas inválidas (fim antes do início)
+      const lerDatas = () => {
+        const i = overlay.querySelector('#dob-card-dini'), c = overlay.querySelector('#dob-card-dconc');
+        const r = {};
+        if(i) r.dataInicio = i.value || '';
+        if(c) r.dataConclusao = c.value || '';
+        if(r.dataInicio && r.dataConclusao && r.dataConclusao < r.dataInicio){
+          mostrarToastSalvo('A data de conclusão não pode ser antes do início', { erro: true });
+          return null;
+        }
+        return r;
+      };
       overlay.querySelector('#dob-card-cancelar').addEventListener('click', () => finalizar(null));
       overlay.addEventListener('click', (ev) => { if(ev.target === overlay) finalizar(null); });
       const confirmarBtn = overlay.querySelector('#dob-card-confirmar');
       if(confirmarBtn) confirmarBtn.addEventListener('click', () => {
+        const datas = lerDatas(); if(!datas) return;
         const responsavel = pedirResponsavel ? (document.getElementById('dob-card-resp').value || '') : undefined;
-        finalizar({ responsavel, empresa: lerEmpresa() });
+        finalizar({ responsavel, empresa: lerEmpresa(), datas });
       });
       const soEmp = overlay.querySelector('#dob-card-so-empresa');
-      if(soEmp) soEmp.addEventListener('click', () => finalizar({ soEmpresa: true, empresa: lerEmpresa() }));
+      if(soEmp) soEmp.addEventListener('click', () => {
+        const datas = lerDatas(); if(!datas) return;
+        finalizar({ soEmpresa: true, empresa: lerEmpresa(), datas });
+      });
     });
   }
   async function manipularCliqueBloco(servico, obra, blocoId){
@@ -4526,7 +4585,8 @@
     const resultado = await cardBlocoCustom({ servico, obra, blocoId, nomeBonito });
     if(!resultado || !mapaModoEdicao) return false;
     if(resultado.empresa !== undefined) empresaPadraoSalvar(servico, obra, resultado.empresa);
-    if(resultado.soEmpresa){ definirEmpresaBloco(servico, obra, blocoId, resultado.empresa); mostrarToastSalvo(`Empresa de ${nomeBonito} salva`); return true; }
+    aplicarDatasBloco(servico, obra, blocoId, resultado.datas);
+    if(resultado.soEmpresa){ definirEmpresaBloco(servico, obra, blocoId, resultado.empresa); mostrarToastSalvo(`${nomeBonito} salvo`); return true; }
     ciclarCorBloco(servico, obra, blocoId, resultado.responsavel, resultado.empresa);
     mostrarToastSalvo(`${nomeBonito} atualizado`);
     return true;
@@ -4562,6 +4622,7 @@
     container.innerHTML = `
       <div class="dob-card-form">
         <h3>Mapa de Acompanhamento</h3>
+        ${(voltarDiarioCtx && !(mapaModoEdicao && !mapaMostrarSeletorCompleto)) ? `<button type="button" class="dob-btn secundario pequeno" data-voltar-diario style="margin-bottom:10px;">← Voltar ao apontamento${voltarDiarioCtx.data ? ' de ' + fmtDate(voltarDiarioCtx.data) : ''}</button>` : ''}
         <div id="dob-mapa-salvo" style="position:sticky; top:0; z-index:61; display:flex; align-items:center; gap:10px; padding:7px 12px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:600;"><span id="dob-mapa-salvo-txt" style="flex:1;"></span><button type="button" class="dob-btn pequeno" id="dob-mapa-salvar-agora">💾 Salvar agora</button></div>
         ${dataForcadaMapa ? `
           <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#fdf2e6; border:1px solid #e8c48f; border-radius:8px; margin-bottom:10px;">
@@ -4579,6 +4640,7 @@
           <div style="position:sticky; top:0; z-index:60; display:flex; align-items:center; gap:10px; padding:10px 14px; background:#274b74; color:#fff; border-radius:8px; margin-bottom:10px; box-shadow:0 3px 10px rgba(0,0,0,0.18);">
             <span style="font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; opacity:.8; flex-shrink:0;">Atualizando</span>
             <span id="dob-mapa-titulo-fixo" style="font-size:15px; font-weight:700; flex:1;">…</span>
+            ${voltarDiarioCtx ? `<button type="button" data-voltar-diario class="dob-btn secundario pequeno" style="flex-shrink:0; background:#fff; color:#274b74; border:none; font-weight:700;">← Voltar ao apontamento</button>` : ''}
             <button type="button" id="dob-mapa-trocar-servico" class="dob-btn secundario pequeno" style="flex-shrink:0; background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.55);">Trocar serviço/obra</button>
           </div>
         ` : ''}
@@ -7753,7 +7815,7 @@
   document.getElementById('dob-btn-mapa').addEventListener('click', () => {
     mapaAberto = !mapaAberto;
     mapaModoEdicao = false;
-    if(!mapaAberto) dataForcadaMapa = null;
+    if(!mapaAberto){ dataForcadaMapa = null; voltarDiarioCtx = null; }
     document.getElementById('dob-btn-mapa').textContent = mapaAberto ? 'Fechar mapa' : 'Mapa de Acompanhamento';
     renderMapa();
     if(mapaAberto) document.getElementById('dob-mapa-container').scrollIntoView({behavior:'smooth', block:'start'});
