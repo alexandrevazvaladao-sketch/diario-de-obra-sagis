@@ -964,7 +964,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.15.36';
+  const APP_VERSION = 'v2026.10.15.37';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -7876,7 +7876,11 @@
     const mais = document.getElementById('dob-fotos-mais');
     if(mais) mais.addEventListener('click', () => { fotosObraLimite += 120; renderFotosObra(); });
     container.querySelectorAll('[data-fobra-abrir]').forEach(el => el.addEventListener('click', () => {
-      openLightbox(lista.map(x => x.foto), Number(el.dataset.fobraAbrir));
+      // No visualizador, avançar (→) sempre vai pra dias mais novos e voltar (←) pra dias mais antigos,
+      // qualquer que seja a ordem da grade
+      const i = Number(el.dataset.fobraAbrir);
+      const cron = fotosObraOrdem === 'recentes' ? lista.slice().reverse() : lista;
+      openLightbox(cron.map(x => x.foto), fotosObraOrdem === 'recentes' ? lista.length - 1 - i : i);
     }));
   }
   document.getElementById('dob-btn-fotos').addEventListener('click', () => {
