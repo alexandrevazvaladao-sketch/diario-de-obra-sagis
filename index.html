@@ -961,7 +961,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.15.34';
+  const APP_VERSION = 'v2026.10.15.35';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -7479,7 +7479,29 @@
   }
 
   let mapaItemContador = 0;
-  function linhasMapaParaHtml(linhas, data){
+  // Tira de fotos de um serviço (montada sob demanda: ver preencherFotosLazy)
+  function fotosStripHtml(servico, fotos){
+    const sv = servico.replace(/"/g, '&quot;');
+    return `<div class="dob-mapa-fotos-strip">${fotos.map((x, fi) => `
+                <div class="dob-mapa-foto-item">
+                  <button type="button" class="dob-mapa-foto-desvincular" data-entry-id="${x.entryId}" data-idx="${x.idx}" title="Desvincular esta foto">✕</button>
+                  <img loading="lazy" decoding="async" src="${x.foto.thumb || x.foto.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" alt="Foto" class="dob-mapa-foto-abrir" data-fv-servico="${sv}" data-fv-idx="${fi}" title="Clique pra ver em tamanho grande" />
+                  <span class="dob-mapa-foto-data">${fmtDate(x.data)}</span>
+                </div>`).join('')}</div>`;
+  }
+  function preencherFotosLazy(raiz){
+    raiz.querySelectorAll('.dob-mapa-fotos-slot').forEach(slot => {
+      if(slot.dataset.pronto) return;
+      slot.dataset.pronto = '1';
+      slot.innerHTML = fotosStripHtml(slot.dataset.fotosServico, fotosDoServico(slot.dataset.fotosServico));
+    });
+  }
+  // Seção "marcações do mapa" do Diário: as fotos só entram no DOM quando a seção é aberta
+  document.addEventListener('toggle', (ev) => {
+    const d = ev.target;
+    if(d && d.matches && d.matches('details.dob-entry-secao-colapsavel') && d.open) preencherFotosLazy(d);
+  }, true);
+  function linhasMapaParaHtml(linhas, data, lazyFotos){
     const STATUS_INFO = {
       andamento: { cor: '#a97e2c', bg: 'rgba(201,154,61,0.18)', label: '🟡 Em Execução', chipClasse: 'mapa-andamento' },
       concluido: { cor: '#2f5f45', bg: 'rgba(63,125,92,0.14)',  label: '🟢 Concluído',    chipClasse: 'mapa-concluido' }
@@ -7512,12 +7534,7 @@
           const fotos = fotosDoServico(l.servico);
           const fotosLabelHtml = `<div class="dob-mapa-fotos-label">Fotos vinculadas${fotos.length ? ` (${fotos.length})` : ''}</div>`;
           const fotosHtml = fotos.length
-            ? `<div class="dob-mapa-fotos-strip">${fotos.map((x, fi) => `
-                <div class="dob-mapa-foto-item">
-                  <button type="button" class="dob-mapa-foto-desvincular" data-entry-id="${x.entryId}" data-idx="${x.idx}" title="Desvincular esta foto">✕</button>
-                  <img loading="lazy" decoding="async" src="${x.foto.thumb || x.foto.data || FOTO_SEM_THUMB}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" alt="Foto" class="dob-mapa-foto-abrir" data-fv-servico="${l.servico.replace(/"/g, '&quot;')}" data-fv-idx="${fi}" title="Clique pra ver em tamanho grande" />
-                  <span class="dob-mapa-foto-data">${fmtDate(x.data)}</span>
-                </div>`).join('')}</div>`
+            ? (lazyFotos ? `<div class="dob-mapa-fotos-slot" data-fotos-servico="${l.servico.replace(/"/g, '&quot;')}"></div>` : fotosStripHtml(l.servico, fotos))
             : `<div class="dob-mapa-sem-foto">Nenhuma foto vinculada a essa atividade ainda.</div>`;
           return `
             <div class="dob-kanban-item" id="${itemId}" data-item-key="${itemKey.replace(/"/g, '&quot;')}">
@@ -7627,7 +7644,7 @@
     const qtdItens = linhas.filter(l => l.tipo === 'item').length;
     const obras = linhas.filter(l => l.tipo === 'obra').map(l => l.texto);
     const resumoObras = obras.length ? ` (${obras.join(', ')})` : '';
-    return `<details class="dob-entry-secao-colapsavel"><summary>📍 ${qtdItens} ${qtdItens===1?'marcação':'marcações'} do mapa nesse dia${resumoObras}</summary><div class="dob-entry-secao-texto">${linhasMapaParaHtml(linhas, data)}</div></details>`;
+    return `<details class="dob-entry-secao-colapsavel"><summary>📍 ${qtdItens} ${qtdItens===1?'marcação':'marcações'} do mapa nesse dia${resumoObras}</summary><div class="dob-entry-secao-texto">${linhasMapaParaHtml(linhas, data, true)}</div></details>`;
   }
 
   function datasComMarcacaoSemRegistro(){
