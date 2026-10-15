@@ -857,6 +857,7 @@
     <div class="dob-side-item" data-side="mapa"><span class="ic">🗺️</span><span class="label">Mapa</span></div>
     <div class="dob-side-item" data-side="cronograma"><span class="ic">📅</span><span class="label">Cronograma</span></div>
     <div class="dob-side-item" data-side="campo"><span class="ic">📷</span><span class="label">Modo Campo</span></div>
+    <div class="dob-side-item" data-side="fotos"><span class="ic">🖼️</span><span class="label">Fotos da obra</span></div>
     <div class="dob-side-item" data-side="resumo-macro"><span class="ic">📊</span><span class="label">Resumo macro</span></div>
     <div class="dob-side-item" data-side="resumo-semana"><span class="ic">📅</span><span class="label">Resumo semana</span></div>
     <div class="dob-side-item" data-side="catalogo"><span class="ic">📐</span><span class="label">Catálogo de custos</span></div>
@@ -922,6 +923,7 @@
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-mapa">Mapa de Acompanhamento</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-cronograma">Cronograma</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-campo">📷 Modo Campo</button>
+    <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-fotos">🖼️ Fotos da obra</button>
     <button type="button" class="dob-btn secundario pequeno dob-filtros-toggle" id="dob-filtros-toggle">🔍 Filtros</button>
     <div class="dob-filtros" id="dob-filtros-painel">
       <select class="dob-select" id="dob-filtro-obra">
@@ -945,6 +947,7 @@
   <div id="dob-painel-container"></div>
   <div id="dob-custo-etapa-container"></div>
   <div id="dob-uaubee-container"></div>
+  <div id="dob-fotos-container"></div>
   <div id="dob-catalogo-container"></div>
   <div id="dob-metodo-container"></div>
   <div id="dob-mapa-container"></div>
@@ -961,7 +964,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.15.35';
+  const APP_VERSION = 'v2026.10.15.36';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -1134,6 +1137,7 @@
 
   // ---------- UAU → BEE: leitura dos relatórios .rdf do UAU (Medição por Obra) pra facilitar a "tradução" manual pro BEE ----------
   let uauBeeAberto = false;
+  let fotosObraAberto = false, fotosObraOrdem = 'recentes', fotosObraFiltro = '', fotosObraLimite = 120;
   let uauBeeState = { items: [], contratos: [] };
   // items: relatório "Planilha de Medição por Obra" -> {key, obra, objeto, fornecedorCodigo, fornecedorNome, contratado, anterior, atual, acumulado, saldo, atualizadoEm}
   // contratos: relatório "Contratos por Obra" -> {key, obra, contratoNumero, objeto, empresaCodigo, fornecedorCodigo, fornecedorNome, itens[], valorTotalContrato, atualizadoEm}
@@ -2667,7 +2671,7 @@
   // ---------- Visibilidade das seções (o dono decide quem vê cada parte do app) ----------
   var VIS_PADRAO = { 'painel': 'dono', 'custo-etapa': 'dono', 'uaubee': 'dono', 'gamma': 'dono' }; // em desenvolvimento: só o dono, até liberar
   var VIS_SECOES = [['novo', 'Novo apontamento', 'dob-novo'], ['metodo', 'Método construtivo', 'dob-btn-metodo'], ['mapa', 'Mapa', 'dob-btn-mapa'], ['cronograma', 'Cronograma', 'dob-btn-cronograma'],
-    ['campo', 'Modo Campo', 'dob-btn-campo'], ['resumo-macro', 'Resumo macro', 'dob-btn-resumo-macro'], ['resumo-semana', 'Resumo semana', 'dob-btn-resumo-semana'], ['catalogo', 'Catálogo de custos', 'dob-btn-catalogo'],
+    ['campo', 'Modo Campo', 'dob-btn-campo'], ['fotos', 'Fotos da obra', 'dob-btn-fotos'], ['resumo-macro', 'Resumo macro', 'dob-btn-resumo-macro'], ['resumo-semana', 'Resumo semana', 'dob-btn-resumo-semana'], ['catalogo', 'Catálogo de custos', 'dob-btn-catalogo'],
     ['painel', 'Meu painel', 'dob-btn-painel'], ['custo-etapa', 'Custo por etapa', 'dob-btn-custo-etapa'], ['relatorio', 'Apresentação', 'dob-btn-relatorio'], ['gamma', 'Comando Gamma', 'dob-btn-gamma'], ['uaubee', 'UAU → BEE', 'dob-btn-uaubee']];
   function nivelSecao(k){ return (nuvem.vis && nuvem.vis[k]) || VIS_PADRAO[k] || 'todos'; }
   function secaoVisivel(k){ const n = nivelSecao(k); if(nuvem.dono) return true; if(n === 'todos') return true; if(n === 'editores') return !!nuvem.editor; return false; }
@@ -7823,6 +7827,64 @@
     renderCatalogo();
     if(catalogoAberto) document.getElementById('dob-catalogo-container').scrollIntoView({behavior:'smooth', block:'start'});
   });
+  // ---------- Fotos da obra: galeria com todas as fotos já enviadas, em ordem cronológica ----------
+  function todasAsFotosObra(){
+    const lista = [];
+    entries.forEach(e => {
+      (e.fotos || []).forEach((f, i) => {
+        const nf = normalizeFoto(f);
+        if(!nf || !(nf.thumb || nf.data)) return;
+        lista.push({ data: e.date, obra: e.obra || '', idx: i, foto: nf, legenda: nf.legenda || '' });
+      });
+    });
+    lista.sort((a, b) => {
+      const ka = a.data + '_' + String(a.idx).padStart(4, '0'), kb = b.data + '_' + String(b.idx).padStart(4, '0');
+      return fotosObraOrdem === 'recentes' ? kb.localeCompare(ka) : ka.localeCompare(kb);
+    });
+    return fotosObraFiltro ? lista.filter(x => x.obra === fotosObraFiltro) : lista;
+  }
+  function renderFotosObra(){
+    const container = document.getElementById('dob-fotos-container');
+    if(!container) return;
+    if(!fotosObraAberto){ container.innerHTML = ''; return; }
+    const lista = todasAsFotosObra();
+    const mostrar = lista.slice(0, fotosObraLimite);
+    container.innerHTML = `
+      <div class="dob-card" style="padding:16px 18px; margin-top:14px;">
+        <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px;">
+          <h3 style="margin:0; font-family:Georgia,serif; font-size:20px; flex:1; min-width:160px;">🖼️ Fotos da obra <span style="font-size:13px; color:#8a8272; font-family:inherit;">(${lista.length})</span></h3>
+          <select class="dob-select" id="dob-fotos-filtro-obra">
+            <option value="">Todas as obras</option>
+            <option value="Pequis"${fotosObraFiltro === 'Pequis' ? ' selected' : ''}>Solar dos Pequis</option>
+            <option value="Buritis"${fotosObraFiltro === 'Buritis' ? ' selected' : ''}>Solar dos Buritis</option>
+            <option value="Geral"${fotosObraFiltro === 'Geral' ? ' selected' : ''}>Geral / Administrativo</option>
+          </select>
+          <button type="button" class="dob-btn secundario pequeno" id="dob-fotos-ordem">${fotosObraOrdem === 'recentes' ? '↓ Mais recentes primeiro' : '↑ Mais antigas primeiro'}</button>
+        </div>
+        ${lista.length ? `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:8px;">${mostrar.map((x, i) => `
+          <div data-fobra-abrir="${i}" style="position:relative; border-radius:8px; overflow:hidden; border:1px solid var(--line); background:#eee; cursor:pointer;" title="${(x.legenda || '').replace(/"/g, '&quot;')}">
+            <img loading="lazy" decoding="async" src="${x.foto.thumb || x.foto.data}" onerror="this.onerror=null;this.src='${FOTO_SEM_THUMB}';" style="width:100%; aspect-ratio:1/1; object-fit:cover; display:block;" />
+            <div style="position:absolute; left:0; right:0; bottom:0; padding:2px 5px; font-size:10px; color:#fff; background:linear-gradient(transparent, rgba(0,0,0,0.6));">${fmtDate(x.data)}${x.obra ? ' · ' + x.obra : ''}</div>
+          </div>`).join('')}</div>
+          ${lista.length > mostrar.length ? `<div style="text-align:center; margin-top:12px;"><button type="button" class="dob-btn secundario" id="dob-fotos-mais">Mostrar mais (${lista.length - mostrar.length} restantes)</button></div>` : ''}`
+          : '<p class="dob-dica" style="margin:0;">Nenhuma foto enviada ainda.</p>'}
+      </div>`;
+    const filtro = document.getElementById('dob-fotos-filtro-obra');
+    if(filtro) filtro.addEventListener('change', () => { fotosObraFiltro = filtro.value; fotosObraLimite = 120; renderFotosObra(); });
+    const ordem = document.getElementById('dob-fotos-ordem');
+    if(ordem) ordem.addEventListener('click', () => { fotosObraOrdem = fotosObraOrdem === 'recentes' ? 'antigas' : 'recentes'; fotosObraLimite = 120; renderFotosObra(); });
+    const mais = document.getElementById('dob-fotos-mais');
+    if(mais) mais.addEventListener('click', () => { fotosObraLimite += 120; renderFotosObra(); });
+    container.querySelectorAll('[data-fobra-abrir]').forEach(el => el.addEventListener('click', () => {
+      openLightbox(lista.map(x => x.foto), Number(el.dataset.fobraAbrir));
+    }));
+  }
+  document.getElementById('dob-btn-fotos').addEventListener('click', () => {
+    fotosObraAberto = !fotosObraAberto;
+    document.getElementById('dob-btn-fotos').textContent = fotosObraAberto ? 'Fechar Fotos da obra' : '🖼️ Fotos da obra';
+    renderFotosObra();
+    if(fotosObraAberto) document.getElementById('dob-fotos-container').scrollIntoView({behavior:'smooth', block:'start'});
+  });
   document.getElementById('dob-btn-uaubee').addEventListener('click', () => {
     uauBeeAberto = !uauBeeAberto;
     document.getElementById('dob-btn-uaubee').textContent = uauBeeAberto ? 'Fechar UAU → BEE' : 'UAU → BEE';
@@ -8183,6 +8245,7 @@
       mapa: 'dob-btn-mapa',
       cronograma: 'dob-btn-cronograma',
       campo: 'dob-btn-campo',
+      fotos: 'dob-btn-fotos',
       'resumo-macro': 'dob-btn-resumo-macro',
       'resumo-semana': 'dob-btn-resumo-semana',
       painel: 'dob-btn-painel',
@@ -8196,7 +8259,7 @@
       config: 'dob-btn-config',
       novo: 'dob-novo'
     };
-    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-cronograma', 'dob-btn-campo', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-painel', 'dob-btn-custo-etapa', 'dob-btn-relatorio', 'dob-btn-gamma', 'dob-btn-uaubee', 'dob-btn-catalogo', 'dob-btn-metodo'];
+    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-cronograma', 'dob-btn-campo', 'dob-btn-fotos', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-painel', 'dob-btn-custo-etapa', 'dob-btn-relatorio', 'dob-btn-gamma', 'dob-btn-uaubee', 'dob-btn-catalogo', 'dob-btn-metodo'];
     function sincronizarSidebar(){
       let algumAberto = false;
       Object.entries(mapaBotoes).forEach(([side, btnId]) => {
