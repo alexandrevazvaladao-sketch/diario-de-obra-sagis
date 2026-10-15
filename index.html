@@ -961,7 +961,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.15.33';
+  const APP_VERSION = 'v2026.10.15.32';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -3986,7 +3986,6 @@
     if(!e) return;
     if(datas.dataInicio !== undefined){ if(datas.dataInicio) e.dataInicio = datas.dataInicio; else delete e.dataInicio; }
     if(datas.dataConclusao !== undefined){ if(datas.dataConclusao) e.dataConclusao = datas.dataConclusao; else delete e.dataConclusao; }
-    if(datas.estimada !== undefined){ if(datas.estimada) e.dataEstimada = true; else delete e.dataEstimada; }
     e.atualizadoEm = Date.now();
   }
   function definirEmpresaBloco(servico, obra, bloco, empresa){
@@ -4487,11 +4486,9 @@
           <div style="flex:1;"><label style="font-size:12px; color:#8a8272; display:block; margin-bottom:4px;">Início</label><input type="date" id="dob-card-dini" class="dob-input" value="${estado.dataInicio || ''}" style="width:100%;" /></div>
           ${atual === 'verde' ? `<div style="flex:1;"><label style="font-size:12px; color:#8a8272; display:block; margin-bottom:4px;">Concluído em</label><input type="date" id="dob-card-dconc" class="dob-input" value="${estado.dataConclusao || ''}" style="width:100%;" /></div>` : ''}
         </div>`);
-        linhas.push(`<label style="display:flex; align-items:center; gap:8px; font-size:12px; color:#8a8272; margin:6px 0 2px; cursor:pointer;"><input type="checkbox" id="dob-card-estim" ${estado.dataEstimada ? 'checked' : ''} /> Data estimada (ainda não confirmada)</label>`);
       } else {
         if(estado?.dataInicio) linhas.push(`<div class="dob-card-bloco-linha"><span>Início</span><b>${fmtDate(estado.dataInicio)}</b></div>`);
         if(estado?.dataConclusao) linhas.push(`<div class="dob-card-bloco-linha"><span>Concluído em</span><b>${fmtDate(estado.dataConclusao)}</b></div>`);
-        if(estado?.dataEstimada) linhas.push(`<div class="dob-card-bloco-linha"><span>Datas</span><b style="color:#b8860b;">⚠ estimadas</b></div>`);
       }
       if(estado?.empresa) linhas.push(`<div class="dob-card-bloco-linha"><span>Empresa</span><b>${estado.empresa}</b></div>`);
       if(estado?.responsavel) linhas.push(`<div class="dob-card-bloco-linha"><span>Responsável</span><b>${estado.responsavel}</b></div>`);
@@ -4551,8 +4548,6 @@
         const r = {};
         if(i) r.dataInicio = i.value || '';
         if(c) r.dataConclusao = c.value || '';
-        const est = overlay.querySelector('#dob-card-estim');
-        if(est) r.estimada = !!est.checked;
         if(r.dataInicio && r.dataConclusao && r.dataConclusao < r.dataInicio){
           mostrarToastSalvo('A data de conclusão não pode ser antes do início', { erro: true });
           return null;
