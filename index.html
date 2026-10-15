@@ -14,9 +14,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Diário de Obra" />
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --ink:#16233d;
@@ -823,6 +823,20 @@
 </head>
 <body>
 <div id="dob-gate"><div class="lg-carregando"><b>Diário de Obra</b><span>Carregando…</span></div></div>
+<script>
+// Rede de segurança: se a tela de carregamento passar de 10 s, oferece recarregar; erros ficam guardados para diagnóstico.
+(function(){
+  function guardar(m){ try{ var l = JSON.parse(localStorage.getItem('dob:erros') || '[]'); l.push(new Date().toISOString().slice(0, 19) + ' ' + String(m).slice(0, 300)); localStorage.setItem('dob:erros', JSON.stringify(l.slice(-8))); }catch(e){ /* ignora */ } }
+  window.addEventListener('error', function(e){ guardar((e.message || 'erro') + ' @' + (e.lineno || '')); });
+  window.addEventListener('unhandledrejection', function(e){ guardar('promessa: ' + (e.reason && (e.reason.message || e.reason))); });
+  setTimeout(function(){
+    var g = document.getElementById('dob-gate'), c = g && g.querySelector('.lg-carregando');
+    if(!g || g.style.display === 'none' || !c) return;
+    c.insertAdjacentHTML('beforeend', '<br><br><button type="button" id="dob-gate-recarregar" style="padding:10px 18px;border-radius:10px;border:0;font-size:15px;background:#fff;color:#16233d;font-weight:600">Demorando… tocar para recarregar</button>');
+    document.getElementById('dob-gate-recarregar').onclick = function(){ location.reload(); };
+  }, 10000);
+})();
+</script>
 <div id="dob-m-fundo"></div>
 <div id="dob-m-bar" aria-label="Navegação">
   <button type="button" data-go="home"><span class="ic">📋</span>Diário</button>
@@ -947,7 +961,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.14.29';
+  const APP_VERSION = 'v2026.10.15.30';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
