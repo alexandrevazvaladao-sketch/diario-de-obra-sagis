@@ -969,7 +969,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.19.39';
+  const APP_VERSION = 'v2026.10.19.40';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2089,22 +2089,23 @@
     const raio = 29.5, circ = 2 * Math.PI * raio;
     const dashOffset = circ - (ppc/100) * circ;
 
-    // Geral de cada obra: PPC acumulado (semanas já fechadas) e avanço do plano (feitos / planejados)
+    // Geral de cada obra: avanço físico até o fim da obra (peso de cada serviço pela curva S da planilha) + PPC acumulado
     const geralHtml = ['Buritis','Pequis'].map(ob => {
       const dd = cronogramaDados[ob]; if(!dd) return '';
-      const folhas = dd.itens.filter(i => i.nivel === 3 && i.semanal);
-      let totF = 0, okF = 0, totP = 0, okP = 0;
-      folhas.forEach(it => Object.keys(it.semanal).forEach(sw => {
+      let real = 0, prev = 0, totF = 0, okF = 0;
+      dd.itens.filter(i => i.nivel === 3 && i.semanal).forEach(it => Object.keys(it.semanal).forEach(sw => {
         if((it.semanal[sw] || 0) <= 0) return;
         const r = semanalFeitos[cronogramaChaveSemana(ob, it.cod, sw)]; const f = !!(r && r.feito);
-        totP++; if(f) okP++;
-        const [yy,mm,dd2] = sw.split('-').map(Number); const fim = new Date(yy, mm-1, dd2 + 6);
+        const pw = (it.pesos && it.pesos[sw]) || 0;
+        if(f) real += pw;
+        const [yy,mm,d3] = sw.split('-').map(Number); const fim = new Date(yy, mm-1, d3 + 6);
         const fimIso = `${fim.getFullYear()}-${String(fim.getMonth()+1).padStart(2,'0')}-${String(fim.getDate()).padStart(2,'0')}`;
-        if(fimIso < hoje){ totF++; if(f) okF++; }
+        if(fimIso < hoje){ totF++; if(f) okF++; prev += pw; }
       }));
-      const pa = totF ? Math.round(okF/totF*100) : 0, pp = totP ? Math.round(okP/totP*100) : 0;
-      const r2 = 26, c2 = 2*Math.PI*r2, off = c2 - (pa/100)*c2;
-      return `<div class="gcard ${ob===cronogramaObraAtual?'sel':''}" data-crono-geral="${ob}"><div class="dob-crono-ppc-aro ${pa>=80?'bom':''}"><svg viewBox="0 0 72 72"><circle class="fundo" cx="36" cy="36" r="${r2+3.5}"></circle><circle class="frente" cx="36" cy="36" r="${r2+3.5}" stroke-dasharray="${2*Math.PI*(r2+3.5)}" stroke-dashoffset="${(2*Math.PI*(r2+3.5)) - (pa/100)*(2*Math.PI*(r2+3.5))}"></circle></svg><div class="valor" style="font-size:15px;">${pa}%</div></div><div><div class="gtit">Solar dos ${ob} — geral</div><div class="gsub">PPC acumulado: ${okF} de ${totF} compromisso(s) das semanas já fechadas</div><div class="gsub">Plano total: ${okP} de ${totP} (${pp}%)</div></div></div>`;
+      const pr = Math.round(real*1000)/10, pv = Math.round(prev*1000)/10, ppcA = totF ? Math.round(okF/totF*100) : 0;
+      const rr = 29.5, cc = 2*Math.PI*rr, off = cc - Math.min(real,1)*cc;
+      const fmt1 = v => String(v).replace('.', ',');
+      return `<div class="gcard ${ob===cronogramaObraAtual?'sel':''}" data-crono-geral="${ob}"><div class="dob-crono-ppc-aro ${real>=prev?'bom':''}"><svg viewBox="0 0 72 72"><circle class="fundo" cx="36" cy="36" r="${rr}"></circle><circle class="frente" cx="36" cy="36" r="${rr}" stroke-dasharray="${cc}" stroke-dashoffset="${off}"></circle></svg><div class="valor" style="font-size:14px;">${fmt1(pr)}%</div></div><div><div class="gtit">Solar dos ${ob} — geral da obra</div><div class="gsub">Avanço até o fim da obra (peso por custo). Previsto até hoje: ${fmt1(pv)}%</div><div class="gsub">PPC acumulado: ${ppcA}% (${okF} de ${totF} compromissos das semanas fechadas)</div></div></div>`;
     }).join('');
 
     const causasResumoHtml = Object.keys(causasContagem).length ?
