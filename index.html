@@ -539,6 +539,11 @@
   .dob-crono-status.naoiniciado{ background:#f0ede4; color:var(--muted); }
   .dob-crono-item.concluido .dob-crono-desc{ text-decoration:line-through; color:var(--muted); }
 
+  .dob-crono-geral{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; margin:14px 0 4px; }
+  .dob-crono-geral .gcard{ display:flex; align-items:center; gap:14px; background:#f7f4ec; border:1px solid var(--line); border-radius:10px; padding:12px 14px; cursor:pointer; }
+  .dob-crono-geral .gcard.sel{ border-color:var(--clay, #d9662f); box-shadow:0 0 0 1px var(--clay, #d9662f) inset; }
+  .dob-crono-geral .gcard .dob-crono-ppc-aro{ width:64px; height:64px; } .dob-crono-geral .gcard .dob-crono-ppc-aro svg{ width:64px; height:64px; }
+  .dob-crono-geral .gtit{ font-weight:700; font-size:15px; } .dob-crono-geral .gsub{ font-size:12.5px; color:var(--muted); margin-top:2px; }
   .dob-crono-ppc-card{ display:flex; align-items:center; gap:18px; background:#f7f4ec; border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin:14px 0; flex-wrap:wrap; }
   .dob-crono-ppc-aro{ position:relative; width:72px; height:72px; flex-shrink:0; }
   .dob-crono-ppc-aro svg{ width:72px; height:72px; transform:rotate(-90deg); }
@@ -964,7 +969,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.19.38';
+  const APP_VERSION = 'v2026.10.19.39';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2084,6 +2089,24 @@
     const raio = 29.5, circ = 2 * Math.PI * raio;
     const dashOffset = circ - (ppc/100) * circ;
 
+    // Geral de cada obra: PPC acumulado (semanas já fechadas) e avanço do plano (feitos / planejados)
+    const geralHtml = ['Buritis','Pequis'].map(ob => {
+      const dd = cronogramaDados[ob]; if(!dd) return '';
+      const folhas = dd.itens.filter(i => i.nivel === 3 && i.semanal);
+      let totF = 0, okF = 0, totP = 0, okP = 0;
+      folhas.forEach(it => Object.keys(it.semanal).forEach(sw => {
+        if((it.semanal[sw] || 0) <= 0) return;
+        const r = semanalFeitos[cronogramaChaveSemana(ob, it.cod, sw)]; const f = !!(r && r.feito);
+        totP++; if(f) okP++;
+        const [yy,mm,dd2] = sw.split('-').map(Number); const fim = new Date(yy, mm-1, dd2 + 6);
+        const fimIso = `${fim.getFullYear()}-${String(fim.getMonth()+1).padStart(2,'0')}-${String(fim.getDate()).padStart(2,'0')}`;
+        if(fimIso < hoje){ totF++; if(f) okF++; }
+      }));
+      const pa = totF ? Math.round(okF/totF*100) : 0, pp = totP ? Math.round(okP/totP*100) : 0;
+      const r2 = 26, c2 = 2*Math.PI*r2, off = c2 - (pa/100)*c2;
+      return `<div class="gcard ${ob===cronogramaObraAtual?'sel':''}" data-crono-geral="${ob}"><div class="dob-crono-ppc-aro ${pa>=80?'bom':''}"><svg viewBox="0 0 72 72"><circle class="fundo" cx="36" cy="36" r="${r2+3.5}"></circle><circle class="frente" cx="36" cy="36" r="${r2+3.5}" stroke-dasharray="${2*Math.PI*(r2+3.5)}" stroke-dashoffset="${(2*Math.PI*(r2+3.5)) - (pa/100)*(2*Math.PI*(r2+3.5))}"></circle></svg><div class="valor" style="font-size:15px;">${pa}%</div></div><div><div class="gtit">Solar dos ${ob} — geral</div><div class="gsub">PPC acumulado: ${okF} de ${totF} compromisso(s) das semanas já fechadas</div><div class="gsub">Plano total: ${okP} de ${totP} (${pp}%)</div></div></div>`;
+    }).join('');
+
     const causasResumoHtml = Object.keys(causasContagem).length ?
       `<div class="dob-crono-causas-resumo">${Object.entries(causasContagem).map(([causa, n]) => {
         const label = (CRONOGRAMA_CAUSAS.find(c => c.v === causa) || {t:causa}).t;
@@ -2207,6 +2230,7 @@
             </select>
           </div>
         </div>
+        <div class="dob-crono-geral">${geralHtml}</div>
         <div class="dob-crono-semana-nav">
           <button type="button" class="dob-btn secundario pequeno" id="dob-crono-semana-prev">← Semana anterior</button>
           <span class="dob-crono-semana-label">${cronogramaSemanaLabel(semanaAtual)}</span>
@@ -2231,6 +2255,7 @@
       </div>
     `;
 
+    container.querySelectorAll('[data-crono-geral]').forEach(el => el.addEventListener('click', () => { const ob = el.dataset.cronoGeral; if(ob !== cronogramaObraAtual){ cronogramaObraAtual = ob; cronogramaSemanaAtual = null; renderCronograma(); } }));
     document.getElementById('dob-crono-obra').addEventListener('change', (ev) => {
       cronogramaObraAtual = ev.target.value;
       cronogramaSemanaAtual = null;
