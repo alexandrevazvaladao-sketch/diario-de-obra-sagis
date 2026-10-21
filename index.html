@@ -539,6 +539,17 @@
   .dob-crono-status.naoiniciado{ background:#f0ede4; color:var(--muted); }
   .dob-crono-item.concluido .dob-crono-desc{ text-decoration:line-through; color:var(--muted); }
 
+  .dob-mapa-atualizando{ position:sticky; top:0; z-index:60; display:flex; align-items:center; gap:10px; padding:10px 14px; background:#274b74; color:#fff; border-radius:8px; margin-bottom:10px; box-shadow:0 3px 10px rgba(0,0,0,0.18); box-sizing:border-box; max-width:100%; }
+  .dob-mapa-atualizando .rot{ font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; opacity:.8; flex-shrink:0; }
+  .dob-mapa-atualizando .tit{ font-size:15px; font-weight:700; flex:1; min-width:0; overflow-wrap:anywhere; }
+  .dob-mapa-atualizando .btn-voltar{ flex-shrink:0; background:#fff; color:#274b74; border:none; font-weight:700; }
+  .dob-mapa-atualizando .btn-trocar{ flex-shrink:0; background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.55); }
+  @media (max-width:640px){
+    .dob-mapa-atualizando{ flex-wrap:wrap; gap:6px 8px; padding:8px 10px; }
+    .dob-mapa-atualizando .rot{ flex:0 0 100%; }
+    .dob-mapa-atualizando .tit{ flex:0 0 100%; font-size:13.5px; line-height:1.3; }
+    .dob-mapa-atualizando .btn-voltar, .dob-mapa-atualizando .btn-trocar{ flex:1 1 auto; white-space:normal; text-align:center; }
+  }
   .dob-crono-geral{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; margin:14px 0 4px; }
   .dob-crono-geral .gcard{ display:flex; align-items:center; gap:14px; background:#f7f4ec; border:1px solid var(--line); border-radius:10px; padding:12px 14px; cursor:pointer; }
   .dob-crono-geral .gcard.sel{ border-color:var(--clay, #d9662f); box-shadow:0 0 0 1px var(--clay, #d9662f) inset; }
@@ -969,7 +980,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.19.40';
+  const APP_VERSION = 'v2026.10.21.41';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -4676,11 +4687,11 @@
           </div>
         ` : ''}
         ${mapaModoEdicao && !mapaMostrarSeletorCompleto ? `
-          <div style="position:sticky; top:0; z-index:60; display:flex; align-items:center; gap:10px; padding:10px 14px; background:#274b74; color:#fff; border-radius:8px; margin-bottom:10px; box-shadow:0 3px 10px rgba(0,0,0,0.18);">
-            <span style="font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; opacity:.8; flex-shrink:0;">Atualizando</span>
-            <span id="dob-mapa-titulo-fixo" style="font-size:15px; font-weight:700; flex:1;">…</span>
-            ${voltarDiarioCtx ? `<button type="button" data-voltar-diario class="dob-btn secundario pequeno" style="flex-shrink:0; background:#fff; color:#274b74; border:none; font-weight:700;">← Voltar ao apontamento</button>` : ''}
-            <button type="button" id="dob-mapa-trocar-servico" class="dob-btn secundario pequeno" style="flex-shrink:0; background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.55);">Trocar serviço/obra</button>
+          <div class="dob-mapa-atualizando">
+            <span class="rot">Atualizando</span>
+            <span id="dob-mapa-titulo-fixo" class="tit">…</span>
+            ${voltarDiarioCtx ? `<button type="button" data-voltar-diario class="dob-btn secundario pequeno btn-voltar">← Voltar ao apontamento</button>` : ''}
+            <button type="button" id="dob-mapa-trocar-servico" class="dob-btn secundario pequeno btn-trocar">Trocar serviço/obra</button>
           </div>
         ` : ''}
         <div class="dob-mapa-layout">
