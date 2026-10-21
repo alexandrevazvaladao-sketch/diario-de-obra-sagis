@@ -550,6 +550,14 @@
     .dob-mapa-atualizando .tit{ flex:0 0 100%; font-size:13.5px; line-height:1.3; }
     .dob-mapa-atualizando .btn-voltar, .dob-mapa-atualizando .btn-trocar{ flex:1 1 auto; white-space:normal; text-align:center; }
   }
+  .dob-mapa-novo-serv{ gap:8px; }
+  .dob-mapa-novo-serv > *{ box-sizing:border-box; min-width:0; max-width:100%; }
+  @media (max-width:640px){
+    .dob-mapa-novo-serv{ flex-direction:column; align-items:stretch; }
+    .dob-mapa-novo-serv > *{ width:100% !important; flex:none !important; font-size:14.5px; height:auto; min-height:42px; }
+    .dob-mapa-novo-serv select{ text-overflow:ellipsis; }
+    .dob-mapa-novo-serv #dob-mapa-add-servico{ font-weight:700; }
+  }
   .dob-crono-geral{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; margin:14px 0 4px; }
   .dob-crono-geral .gcard{ display:flex; align-items:center; gap:14px; background:#f7f4ec; border:1px solid var(--line); border-radius:10px; padding:12px 14px; cursor:pointer; }
   .dob-crono-geral .gcard.sel{ border-color:var(--clay, #d9662f); box-shadow:0 0 0 1px var(--clay, #d9662f) inset; }
@@ -980,7 +988,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.10.21.41';
+  const APP_VERSION = 'v2026.10.21.42';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -4728,7 +4736,7 @@
           </div>
           <details style="margin-top:8px;">
             <summary style="cursor:pointer; font-size:12.5px; color:var(--muted); user-select:none;">+ cadastrar nova atividade pra acompanhar</summary>
-            <div class="dob-linha" style="margin-top:8px;">
+            <div class="dob-linha dob-mapa-novo-serv" style="margin-top:8px;">
               <input class="dob-input" id="dob-mapa-novo-servico" style="flex:1;" placeholder="+ novo serviço a acompanhar (ex: Alvenaria)" />
               <select class="dob-select" id="dob-mapa-novo-macro" style="flex:1;"></select>
               <select class="dob-select" id="dob-mapa-novo-tipo" style="flex:1;">
