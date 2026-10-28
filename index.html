@@ -552,12 +552,10 @@
   }
   .dob-mapa-novo-serv{ gap:8px; }
   .dob-mapa-novo-serv > *{ box-sizing:border-box; min-width:0; max-width:100%; }
-  @media (max-width:640px){
-    .dob-mapa-novo-serv{ flex-direction:column; align-items:stretch; }
-    .dob-mapa-novo-serv > *{ width:100% !important; flex:none !important; font-size:14.5px; height:auto; min-height:42px; }
-    .dob-mapa-novo-serv select{ text-overflow:ellipsis; }
-    .dob-mapa-novo-serv #dob-mapa-add-servico{ font-weight:700; }
-  }
+  .dob-mapa-novo-serv{ flex-direction:column; align-items:stretch; }
+  .dob-mapa-novo-serv > *{ width:100% !important; flex:none !important; font-size:14px; height:auto; min-height:40px; }
+  .dob-mapa-novo-serv select{ text-overflow:ellipsis; }
+  .dob-mapa-novo-serv #dob-mapa-add-servico{ font-weight:700; }
   .dob-crono-geral{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; margin:14px 0 4px; }
   .dob-crono-geral .gcard{ display:flex; align-items:center; gap:14px; background:#f7f4ec; border:1px solid var(--line); border-radius:10px; padding:12px 14px; cursor:pointer; }
   .dob-crono-geral .gcard.sel{ border-color:var(--clay, #d9662f); box-shadow:0 0 0 1px var(--clay, #d9662f) inset; }
@@ -5519,25 +5517,68 @@
       if((mapaState.tipoPorServico[servico] || 'bloco') !== 'bloco'){ alert('Escopo por blocos só está disponível pra serviços do tipo "Blocos residenciais" por enquanto.'); return; }
       const obraAtual = document.getElementById('dob-mapa-obra').value;
       const blocosDaObraAtual = BLOCOS_MAPA.filter(b => b.obra === obraAtual && b.cat === 'bloco');
-      const numerosDisponiveis = blocosDaObraAtual.map(b => b.num).join(', ');
       const escopoAtualIds = escopoDoServico(servico, obraAtual);
-      const numerosAtuais = escopoAtualIds ? blocosDaObraAtual.filter(b => escopoAtualIds.includes(b.id)).map(b => b.num).join(', ') : '';
-      const resposta = prompt(`Isso restringe "${servico}" só dentro de ${obraAtual} (a outra obra não é afetada).\nBlocos de ${obraAtual} nos quais esse serviço se aplica (separados por vírgula).\nDisponíveis: ${numerosDisponiveis}\nDeixe em branco para liberar pra todos os blocos de ${obraAtual}.`, numerosAtuais);
-      if(resposta === null) return;
-      const numerosEscolhidos = resposta.split(',').map(s => s.trim()).filter(Boolean);
-      if(!mapaState.escopoPorServico[servico]) mapaState.escopoPorServico[servico] = {};
-      if(numerosEscolhidos.length === 0){
-        delete mapaState.escopoPorServico[servico][obraAtual];
-        if(Object.keys(mapaState.escopoPorServico[servico]).length === 0) delete mapaState.escopoPorServico[servico];
-      } else {
-        const ids = blocosDaObraAtual.filter(b => numerosEscolhidos.includes(b.num)).map(b => b.id);
-        if(ids.length === 0){ alert('Nenhum desses blocos foi encontrado.'); return; }
-        mapaState.escopoPorServico[servico][obraAtual] = ids;
-      }
-      saveMapaState();
-      atualizarTituloFixo();
-      renderizarListaServicos();
-      renderGrid();
+      const marcados = new Set(escopoAtualIds && escopoAtualIds[0] !== '__nenhum__' ? escopoAtualIds : blocosDaObraAtual.map(b => b.id));
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed; inset:0; background:rgba(20,20,20,0.45); z-index:100000; display:flex; align-items:center; justify-content:center; padding:16px;';
+      overlay.innerHTML = `
+        <div style="background:#fff; border-radius:12px; padding:18px 20px; max-width:420px; width:100%; max-height:86vh; display:flex; flex-direction:column; box-shadow:0 16px 40px rgba(0,0,0,0.3); font-family:inherit;">
+          <p style="margin:0 0 4px; font-size:14px; font-weight:700; color:#222;">Escopo de "${servico}" em ${obraAtual}</p>
+          <p style="margin:0 0 10px; font-size:12px; color:var(--muted);">Marque os blocos onde esse serviço se aplica. Só vale pra ${obraAtual}; a outra obra não muda.</p>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+            <button type="button" id="dob-esc-todos" style="padding:6px 10px; border-radius:8px; border:1px solid #ccc; background:#fff; font-size:12.5px; cursor:pointer;">Todos</button>
+            <button type="button" id="dob-esc-limpar" style="padding:6px 10px; border-radius:8px; border:1px solid #ccc; background:#fff; font-size:12.5px; cursor:pointer;">Limpar</button>
+            <button type="button" id="dob-esc-nenhum" style="padding:6px 10px; border-radius:8px; border:1px solid #c99a3d; background:#fff8e6; color:#7a5a12; font-size:12.5px; font-weight:600; cursor:pointer;" title="Nenhum bloco: o serviço vai ser desenhado direto no mapa">N · Nenhum bloco (desenhar no mapa)</button>
+          </div>
+          <div id="dob-esc-lista" style="overflow-y:auto; flex:1; display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:6px; margin-bottom:14px;">
+            ${blocosDaObraAtual.map(b => `
+              <label style="display:flex; align-items:center; justify-content:center; gap:5px; padding:8px 4px; border:1px solid #ddd; border-radius:8px; font-size:13px; color:#222; cursor:pointer;">
+                <input type="checkbox" data-esc-bloco="${b.id}" ${marcados.has(b.id) ? 'checked' : ''} style="width:16px; height:16px; flex-shrink:0;" /> ${b.num}
+              </label>`).join('')}
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="button" id="dob-esc-cancelar" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ccc; background:#fff; font-size:13px; cursor:pointer;">Cancelar</button>
+            <button type="button" id="dob-esc-salvar" style="flex:1; padding:10px; border-radius:8px; border:none; background:#274b74; color:#fff; font-weight:600; font-size:13px; cursor:pointer;">Salvar</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const fechar = () => overlay.remove();
+      const checks = () => [...overlay.querySelectorAll('[data-esc-bloco]')];
+      overlay.querySelector('#dob-esc-cancelar').addEventListener('click', fechar);
+      overlay.addEventListener('click', (ev) => { if(ev.target === overlay) fechar(); });
+      overlay.querySelector('#dob-esc-todos').addEventListener('click', () => checks().forEach(c => c.checked = true));
+      overlay.querySelector('#dob-esc-limpar').addEventListener('click', () => checks().forEach(c => c.checked = false));
+      overlay.querySelector('#dob-esc-nenhum').addEventListener('click', () => {
+        const ok = confirm(`Nenhum bloco: "${servico}" passa a ser desenhado direto no mapa (tipo Redes/desenho), sem marcar blocos. Continuar?`);
+        if(!ok) return;
+        mapaState.tipoPorServico[servico] = 'rede';
+        if(mapaState.escopoPorServico && mapaState.escopoPorServico[servico]){
+          delete mapaState.escopoPorServico[servico][obraAtual];
+          if(Object.keys(mapaState.escopoPorServico[servico]).length === 0) delete mapaState.escopoPorServico[servico];
+        }
+        saveMapaState();
+        fechar();
+        if(typeof montarMacrosEAtividades === 'function') montarMacrosEAtividades();
+        atualizarTituloFixo();
+        renderizarListaServicos();
+        renderGrid();
+      });
+      overlay.querySelector('#dob-esc-salvar').addEventListener('click', () => {
+        const ids = checks().filter(c => c.checked).map(c => c.dataset.escBloco);
+        if(ids.length === 0){ alert('Marque pelo menos um bloco, ou use "N · Nenhum bloco" se for desenhar no mapa.'); return; }
+        if(!mapaState.escopoPorServico[servico]) mapaState.escopoPorServico[servico] = {};
+        if(ids.length === blocosDaObraAtual.length){
+          delete mapaState.escopoPorServico[servico][obraAtual];
+          if(Object.keys(mapaState.escopoPorServico[servico]).length === 0) delete mapaState.escopoPorServico[servico];
+        } else {
+          mapaState.escopoPorServico[servico][obraAtual] = ids;
+        }
+        saveMapaState();
+        atualizarTituloFixo();
+        renderizarListaServicos();
+        renderGrid();
+        fechar();
+      });
     });
 
     document.getElementById('dob-mapa-prereq-servico').addEventListener('click', () => {
