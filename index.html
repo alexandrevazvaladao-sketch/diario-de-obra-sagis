@@ -919,6 +919,7 @@
   .dob-cat .lista h2, .dob-cat h3, .dob-cat th, .dob-cat label, .dob-cat .kpi small, .dob-cat-macro{ text-transform:none; letter-spacing:0.1px; font-size:12px; font-weight:600; }
   .dob-cat .kpi small{ font-weight:500; }
   .dob-pd-filtros label, .dob-pd-th-desc, .dob-pd-th-un, .dob-pd-th-total, .dob-pd-sub td{ text-transform:none; letter-spacing:0; font-size:11.5px; }
+  .dob-mapa-macro{ font-size:12px; color:var(--muted,#6b6455); margin:2px 0 8px; }
   @media (prefers-reduced-motion:reduce){ .dob-side-item, .dob-daypill, .dob-btn{ transition:none; } }
 </style>
 </head>
@@ -2564,6 +2565,23 @@
   function macroDoServico(nome){
     if(mapaState.macroPorServico && Object.prototype.hasOwnProperty.call(mapaState.macroPorServico, nome)) return mapaState.macroPorServico[nome];
     return MACRO_PADRAO_SERVICOS[nome] || '';
+  }
+  // Área comum: o macroserviço do BEE depende da edificação marcada (guarita, casa do gás, lixo...) e da obra
+  // (Buritis = 05.xx, Pequis = 06.xx). Para os demais serviços vale o macro do serviço.
+  const MACRO_EDIFICACAO = [
+    [/guarita/, '01'], [/gourmet|espaco comunit|salao/, '02'], [/vestiario/, '03'], [/lixo|\bars\b/, '05'],
+    [/gas/, '06'], [/bomba|^cb$|_cb_|reservatorio/, '08'], [/playground/, '10'], [/academia|fitness/, '11'], [/piscina/, '12'], [/campo|gramado/, '13']
+  ];
+  function macroDoBloco(servico, obra, bloco){
+    if(mapaState.tipoPorServico && mapaState.tipoPorServico[servico] === 'area_comum' && bloco){
+      const t = String(bloco).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const hit = MACRO_EDIFICACAO.find(([re]) => re.test(t));
+      if(hit){
+        const ob = /buritis/.test(t) ? 'Buritis' : /pequis/.test(t) ? 'Pequis' : obra;
+        return (ob === 'Buritis' ? '05.' : '06.') + hit[1];
+      }
+    }
+    return macroDoServico(servico);
   }
   function rotuloMacro(cod){
     if(!cod) return 'Sem macroserviço';
@@ -7832,6 +7850,7 @@
               </div>
               <div class="dob-kanban-detail">
                 ${blocosChipsHtml}
+                ${(() => { const cods = [...new Set((l.itens && l.itens.length ? l.itens.map(it => macroDoBloco(l.servico, b.raw, it.bloco)) : [macroDoServico(l.servico)]))].filter(Boolean); return cods.length ? `<div class="dob-mapa-macro">Macro no BEE: ${cods.map(c => rotuloMacro(c)).join(' · ')}</div>` : ''; })()}
                 ${fotosLabelHtml}
                 ${fotosHtml}
                 <div class="dob-mapa-detail-acoes">
