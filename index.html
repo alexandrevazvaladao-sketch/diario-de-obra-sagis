@@ -4346,6 +4346,10 @@
     };
     if(imgEl.complete) gerar(); else imgEl.addEventListener('load', gerar, { once: true });
   }
+  const MAPA_LARGURA_MAX = 1400;
+  let refitMapaFn = null;
+  let refitMapaTimer = null;
+  window.addEventListener('resize', () => { clearTimeout(refitMapaTimer); refitMapaTimer = setTimeout(() => { if(refitMapaFn) refitMapaFn(); }, 200); });
   let mapaMostrarRotulos = true;
   function addDesenho(servico, obra, planta, dados){
     const id = 'd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -4954,7 +4958,7 @@
             <span class="dob-dica" style="margin:0 0 0 auto;">arraste a imagem pra navegar quando der zoom</span>
           </div>
           ${barraExtra}
-          <div style="overflow-x:auto; max-width:100%;">
+          <div id="dob-mapa-zoomouter" style="overflow-x:auto; max-width:100%;${mapaZoomAtual === 1 ? ' display:flex; justify-content:center;' : ''}">
           <div id="dob-mapa-zoomwrap" style="transform:scale(${mapaZoomAtual}); transform-origin:top left; display:inline-block;">
             <div id="dob-mapa-girowrap" style="position:relative;">
               <div id="dob-mapa-rot-inner">
@@ -4972,6 +4976,7 @@
       const girowrap = document.getElementById('dob-mapa-girowrap');
       const inner = document.getElementById('dob-mapa-rot-inner');
       if(!girowrap || !inner) return;
+      refitMapaFn = () => { if(document.getElementById('dob-mapa-rot-inner') === inner) aplicarGiro(rotKey); };
       const imgsPendentes = Array.from(inner.querySelectorAll('img')).filter(img => !img.complete);
       if(imgsPendentes.length){
         let restantes = imgsPendentes.length;
@@ -4982,8 +4987,29 @@
       const deg = rotKey ? grauAtual(rotKey) : 0;
       inner.style.transform = 'none';
       inner.style.position = 'static';
-      inner.style.width = '';
+      // Tamanho padrão: toda planta (em qualquer giro) cabe inteira na área do mapa, sem barra horizontal,
+      // com a mesma largura máxima. O zoom (＋/－) parte desse tamanho.
+      const outer = document.getElementById('dob-mapa-zoomouter');
+      const disp = outer ? outer.clientWidth : 0;
+      if(disp > 50){
+        inner.style.width = '1000px';
+        const r0 = inner.offsetHeight / 1000;
+        const girado = deg === 90 || deg === 270;
+        const umaImagem = inner.querySelectorAll('img').length === 1;
+        const maxAltura = Math.max(420, window.innerHeight * 0.82);
+        let larguraVisual = Math.min(disp, MAPA_LARGURA_MAX);
+        if(umaImagem && r0 > 0){
+          const proporcaoVisual = girado ? 1 / r0 : r0;
+          larguraVisual = Math.min(larguraVisual, maxAltura / proporcaoVisual);
+        }
+        larguraVisual = Math.max(larguraVisual, Math.min(disp, 320));
+        inner.style.width = Math.round(girado && r0 > 0 ? larguraVisual / r0 : larguraVisual) + 'px';
+      } else {
+        inner.style.width = '';
+      }
       const w = inner.offsetWidth, h = inner.offsetHeight;
+      const cv = document.getElementById('dob-mapa-canvas');
+      if(cv) requestAnimationFrame(() => cv.dispatchEvent(new Event('reajustar')));
       if(deg === 0 || w < 10){
         girowrap.style.width = '';
         girowrap.style.height = '';
@@ -5130,7 +5156,7 @@
             </div>
           </div>`;
 
-        const conteudoRede = `<div style="position:relative; width:1000px;" id="dob-mapa-rede-box">
+        const conteudoRede = `<div style="position:relative; width:100%;" id="dob-mapa-rede-box">
           <img loading="lazy" decoding="async" src="mapa-imgs/redes/${chaveAtualRede}.jpg" style="width:100%; display:block; border-radius:8px; border:1px solid var(--line);" id="dob-mapa-rede-img" />
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;">${overlaysRede}</svg>
           ${isDesenhavel ? `<canvas id="dob-mapa-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; ${modoDesenho ? 'cursor:crosshair; pointer-events:auto;' : 'pointer-events:none;'}"></canvas>` : ''}
@@ -5196,6 +5222,7 @@
               redesenhar();
             };
             if(imgEl.complete) inicializarCanvas(); else imgEl.addEventListener('load', inicializarCanvas);
+            canvas.addEventListener('reajustar', inicializarCanvas);
 
             if(modoDesenho){
               let desenhando = false;
@@ -5351,7 +5378,7 @@
           }).join('');
           return `<div style="margin-bottom:20px;">
             <div style="font-size:12px; font-weight:600; color:var(--muted); margin-bottom:8px;">${planta.label}</div>
-            <div style="position:relative; width:820px; max-width:100%;">
+            <div style="position:relative; width:100%;">
               <img loading="lazy" decoding="async" src="mapa-imgs/area-comum/${chave}.jpg" style="width:100%; display:block; border-radius:8px; border:1px solid var(--line);" />
               ${overlaysArea}
             </div>
@@ -5379,7 +5406,7 @@
         </div>`;
       }).join('');
 
-      const conteudoBloco = `<div style="position:relative; width:820px; max-width:100%;">
+      const conteudoBloco = `<div style="position:relative; width:100%;">
         <img loading="lazy" decoding="async" src="mapa-imgs/mapa-blocos.jpg" style="width:100%; display:block; border-radius:8px; border:1px solid var(--line);" />
         ${overlays}
       </div>`;
