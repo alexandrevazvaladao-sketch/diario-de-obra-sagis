@@ -932,6 +932,11 @@
   .dob-eqemp-total{ font-size:12.5px; color:var(--muted,#6b6455); padding:2px 4px; }
   .dob-eqemp-extra{ margin-top:6px; font-size:12.5px; color:var(--muted,#6b6455); }
   .dob-eqemp-extra summary{ cursor:pointer; }
+  .dob-eqemp-x{ flex:none; width:28px; height:28px; border-radius:50%; border:1px solid var(--line,#d9d3c4); background:#faf8f3; color:var(--muted,#6b6455); font-size:17px; line-height:1; cursor:pointer; padding:0; }
+  .dob-eqemp-x:hover{ background:#f3e3dc; color:#b4492a; border-color:#e3b9a8; }
+  .dob-eqemp-linha .dob-eqemp-nome{ flex:1; }
+  .dob-eqemp-ocultas-t{ font-size:12px; font-weight:600; color:var(--ink,#16233d); margin-bottom:4px; }
+  .dob-eqemp-oculta{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12.5px; padding:4px 0; }
   @media (prefers-reduced-motion:reduce){ .dob-side-item, .dob-daypill, .dob-btn{ transition:none; } }
 </style>
 </head>
@@ -1228,12 +1233,13 @@
   }
   // Equipe das empreiteiras (pessoas vistas por empresa × serviço × obra × dia). qtd 0 = a empresa não veio; sem registro = não contado.
   var renderEquipeEmpFn = null;
-  let equipeEmpState = { registros: [], excluidos: [] };
+  let equipeEmpState = { registros: [], ocultas: [], excluidos: [] };
   (function loadEquipeEmpState(){
     try{
       const raw = localStorage.getItem('dob:equipeemp_state');
       if(raw) equipeEmpState = JSON.parse(raw);
       if(!equipeEmpState.registros) equipeEmpState.registros = [];
+      if(!equipeEmpState.ocultas) equipeEmpState.ocultas = [];
       if(!equipeEmpState.excluidos) equipeEmpState.excluidos = [];
     }catch(e){ /* usa estado vazio padrão */ }
   })();
@@ -1242,6 +1248,17 @@
     if(typeof nuvemEquipeEmp !== 'undefined' && nuvemEquipeEmp) nuvemEquipeEmp.agendar();
   }
   function equipeEmpChave(r){ return [r.data, r.empresa, r.servico, r.obra].join('|'); }
+  // Frente que você tirou da lista (ex.: empreiteira que já terminou): some a partir do dia em que foi removida.
+  function equipeEmpOculta(empresa, servico, obra){
+    const ch = [empresa, servico, obra].join('|');
+    return (equipeEmpState.ocultas || []).find(o => [o.empresa, o.servico, o.obra].join('|') === ch) || null;
+  }
+  function equipeEmpOcultar(empresa, servico, obra, desde, ativo){
+    const o = equipeEmpOculta(empresa, servico, obra);
+    if(o){ o.desde = desde; o.ativo = ativo; o.atualizadoEm = Date.now(); }
+    else equipeEmpState.ocultas.push({ empresa, servico, obra, desde, ativo, atualizadoEm: Date.now() });
+    saveEquipeEmpState();
+  }
   function equipeEmpGet(data, empresa, servico, obra){
     const ch = [data, empresa, servico, obra].join('|');
     return equipeEmpState.registros.find(r => equipeEmpChave(r) === ch) || null;
@@ -3326,11 +3343,13 @@
     nuvemEquipeEmp = criarDocNuvem({
       path: 'estado/equipeempreiteiros', rotulo: 'Equipe das empreiteiras',
       ler: () => equipeEmpState,
-      aplicar: (st) => { equipeEmpState = Object.assign({ registros: [], excluidos: [] }, st); try{ localStorage.setItem('dob:equipeemp_state', JSON.stringify(equipeEmpState)); }catch(e){ /* ignora */ } try{ if(typeof renderEquipeEmpFn === 'function') renderEquipeEmpFn(); }catch(e){ /* ignora */ } },
+      aplicar: (st) => { equipeEmpState = Object.assign({ registros: [], ocultas: [], excluidos: [] }, st); try{ localStorage.setItem('dob:equipeemp_state', JSON.stringify(equipeEmpState)); }catch(e){ /* ignora */ } try{ if(typeof renderEquipeEmpFn === 'function') renderEquipeEmpFn(); }catch(e){ /* ignora */ } },
       mesclar: (r, l) => {
         const m = {};
         [...((r && r.registros) || []), ...((l && l.registros) || [])].forEach(x => { const k = equipeEmpChave(x); if(!m[k] || (x.atualizadoEm || 0) >= (m[k].atualizadoEm || 0)) m[k] = x; });
-        return { registros: Object.values(m), excluidos: [] };
+        const oc = {};
+        [...((r && r.ocultas) || []), ...((l && l.ocultas) || [])].forEach(x => { const k = [x.empresa, x.servico, x.obra].join('|'); if(!oc[k] || (x.atualizadoEm || 0) >= (oc[k].atualizadoEm || 0)) oc[k] = x; });
+        return { registros: Object.values(m), ocultas: Object.values(oc), excluidos: [] };
       },
       temDados: (st) => ((st.registros || []).length) > 0
     });
@@ -6839,6 +6858,7 @@
               <select class="dob-select" id="dob-f-eqemp-obra"><option>Pequis</option><option>Buritis</option></select>
               <button class="dob-btn secundario pequeno" id="dob-f-eqemp-add" type="button">Adicionar</button>
             </div>
+            <div id="dob-f-eqemp-ocultas" style="margin-top:10px;"></div>
           </details>
         </div>
         <div class="dob-campo" style="margin-bottom:10px; display:none;">
@@ -7021,13 +7041,20 @@
       const el = document.getElementById('dob-f-eqemp-lista'); if(!el) return;
       const data = document.getElementById('dob-f-data').value || todayStr();
       const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-      const frentes = frentesEmpreiteirasDoDia(data);
+      const escondida = f => { const o = equipeEmpOculta(f.empresa, f.servico, f.obra); if(!o || !o.ativo || data < o.desde) return false; const r = equipeEmpGet(data, f.empresa, f.servico, f.obra); return !(r && r.qtd > 0); };
+      const frentes = frentesEmpreiteirasDoDia(data).filter(f => !escondida(f));
       // frentes lançadas manualmente nesse dia que não estão no mapa
-      equipeEmpState.registros.filter(r => r.data === data && !frentes.some(f => f.empresa === r.empresa && f.servico === r.servico && f.obra === r.obra))
+      equipeEmpState.registros.filter(r => r.data === data && !escondida(r) && !frentes.some(f => f.empresa === r.empresa && f.servico === r.servico && f.obra === r.obra))
         .forEach(r => frentes.push({ empresa: r.empresa, servico: r.servico, obra: r.obra, n: 0, manual: true }));
       const emps = new Set(); mapaState.estados.forEach(e => e.empresa && emps.add(e.empresa)); equipeEmpState.registros.forEach(r => emps.add(r.empresa));
       const dl = document.getElementById('dob-f-eqemp-emps'); if(dl) dl.innerHTML = [...emps].sort().map(x => `<option value="${esc(x)}">`).join('');
       const sv = document.getElementById('dob-f-eqemp-serv'); if(sv && !sv.options.length) sv.innerHTML = (mapaState.servicos || []).map(x => `<option>${esc(x)}</option>`).join('');
+      const rest = document.getElementById('dob-f-eqemp-ocultas');
+      if(rest){
+        const ocs = (equipeEmpState.ocultas || []).filter(o => o.ativo);
+        rest.innerHTML = ocs.length ? '<div class="dob-eqemp-ocultas-t">Frentes tiradas da lista</div>' + ocs.map((o, k) => `<div class="dob-eqemp-oculta"><span>${esc(o.empresa)} · ${esc(o.servico)} (desde ${fmtDate(o.desde)})</span><button type="button" class="dob-btn secundario pequeno" data-eqvolta="${k}">Voltar</button></div>`).join('') : '';
+        rest.querySelectorAll('[data-eqvolta]').forEach(b => b.addEventListener('click', () => { const o = ocs[Number(b.dataset.eqvolta)]; equipeEmpOcultar(o.empresa, o.servico, o.obra, o.desde, false); renderEquipeEmp(); }));
+      }
       if(!frentes.length){ el.innerHTML = '<p class="dob-dica" style="margin:2px 0;">Nenhuma frente em execução no mapa nesse dia. Use "Frente fora do mapa" se quiser lançar mesmo assim.</p>'; return; }
       let totalDia = 0;
       const linhas = frentes.map((f, i) => {
@@ -7036,6 +7063,7 @@
         const val = r ? r.qtd : '';
         const det = f.manual ? 'fora do mapa' : `${f.obra} · ${f.n} ${f.n === 1 ? 'frente' : 'frentes'}`;
         return `<div class="dob-eqemp-linha" data-i="${i}">
+          <button type="button" class="dob-eqemp-x" data-eqx title="Tirar esta frente da lista (a partir de hoje)" aria-label="Tirar da lista">×</button>
           <div class="dob-eqemp-nome"><b>${esc(f.empresa)}</b><span>${esc(f.servico)} · ${esc(det)}</span></div>
           <div class="dob-eqemp-passo"><button type="button" data-eqmenos aria-label="menos">−</button><input type="number" inputmode="numeric" min="0" max="999" value="${val}" placeholder="—" data-eqval aria-label="pessoas" /><button type="button" data-eqmais aria-label="mais">+</button></div>
         </div>`;
@@ -7045,6 +7073,7 @@
         const f = frentes[Number(row.dataset.i)];
         const inp = row.querySelector('[data-eqval]');
         const grava = v => { equipeEmpSet(data, f.empresa, f.servico, f.obra, v); renderEquipeEmp(); };
+        row.querySelector('[data-eqx]').addEventListener('click', () => { equipeEmpOcultar(f.empresa, f.servico, f.obra, data, true); renderEquipeEmp(); });
         row.querySelector('[data-eqmenos]').addEventListener('click', () => grava(Math.max(0, (Number(inp.value) || 0) - 1)));
         row.querySelector('[data-eqmais]').addEventListener('click', () => grava((Number(inp.value) || 0) + 1));
         inp.addEventListener('change', () => { if(inp.value === '') return; grava(inp.value); });
