@@ -912,6 +912,10 @@
   .dob-kanban-card-compacta{ padding:8px 11px; font-size:12.5px; }
   .dob-btn.pequeno{ padding:7px 14px; }
   .dob-btn.secundario{ border-color:#ddd8ca; }
+  .dob-sub{ font-family:inherit; font-size:12.5px; text-transform:none; letter-spacing:0.1px; color:#b4c0d4; margin-top:4px; }
+  .dob-versao{ font-family:inherit; font-size:11px; letter-spacing:0.2px; }
+  .dob-stamp{ font-family:inherit !important; text-transform:none !important; letter-spacing:0.1px !important; font-size:12.5px !important; font-weight:600; }
+  #dob-f-painel-mapa > label{ font-size:14px; font-weight:700; color:var(--ink); margin-bottom:6px; }
   @media (prefers-reduced-motion:reduce){ .dob-side-item, .dob-daypill, .dob-btn{ transition:none; } }
 </style>
 </head>
@@ -977,7 +981,7 @@
     </div>
     <div class="dob-header-right" style="display:flex; align-items:center; gap:10px;">
       <a class="dob-drive-link" id="dob-link-pasta" href="#" target="_blank" style="display:none;">Abrir pasta no Drive →</a>
-      <button type="button" class="dob-modo-compacto-toggle" id="dob-modo-compacto-toggle" title="Alterna entre a tela completa e uma versão mais simples e direta">📱 Modo simples</button>
+      <button type="button" class="dob-modo-compacto-toggle" id="dob-modo-compacto-toggle" title="Alterna entre a tela completa e uma versão mais simples e direta">Modo simples</button>
       <div class="dob-stamp">Apontamento de campo</div>
     </div>
   </div>
@@ -8643,7 +8647,7 @@
         document.body.classList.remove('dob-stats-abertas', 'dob-filtros-abertos');
       }
       btnToggle.classList.toggle('ativo', ativo);
-      btnToggle.textContent = ativo ? '📱 Modo simples ✓' : '📱 Modo simples';
+      btnToggle.textContent = ativo ? 'Modo simples ✓' : 'Modo simples';
       try{ localStorage.setItem('dob:modo-compacto', ativo ? '1' : '0'); }catch(e){}
     }
     const salvo = (function(){
