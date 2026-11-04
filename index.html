@@ -7277,6 +7277,7 @@
     return s || String(id);
   }
 
+  const SERVICOS_COMPARTILHADOS = ['MURO DE DIVISA'];
   function marcacoesMapaDoDia(data){
     const porObra = {};
     const registrar = (obra, item) => {
@@ -7332,8 +7333,35 @@
       registrar(g.obra, { servico: g.servico, status: g.status, qtd: g.qtd, desde: null, planta: g.planta, trecho: true });
     });
 
+    // Serviços que valem para as duas obras (ex.: muro de divisa é o mesmo em Pequis e Buritis):
+    // aparecem uma vez só, em "Pequis + Buritis", marcados em qualquer uma das duas.
+    const compartilhados = {};
+    Object.keys(porObra).forEach(obra => {
+      porObra[obra] = porObra[obra].filter(it => {
+        if(!SERVICOS_COMPARTILHADOS.includes(it.servico)) return true;
+        (compartilhados[it.servico] = compartilhados[it.servico] || []).push(it);
+        return false;
+      });
+      if(!porObra[obra].length) delete porObra[obra];
+    });
+    Object.keys(compartilhados).forEach(serv => {
+      const todos = compartilhados[serv];
+      const emAndamento = todos.filter(it => it.status === 'andamento');
+      const grupo = emAndamento.length ? emAndamento : todos;
+      const status = emAndamento.length ? 'andamento' : 'concluido';
+      const base = grupo[0];
+      const juntos = { servico: serv, status, qtd: grupo.reduce((a, it) => a + it.qtd, 0), desde: null, planta: base.planta, trecho: grupo.every(it => it.trecho) };
+      if(!porObra['__ambas']) porObra['__ambas'] = [];
+      porObra['__ambas'].push(juntos);
+    });
+
     const linhas = [];
     Object.keys(porObra).sort().forEach(obra => {
+      if(obra === '__ambas'){
+        linhas.push({ tipo: 'obra', texto: 'Pequis + Buritis', raw: 'Pequis' });
+        porObra[obra].forEach(item => linhas.push({ tipo: 'item', ...item }));
+        return;
+      }
       const obraLabel = obra === 'Pequis' ? 'Solar dos Pequis' : obra === 'Buritis' ? 'Solar dos Buritis' : obra;
       linhas.push({ tipo: 'obra', texto: obraLabel, raw: obra });
       porObra[obra].forEach(item => linhas.push({ tipo: 'item', ...item }));
