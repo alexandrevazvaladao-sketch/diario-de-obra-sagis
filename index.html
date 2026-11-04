@@ -7860,7 +7860,7 @@
               </div>
               <div class="dob-kanban-detail">
                 ${blocosChipsHtml}
-                ${(() => { const cods = [...new Set((l.itens && l.itens.length ? l.itens.map(it => macroDoBloco(l.servico, b.raw, it.bloco)) : [macroDoServico(l.servico)]))].filter(Boolean); return cods.length ? `<div class="dob-mapa-macro">Macro no BEE: ${cods.map(c => rotuloMacro(c)).join('; ')}</div>` : ''; })()}
+                ${(() => { const cods = SERVICOS_COMPARTILHADOS.includes(l.servico) ? ['03.01', '04.01'] : [...new Set((l.itens && l.itens.length ? l.itens.map(it => macroDoBloco(l.servico, b.raw, it.bloco)) : [macroDoServico(l.servico)]))].filter(Boolean); return cods.length ? `<div class="dob-mapa-macro">Macro no BEE: ${cods.map(c => rotuloMacro(c)).join('; ')}</div>` : ''; })()}
                 ${fotosLabelHtml}
                 ${fotosHtml}
                 <div class="dob-mapa-detail-acoes">
