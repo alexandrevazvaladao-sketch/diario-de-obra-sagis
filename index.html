@@ -895,6 +895,23 @@
   .dob-side-brand{ display:flex; align-items:center; gap:9px; }
   .dob-side-logo{ width:26px; height:26px; border-radius:8px; background:var(--clay); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .dob-side-logo svg{ width:15px; height:15px; fill:none; stroke:#fff; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+  /* ---------- Refinamento visual: formulários, mapa e rótulos ---------- */
+  .dob-pt{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; vertical-align:1px; }
+  .dob-campo label{ text-transform:none; letter-spacing:0; font-size:12.5px; font-weight:600; color:var(--ink-soft); }
+  .dob-input, .dob-select, .dob-textarea{ border-radius:10px; border-color:#ddd8ca; padding:10px 12px; background:#fff; transition:border-color .12s ease, box-shadow .12s ease; }
+  .dob-input:hover, .dob-select:hover, .dob-textarea:hover{ border-color:#c9c3b3; }
+  .dob-card-form{ border-color:transparent; border-radius:16px; padding:24px 26px; }
+  .dob-card-form h3{ font-size:19px; border-bottom-color:#eeeade; }
+  .dob-custo-resumo .rot, .dob-mapa-fotos-label, .dob-mapa-atualizando .rot, .dob-resumo-semana-card .l, .dob-pd-filtros label,
+  .dob-crono-grupo2 > h5, .dob-crono-ppc-txt .titulo{ text-transform:none; letter-spacing:0; }
+  .dob-mapa-status-label, .dob-crono-status{ text-transform:none; letter-spacing:0; font-size:11.5px; }
+  .dob-crono-grupo2 > h5, .dob-crono-ppc-txt .titulo{ font-size:13.5px; color:var(--ink-soft); }
+  .dob-kanban-col{ background:#f6f2e9; border-radius:12px; padding:10px; }
+  .dob-kanban-item{ border-radius:9px; margin-bottom:6px; box-shadow:0 1px 2px rgba(22,35,61,0.07); }
+  .dob-kanban-card-compacta{ padding:8px 11px; font-size:12.5px; }
+  .dob-btn.pequeno{ padding:7px 14px; }
+  .dob-btn.secundario{ border-color:#ddd8ca; }
   @media (prefers-reduced-motion:reduce){ .dob-side-item, .dob-daypill, .dob-btn{ transition:none; } }
 </style>
 </head>
@@ -7765,8 +7782,8 @@
   }, true);
   function linhasMapaParaHtml(linhas, data, lazyFotos){
     const STATUS_INFO = {
-      andamento: { cor: '#a97e2c', bg: 'rgba(201,154,61,0.18)', label: '🟡 Em Execução', chipClasse: 'mapa-andamento' },
-      concluido: { cor: '#2f5f45', bg: 'rgba(63,125,92,0.14)',  label: '🟢 Concluído',    chipClasse: 'mapa-concluido' }
+      andamento: { cor: '#a97e2c', bg: 'rgba(201,154,61,0.18)', label: 'Em execução', chipClasse: 'mapa-andamento' },
+      concluido: { cor: '#2f5f45', bg: 'rgba(63,125,92,0.14)',  label: 'Concluído', chipClasse: 'mapa-concluido' }
     };
     const blocosObra = [];
     let atual = null;
@@ -7779,7 +7796,7 @@
       }
     });
     const corpo = blocosObra.map(b => {
-      const obraHtml = `<div style="font-weight:700; font-size:15px; margin:12px 0 6px; color:var(--ink,#16233d);">🏗️ ${b.texto}</div>`;
+      const obraHtml = `<div style="font-weight:700; font-size:15px; margin:14px 0 8px; color:var(--ink,#16233d); display:flex; align-items:center; gap:8px;"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true" style="width:18px; height:18px; color:var(--clay-dark);"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01"/></svg>${b.texto}</div>`;
       const colunasHtml = ['andamento', 'concluido'].map(st => {
         const info = STATUS_INFO[st];
         const itens = b.porStatus[st];
@@ -7819,7 +7836,7 @@
         }).join('') : `<div style="font-size:11px; color:#8a8272; padding:6px 2px;">Nada aqui.</div>`;
         return `
           <div class="dob-kanban-col">
-            <div style="font-size:11px; font-weight:700; letter-spacing:.03em; color:${info.cor}; background:${info.bg}; display:inline-block; padding:3px 11px; border-radius:999px; margin-bottom:6px;">${info.label}</div>
+            <div style="font-size:11px; font-weight:700; letter-spacing:.03em; color:${info.cor}; background:${info.bg}; display:inline-block; padding:3px 11px; border-radius:999px; margin-bottom:6px;"><span class="dob-pt" style="background:${info.cor};"></span>${info.label}</div>
             ${cardsHtml}
           </div>`;
       }).join('');
