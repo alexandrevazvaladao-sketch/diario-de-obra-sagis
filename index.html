@@ -920,6 +920,18 @@
   .dob-cat .kpi small{ font-weight:500; }
   .dob-pd-filtros label, .dob-pd-th-desc, .dob-pd-th-un, .dob-pd-th-total, .dob-pd-sub td{ text-transform:none; letter-spacing:0; font-size:11.5px; }
   .dob-mapa-macro{ font-size:12px; color:var(--muted,#6b6455); margin:2px 0 8px; }
+  .dob-eqemp-lista{ display:flex; flex-direction:column; gap:6px; }
+  .dob-eqemp-linha{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:#fff; border:1px solid var(--line,#e4dfd3); border-radius:12px; padding:8px 10px; }
+  .dob-eqemp-nome{ display:flex; flex-direction:column; min-width:0; }
+  .dob-eqemp-nome b{ font-size:13.5px; color:var(--ink,#16233d); }
+  .dob-eqemp-nome span{ font-size:12px; color:var(--muted,#6b6455); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dob-eqemp-passo{ display:flex; align-items:center; gap:4px; flex:none; }
+  .dob-eqemp-passo button{ width:36px; height:36px; border-radius:10px; border:1px solid var(--line,#d9d3c4); background:#faf8f3; font-size:18px; line-height:1; cursor:pointer; color:var(--ink,#16233d); }
+  .dob-eqemp-passo button:active{ background:#efeadd; }
+  .dob-eqemp-passo input{ width:52px; height:36px; text-align:center; border:1px solid var(--line,#d9d3c4); border-radius:10px; font-size:15px; font-weight:600; background:#fff; }
+  .dob-eqemp-total{ font-size:12.5px; color:var(--muted,#6b6455); padding:2px 4px; }
+  .dob-eqemp-extra{ margin-top:6px; font-size:12.5px; color:var(--muted,#6b6455); }
+  .dob-eqemp-extra summary{ cursor:pointer; }
   @media (prefers-reduced-motion:reduce){ .dob-side-item, .dob-daypill, .dob-btn{ transition:none; } }
 </style>
 </head>
@@ -1213,6 +1225,33 @@
     if(sincronizar !== false && typeof nuvemMao !== 'undefined' && nuvemMao) nuvemMao.agendar();
     if(sincronizar !== false && accessToken) return syncMaoObraToDrive();
     return null;
+  }
+  // Equipe das empreiteiras (pessoas vistas por empresa × serviço × obra × dia). qtd 0 = a empresa não veio; sem registro = não contado.
+  var renderEquipeEmpFn = null;
+  let equipeEmpState = { registros: [], excluidos: [] };
+  (function loadEquipeEmpState(){
+    try{
+      const raw = localStorage.getItem('dob:equipeemp_state');
+      if(raw) equipeEmpState = JSON.parse(raw);
+      if(!equipeEmpState.registros) equipeEmpState.registros = [];
+      if(!equipeEmpState.excluidos) equipeEmpState.excluidos = [];
+    }catch(e){ /* usa estado vazio padrão */ }
+  })();
+  function saveEquipeEmpState(){
+    try{ localStorage.setItem('dob:equipeemp_state', JSON.stringify(equipeEmpState)); }catch(e){ /* ignora */ }
+    if(typeof nuvemEquipeEmp !== 'undefined' && nuvemEquipeEmp) nuvemEquipeEmp.agendar();
+  }
+  function equipeEmpChave(r){ return [r.data, r.empresa, r.servico, r.obra].join('|'); }
+  function equipeEmpGet(data, empresa, servico, obra){
+    const ch = [data, empresa, servico, obra].join('|');
+    return equipeEmpState.registros.find(r => equipeEmpChave(r) === ch) || null;
+  }
+  function equipeEmpSet(data, empresa, servico, obra, qtd){
+    const q = Math.max(0, Math.min(999, Math.round(Number(qtd) || 0)));
+    const ex = equipeEmpGet(data, empresa, servico, obra);
+    if(ex){ ex.qtd = q; ex.atualizadoEm = Date.now(); }
+    else equipeEmpState.registros.push({ data, empresa, servico, obra, qtd: q, atualizadoEm: Date.now() });
+    saveEquipeEmpState();
   }
   function estaPresenteMaoObraNaData(pessoaId, data){
     return maoObraState.presencas.some(p => p.pessoaId === pessoaId && p.date === data);
@@ -3003,7 +3042,7 @@
       const temDados = (m.estados.length + m.desenhos.length + Object.keys(m.catalogoCustom).length + m.metodoPassos.length + Object.keys(m.custoEtapa).length) > 0;
       if((!nuvem.existe && temDados) || nuvem.sujo) nuvemAgendarGravacao(true);
     }
-    if(nuvem.editor){ [nuvemEquip, nuvemMao].forEach(x => { if(x) x.iniciarEditor(); });
+    if(nuvem.editor){ [nuvemEquip, nuvemMao, nuvemEquipeEmp].forEach(x => { if(x) x.iniciarEditor(); });
       if(nuvemCrono){ (async () => { // primeira vez: sobe o "já feito" (verde) da planilha, se ainda não houver nada no banco
         await nuvemCrono.primeiro;
         if(!nuvemCrono.existe && !Object.keys(cronogramaSemanalLer()).length){ try{ const seed = await (await fetch('cronograma-feitos.json')).json(); localStorage.setItem('dob:cronograma_semanal', JSON.stringify(seed)); }catch(e){ /* ignora */ } }
@@ -3256,7 +3295,7 @@
     };
     return d;
   }
-  var nuvemEquip = null, nuvemMao = null, nuvemContr = null, nuvemUau = null, nuvemCrono = null;
+  var nuvemEquip = null, nuvemMao = null, nuvemContr = null, nuvemUau = null, nuvemCrono = null, nuvemEquipeEmp = null;
   function mesclarPorId(remote, local, listas){
     const excl = Array.from(new Set([...(remote.excluidos || []), ...(local.excluidos || [])]));
     const out = Object.assign({}, remote, local, { excluidos: excl });
@@ -3283,6 +3322,17 @@
       mesclar: (r, l) => mesclarPorId(Object.assign({ pessoas: [], presencas: [] }, r), Object.assign({ pessoas: [], presencas: [] }, l), [['pessoas', x => x.id], ['presencas', x => x.pessoaId + '|' + x.date, 'pessoaId']]),
       temDados: (s) => ((s.pessoas || []).length + (s.presencas || []).length) > 0
     });
+    nuvemEquipeEmp = criarDocNuvem({
+      path: 'estado/equipeempreiteiros', rotulo: 'Equipe das empreiteiras',
+      ler: () => equipeEmpState,
+      aplicar: (st) => { equipeEmpState = Object.assign({ registros: [], excluidos: [] }, st); try{ localStorage.setItem('dob:equipeemp_state', JSON.stringify(equipeEmpState)); }catch(e){ /* ignora */ } try{ if(typeof renderEquipeEmpFn === 'function') renderEquipeEmpFn(); }catch(e){ /* ignora */ } },
+      mesclar: (r, l) => {
+        const m = {};
+        [...((r && r.registros) || []), ...((l && l.registros) || [])].forEach(x => { const k = equipeEmpChave(x); if(!m[k] || (x.atualizadoEm || 0) >= (m[k].atualizadoEm || 0)) m[k] = x; });
+        return { registros: Object.values(m), excluidos: [] };
+      },
+      temDados: (st) => ((st.registros || []).length) > 0
+    });
     nuvemContr = criarDocNuvem({
       path: 'estado/contratos', rotulo: 'Contratos',
       ler: () => contratosState,
@@ -3305,7 +3355,7 @@
       temDados: (st) => Object.keys(st || {}).length > 0
     });
     nuvemEquip.ouvir(); nuvemMao.ouvir(); nuvemCrono.ouvir();
-    if(nuvem.editor){ nuvemContr.ouvir(); nuvemUau.ouvir(); } // contratos e UAU: só editores (valores de fornecedores)
+    if(nuvem.editor){ nuvemContr.ouvir(); nuvemUau.ouvir(); nuvemEquipeEmp.ouvir(); } // contratos e UAU: só editores (valores de fornecedores)
   }
 
   // ---------- Nuvem: apontamentos (um documento por apontamento) ----------
@@ -6770,6 +6820,19 @@
             <button class="dob-btn secundario pequeno" id="dob-f-mo-add" type="button">Adicionar</button>
           </div>
         </div>
+        <div class="dob-campo" style="margin-bottom:10px;">
+          <label>Equipe das empreiteiras hoje <span style="font-weight:400; color:var(--muted);">(pessoas que você viu em cada frente)</span></label>
+          <div id="dob-f-eqemp-lista" class="dob-eqemp-lista"></div>
+          <details class="dob-eqemp-extra"><summary>Frente fora do mapa</summary>
+            <div class="dob-linha" style="margin-top:8px; flex-wrap:wrap;">
+              <input class="dob-input" id="dob-f-eqemp-emp" list="dob-f-eqemp-emps" style="flex:1; min-width:150px;" placeholder="Empresa" />
+              <datalist id="dob-f-eqemp-emps"></datalist>
+              <select class="dob-select" id="dob-f-eqemp-serv" style="flex:1; min-width:150px;"></select>
+              <select class="dob-select" id="dob-f-eqemp-obra"><option>Pequis</option><option>Buritis</option></select>
+              <button class="dob-btn secundario pequeno" id="dob-f-eqemp-add" type="button">Adicionar</button>
+            </div>
+          </details>
+        </div>
         <div class="dob-campo" style="margin-bottom:10px; display:none;">
           <label>Serviço / contrato vinculado <span style="font-weight:400; color:var(--muted); text-transform:none; letter-spacing:0;">(liga a atividade ao macro-serviço do BEE)</span></label>
           <div id="dob-f-servico-tags" class="dob-chips" style="margin-bottom:8px;"></div>
@@ -6921,6 +6984,76 @@
     }
     renderChamadaListas();
     document.getElementById('dob-f-data').addEventListener('change', renderChamadaListas);
+
+    // ---- Equipe das empreiteiras: frentes do dia vêm do mapa (empresa × serviço × obra) ----
+    function frentesEmpreiteirasDoDia(data){
+      const g = {};
+      const add = (empresa, servico, obra, n) => {
+        const ob = SERVICOS_COMPARTILHADOS.includes(servico) ? 'Pequis + Buritis' : obra;
+        const ch = [empresa, servico, ob].join('|');
+        if(!g[ch]) g[ch] = { empresa, servico, obra: ob, n: 0 };
+        g[ch].n += n;
+      };
+      const existe = sv => (mapaState.servicos || []).includes(sv);
+      mapaState.estados.forEach(e => {
+        if(!existe(e.servico) || !e.dataInicio || e.dataInicio > data) return;
+        if(e.dataConclusao && e.dataConclusao < data) return; // já tinha terminado antes desse dia
+        add(e.empresa || 'Sem empresa', e.servico, e.obra, 1);
+      });
+      mapaState.desenhos.forEach(d => {
+        const ini = d.dataInicio || d.data;
+        if(!existe(d.servico) || !ini || ini > data) return;
+        if(d.cor === 'verde'){ if((d.dataConclusao || ini) !== data) return; }
+        else if(d.dataConclusao && d.dataConclusao < data) return;
+        add(d.empresa || 'Sem empresa', d.servico, d.obra, 1);
+      });
+      return Object.values(g).sort((a, b) => a.empresa.localeCompare(b.empresa) || a.servico.localeCompare(b.servico));
+    }
+    function renderEquipeEmp(){
+      const el = document.getElementById('dob-f-eqemp-lista'); if(!el) return;
+      const data = document.getElementById('dob-f-data').value || todayStr();
+      const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+      const frentes = frentesEmpreiteirasDoDia(data);
+      // frentes lançadas manualmente nesse dia que não estão no mapa
+      equipeEmpState.registros.filter(r => r.data === data && !frentes.some(f => f.empresa === r.empresa && f.servico === r.servico && f.obra === r.obra))
+        .forEach(r => frentes.push({ empresa: r.empresa, servico: r.servico, obra: r.obra, n: 0, manual: true }));
+      const emps = new Set(); mapaState.estados.forEach(e => e.empresa && emps.add(e.empresa)); equipeEmpState.registros.forEach(r => emps.add(r.empresa));
+      const dl = document.getElementById('dob-f-eqemp-emps'); if(dl) dl.innerHTML = [...emps].sort().map(x => `<option value="${esc(x)}">`).join('');
+      const sv = document.getElementById('dob-f-eqemp-serv'); if(sv && !sv.options.length) sv.innerHTML = (mapaState.servicos || []).map(x => `<option>${esc(x)}</option>`).join('');
+      if(!frentes.length){ el.innerHTML = '<p class="dob-dica" style="margin:2px 0;">Nenhuma frente em execução no mapa nesse dia. Use "Frente fora do mapa" se quiser lançar mesmo assim.</p>'; return; }
+      let totalDia = 0;
+      const linhas = frentes.map((f, i) => {
+        const r = equipeEmpGet(data, f.empresa, f.servico, f.obra);
+        if(r) totalDia += r.qtd;
+        const val = r ? r.qtd : '';
+        const det = f.manual ? 'fora do mapa' : `${f.obra} · ${f.n} ${f.n === 1 ? 'frente' : 'frentes'}`;
+        return `<div class="dob-eqemp-linha" data-i="${i}">
+          <div class="dob-eqemp-nome"><b>${esc(f.empresa)}</b><span>${esc(f.servico)} · ${esc(det)}</span></div>
+          <div class="dob-eqemp-passo"><button type="button" data-eqmenos aria-label="menos">−</button><input type="number" inputmode="numeric" min="0" max="999" value="${val}" placeholder="—" data-eqval aria-label="pessoas" /><button type="button" data-eqmais aria-label="mais">+</button></div>
+        </div>`;
+      }).join('');
+      el.innerHTML = linhas + `<div class="dob-eqemp-total">Total visto hoje: <b>${totalDia}</b> ${totalDia === 1 ? 'pessoa' : 'pessoas'}</div>`;
+      el.querySelectorAll('.dob-eqemp-linha').forEach(row => {
+        const f = frentes[Number(row.dataset.i)];
+        const inp = row.querySelector('[data-eqval]');
+        const grava = v => { equipeEmpSet(data, f.empresa, f.servico, f.obra, v); renderEquipeEmp(); };
+        row.querySelector('[data-eqmenos]').addEventListener('click', () => grava(Math.max(0, (Number(inp.value) || 0) - 1)));
+        row.querySelector('[data-eqmais]').addEventListener('click', () => grava((Number(inp.value) || 0) + 1));
+        inp.addEventListener('change', () => { if(inp.value === '') return; grava(inp.value); });
+      });
+    }
+    renderEquipeEmpFn = renderEquipeEmp;
+    document.getElementById('dob-f-data').addEventListener('change', renderEquipeEmp);
+    document.getElementById('dob-f-eqemp-add').addEventListener('click', () => {
+      const emp = (document.getElementById('dob-f-eqemp-emp').value || '').trim();
+      const serv = document.getElementById('dob-f-eqemp-serv').value;
+      const obra = document.getElementById('dob-f-eqemp-obra').value;
+      if(!emp || !serv) return;
+      equipeEmpSet(document.getElementById('dob-f-data').value || todayStr(), emp, serv, obra, 0);
+      document.getElementById('dob-f-eqemp-emp').value = '';
+      renderEquipeEmp();
+    });
+    renderEquipeEmp();
 
     function atualizarPainelMapa(){
       const dataAtual = document.getElementById('dob-f-data').value || todayStr();
