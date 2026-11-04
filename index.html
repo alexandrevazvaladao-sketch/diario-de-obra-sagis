@@ -7310,9 +7310,17 @@
 
     const gruposDesenho = {};
     mapaState.desenhos.forEach(d => {
-      const dRef = (d.cor === 'verde' && d.dataConclusao) ? d.dataConclusao : (d.dataInicio || d.data);
-      if(dRef !== data) return;
-      const status = d.cor === 'verde' ? 'concluido' : 'andamento';
+      const ini = d.dataInicio || d.data;
+      let status;
+      if(d.cor === 'verde'){
+        const dRef = d.dataConclusao || ini;
+        if(dRef !== data) return; // concluído: só aparece no dia da conclusão
+        status = 'concluido';
+      } else {
+        if(!ini || ini > data) return; // ainda não começou
+        if(d.dataConclusao && d.dataConclusao <= data) return;
+        status = 'andamento'; // em execução segue aparecendo até concluir
+      }
       const chave = d.servico + '|' + d.obra + '|' + d.planta + '|' + status;
       if(!gruposDesenho[chave]) gruposDesenho[chave] = { servico: d.servico, obra: d.obra, planta: d.planta, status, qtd: 0 };
       gruposDesenho[chave].qtd++;
