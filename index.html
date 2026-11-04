@@ -3034,6 +3034,7 @@
     if(typeof renderSaudacao === 'function') renderSaudacao();
     if(u) esconderGate(); // papel já conhecido: abre o app sem esperar a primeira leitura do banco
     try{ aplicarVisibilidade(); }catch(e){ /* ignora */ }
+    try{ nuvemOuvirDocsEditor(); }catch(e){ /* ignora */ }
     if(nuvem.editor){
       await nuvem.primeiro; // espera a primeira leitura da nuvem antes de decidir se sobe os dados deste aparelho
       // Só sobe os dados deste aparelho se houver algo de verdade neles (evita subir um estado vazio por cima de dados
@@ -3355,7 +3356,14 @@
       temDados: (st) => Object.keys(st || {}).length > 0
     });
     nuvemEquip.ouvir(); nuvemMao.ouvir(); nuvemCrono.ouvir();
-    if(nuvem.editor){ nuvemContr.ouvir(); nuvemUau.ouvir(); nuvemEquipeEmp.ouvir(); } // contratos e UAU: só editores (valores de fornecedores)
+    nuvemOuvirDocsEditor();
+  }
+  // Documentos só de editores (contratos, UAU, equipe das empreiteiras). O papel pode ser confirmado depois que os documentos
+  // são criados (contas de usuário e senha), então isto roda nos dois momentos e só inicia uma vez.
+  function nuvemOuvirDocsEditor(){
+    if(!nuvem.editor || nuvem.docsEditorOk || !nuvemContr || !nuvemUau || !nuvemEquipeEmp) return;
+    nuvem.docsEditorOk = true;
+    nuvemContr.ouvir(); nuvemUau.ouvir(); nuvemEquipeEmp.ouvir();
   }
 
   // ---------- Nuvem: apontamentos (um documento por apontamento) ----------
