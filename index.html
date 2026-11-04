@@ -7285,7 +7285,9 @@
     };
 
     const gruposEstado = {};
+    const servicoExiste = sv => (mapaState.servicos || []).includes(sv);
     mapaState.estados.forEach(e => {
+      if(!servicoExiste(e.servico)) return; // serviço apagado do mapa: marcação órfã não conta
       if(!e.dataInicio || e.dataInicio > data) return; // ainda não começou até essa data
       let status;
       if(e.dataConclusao && e.dataConclusao <= data){
@@ -7310,6 +7312,7 @@
 
     const gruposDesenho = {};
     mapaState.desenhos.forEach(d => {
+      if(!servicoExiste(d.servico)) return;
       const ini = d.dataInicio || d.data;
       let status;
       if(d.cor === 'verde'){
@@ -7321,7 +7324,7 @@
         if(d.dataConclusao && d.dataConclusao <= data) return;
         status = 'andamento'; // em execução segue aparecendo até concluir
       }
-      const chave = d.servico + '|' + d.obra + '|' + d.planta + '|' + status;
+      const chave = d.servico + '|' + d.obra + '|' + status;
       if(!gruposDesenho[chave]) gruposDesenho[chave] = { servico: d.servico, obra: d.obra, planta: d.planta, status, qtd: 0 };
       gruposDesenho[chave].qtd++;
     });
@@ -7656,7 +7659,7 @@
         const cardsHtml = itens.length ? itens.map(l => {
           mapaItemContador++;
           const itemId = `dob-mapa-item-${data || 'x'}-${mapaItemContador}`;
-          const itemKey = `${data || 'x'}|||${b.raw}|||${l.servico}|||${st}`;
+          const itemKey = `${data || 'x'}|||${b.raw}|||${l.servico}|||${st}${l.trecho ? '|||t' : ''}`;
           const irMapaAttr = `data-ir-mapa="${b.raw}|||${l.servico}|||${l.planta || ''}|||${data || ''}"`;
           const desdeTxt = l.desde ? ` · desde ${fmtDate(l.desde)}` : '';
           const qtdTxt = l.trecho ? `${l.qtd} trecho${l.qtd === 1 ? '' : 's'}` : `${l.qtd} bloco${l.qtd === 1 ? '' : 's'}`;
@@ -8056,6 +8059,10 @@
       const tipo = mapaState.tipoPorServico[e.servico];
       const nome = `${humanizarNomeBloco(e.bloco, tipo)} — ${e.servico}`;
       if(!nomes.includes(nome)) nomes.push(nome);
+    });
+    mapaState.desenhos.forEach(d => {
+      if(d.cor !== 'amarelo' || d.dataConclusao || !(mapaState.servicos || []).includes(d.servico)) return;
+      if(!nomes.includes(d.servico)) nomes.push(d.servico);
     });
     return nomes;
   }
