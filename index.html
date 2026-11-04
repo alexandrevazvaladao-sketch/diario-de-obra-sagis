@@ -4958,7 +4958,7 @@
             <span class="dob-dica" style="margin:0 0 0 auto;">arraste a imagem pra navegar quando der zoom</span>
           </div>
           ${barraExtra}
-          <div id="dob-mapa-zoomouter" style="overflow-x:auto; max-width:100%;${mapaZoomAtual === 1 ? ' display:flex; justify-content:center;' : ''}">
+          <div id="dob-mapa-zoomouter" style="overflow-x:auto; max-width:100%; box-sizing:border-box; padding:6px; border:1px solid var(--line); border-radius:10px; background:var(--paper2,#f3ede1);${mapaZoomAtual === 1 ? ' display:flex; justify-content:center; align-items:center;' : ''}">
           <div id="dob-mapa-zoomwrap" style="transform:scale(${mapaZoomAtual}); transform-origin:top left; display:inline-block;">
             <div id="dob-mapa-girowrap" style="position:relative;">
               <div id="dob-mapa-rot-inner">
@@ -4990,19 +4990,14 @@
       // Tamanho padrão: toda planta (em qualquer giro) cabe inteira na área do mapa, sem barra horizontal,
       // com a mesma largura máxima. O zoom (＋/－) parte desse tamanho.
       const outer = document.getElementById('dob-mapa-zoomouter');
-      const disp = outer ? outer.clientWidth : 0;
+      const disp = outer ? outer.clientWidth - 12 : 0;
       if(disp > 50){
         inner.style.width = '1000px';
         const r0 = inner.offsetHeight / 1000;
         const girado = deg === 90 || deg === 270;
-        const umaImagem = inner.querySelectorAll('img').length === 1;
-        const maxAltura = Math.max(420, window.innerHeight * 0.82);
-        let larguraVisual = Math.min(disp, MAPA_LARGURA_MAX);
-        if(umaImagem && r0 > 0){
-          const proporcaoVisual = girado ? 1 / r0 : r0;
-          larguraVisual = Math.min(larguraVisual, maxAltura / proporcaoVisual);
-        }
-        larguraVisual = Math.max(larguraVisual, Math.min(disp, 320));
+        // Largura única: toda planta ocupa a largura toda da área do mapa (fácil de ver e de marcar);
+        // a altura segue a proporção da planta e a página rola na vertical.
+        const larguraVisual = Math.max(Math.min(disp, MAPA_LARGURA_MAX), Math.min(disp, 320));
         inner.style.width = Math.round(girado && r0 > 0 ? larguraVisual / r0 : larguraVisual) + 'px';
       } else {
         inner.style.width = '';
