@@ -916,6 +916,9 @@
   .dob-versao{ font-family:inherit; font-size:11px; letter-spacing:0.2px; }
   .dob-stamp{ font-family:inherit !important; text-transform:none !important; letter-spacing:0.1px !important; font-size:12.5px !important; font-weight:600; }
   #dob-f-painel-mapa > label{ font-size:14px; font-weight:700; color:var(--ink); margin-bottom:6px; }
+  .dob-cat .lista h2, .dob-cat h3, .dob-cat th, .dob-cat label, .dob-cat .kpi small, .dob-cat-macro{ text-transform:none; letter-spacing:0.1px; font-size:12px; font-weight:600; }
+  .dob-cat .kpi small{ font-weight:500; }
+  .dob-pd-filtros label, .dob-pd-th-desc, .dob-pd-th-un, .dob-pd-th-total, .dob-pd-sub td{ text-transform:none; letter-spacing:0; font-size:11.5px; }
   @media (prefers-reduced-motion:reduce){ .dob-side-item, .dob-daypill, .dob-btn{ transition:none; } }
 </style>
 </head>
@@ -8131,7 +8134,7 @@
     container.innerHTML = `
       <div class="dob-card" style="padding:16px 18px; margin-top:14px;">
         <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px;">
-          <h3 style="margin:0; font-family:Georgia,serif; font-size:20px; flex:1; min-width:160px;">🖼️ Fotos da obra <span style="font-size:13px; color:#8a8272; font-family:inherit;">(${lista.length})</span></h3>
+          <h3 style="margin:0; font-family:Georgia,serif; font-size:20px; flex:1; min-width:160px;">Fotos da obra <span style="font-size:13px; color:#8a8272; font-family:inherit;">(${lista.length})</span></h3>
           <select class="dob-select" id="dob-fotos-filtro-obra">
             <option value="">Todas as obras</option>
             <option value="Pequis"${fotosObraFiltro === 'Pequis' ? ' selected' : ''}>Solar dos Pequis</option>
@@ -8310,7 +8313,7 @@
     ` : '';
     container.innerHTML = `
       <div class="dob-card-form" style="margin-top:14px; max-width:520px;">
-        <h3 style="margin:0 0 6px; font-size:19px; text-align:center;">📷 Modo Campo</h3>
+        <h3 style="margin:0 0 6px; font-size:19px; text-align:center;">Modo Campo</h3>
         <p class="dob-dica" style="margin:0 0 16px; text-align:center;">Toque no botão pra tirar foto. Toque numa foto aí embaixo pra vincular à atividade.</p>
         <label id="dob-campo-tirar-foto" class="dob-btn" ${enviando ? '' : 'for="dob-campo-file-input"'} style="display:block; text-align:center; width:100%; padding:18px; font-size:17px; font-weight:700; margin-bottom:10px; box-sizing:border-box; ${enviando ? 'opacity:0.5; cursor:not-allowed;' : 'cursor:pointer;'}">📸 Tirar Foto</label>
         <label id="dob-campo-enviar-foto" class="dob-btn secundario" ${enviando ? '' : 'for="dob-campo-file-input-upload"'} style="display:block; text-align:center; width:100%; padding:14px; font-size:14.5px; font-weight:700; margin-bottom:16px; box-sizing:border-box; ${enviando ? 'opacity:0.5; cursor:not-allowed;' : 'cursor:pointer;'}">🖼️ Enviar fotos da galeria</label>
