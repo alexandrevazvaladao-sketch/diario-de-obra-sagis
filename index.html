@@ -2553,6 +2553,16 @@
  "09.03": "VIABILIDADE ENERGETICA",
  "09.04": "SINALIZACAO VIARIA",
  "09.05": "PRAD",
+ "05.01": "GUARITA (BURITIS)",
+ "05.02": "ESPAÇO COMUNITARIO (BURITIS)",
+ "05.05": "ARS / CASA DO LIXO (BURITIS)",
+ "05.06": "CASA DO GAS (BURITIS)",
+ "05.08": "CASA DE BOMBAS (BURITIS)",
+ "05.10": "PLAYGROUND (BURITIS)",
+ "05.11": "ACADEMIA (BURITIS)",
+ "05.12": "PISCINA (BURITIS)",
+ "05.13": "CAMPO GRAMADO (BURITIS)",
+ "05": "EDIFICACOES E EQUIPAMENTOS DAS AREA COMUNS - BURITIS",
  "06": "EDIFICACOES E EQUIPAMENTOS DAS AREA COMUNS"
 };
   const MACRO_PADRAO_SERVICOS = {
@@ -7850,7 +7860,7 @@
               </div>
               <div class="dob-kanban-detail">
                 ${blocosChipsHtml}
-                ${(() => { const cods = [...new Set((l.itens && l.itens.length ? l.itens.map(it => macroDoBloco(l.servico, b.raw, it.bloco)) : [macroDoServico(l.servico)]))].filter(Boolean); return cods.length ? `<div class="dob-mapa-macro">Macro no BEE: ${cods.map(c => rotuloMacro(c)).join(' · ')}</div>` : ''; })()}
+                ${(() => { const cods = [...new Set((l.itens && l.itens.length ? l.itens.map(it => macroDoBloco(l.servico, b.raw, it.bloco)) : [macroDoServico(l.servico)]))].filter(Boolean); return cods.length ? `<div class="dob-mapa-macro">Macro no BEE: ${cods.map(c => rotuloMacro(c)).join('; ')}</div>` : ''; })()}
                 ${fotosLabelHtml}
                 ${fotosHtml}
                 <div class="dob-mapa-detail-acoes">
