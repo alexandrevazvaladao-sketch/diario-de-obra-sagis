@@ -4894,6 +4894,11 @@
       atvsEl.querySelectorAll('.dob-mapa-atv-chip').forEach(btn => btn.addEventListener('click', () => {
         sel.value = btn.dataset.atv;
         sel.dispatchEvent(new Event('change', {bubbles:true}));
+        // Escolheu a atividade: se o mapa está lá embaixo fora da tela, leva a tela até ele.
+        setTimeout(() => {
+          const g = document.getElementById('dob-mapa-grid');
+          if(g && g.getBoundingClientRect().top > window.innerHeight * 0.55) g.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 150);
       }));
       const novoMacro = document.getElementById('dob-mapa-novo-macro');
       if(novoMacro && !novoMacro.options.length){
@@ -5020,6 +5025,13 @@
       const obra = obraSelEl.value;
       const servico = document.getElementById('dob-mapa-servico').value;
       const gridEl = document.getElementById('dob-mapa-grid');
+      // Segura a altura do mapa enquanto ele é redesenhado: sem isso a página encolhe até a imagem
+      // carregar e o navegador joga a tela pra cima (e depois ela volta).
+      if(gridEl.offsetHeight > 0){
+        gridEl.style.minHeight = gridEl.offsetHeight + 'px';
+        clearTimeout(gridEl._liberaAltura);
+        gridEl._liberaAltura = setTimeout(() => { gridEl.style.minHeight = ''; }, 1500);
+      }
       if(!servico){ gridEl.innerHTML = `<p class="dob-dica" style="padding:18px;">Escolha o condomínio, o macroserviço e a atividade ao lado para ver o mapa${mapaState.servicos.length ? '' : ' (cadastre um serviço para começar)'}.</p>`; return; }
 
       const escopoIds = escopoDoServico(servico, obra);
