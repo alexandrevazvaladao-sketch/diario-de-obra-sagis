@@ -6520,12 +6520,12 @@
         <div style="display:flex;gap:6px;"><input id="dob-cfg-nome" value="${escapeHtmlSaud(nuvem.nomeCad || (nuvem.user.displayName || ''))}" style="${inp}flex:1;" /><button type="button" class="dob-btn secundario pequeno" id="dob-cfg-nome-salvar">Salvar</button></div>
         <div id="dob-cfg-msg" style="min-height:16px;font-size:12px;"></div></div>` : ''}
       <div style="display:flex;flex-direction:column;gap:8px;">
-        <button type="button" class="dob-btn" id="dob-cfg-trocar">${nuvem.user ? '🔄 Trocar de conta' : 'Entrar / Cadastrar'}</button>
+        <button type="button" class="dob-btn" id="dob-cfg-trocar">${nuvem.user ? 'Trocar de conta' : 'Entrar / Cadastrar'}</button>
         ${nuvem.user ? '<button type="button" class="dob-btn secundario" id="dob-cfg-sair">Sair da conta</button>' : ''}
-        ${senhaUser ? '<button type="button" class="dob-btn secundario" id="dob-cfg-senha">🔑 Alterar minha senha</button><div id="dob-cfg-senha-box" style="display:none;"><input id="dob-cfg-senha-nova" type="password" autocomplete="new-password" placeholder="Nova senha (mín. 8 caracteres)" style="' + inp + '" /><button type="button" class="dob-btn pequeno" id="dob-cfg-senha-ok">Salvar nova senha</button></div>' : ''}
-        ${nuvem.admin ? '<button type="button" class="dob-btn secundario" id="dob-cfg-usuarios">👥 Usuários e permissões</button>' : ''}
-        ${nuvem.dono ? '<button type="button" class="dob-btn secundario" id="dob-cfg-visibilidade">👁 Quem vê cada seção</button>' : ''}
-        ${nuvem.dono ? '<button type="button" class="dob-btn secundario" id="dob-cfg-historico">📜 Histórico de atividades</button>' : ''}
+        ${senhaUser ? '<button type="button" class="dob-btn secundario" id="dob-cfg-senha">Alterar minha senha</button><div id="dob-cfg-senha-box" style="display:none;"><input id="dob-cfg-senha-nova" type="password" autocomplete="new-password" placeholder="Nova senha (mín. 8 caracteres)" style="' + inp + '" /><button type="button" class="dob-btn pequeno" id="dob-cfg-senha-ok">Salvar nova senha</button></div>' : ''}
+        ${nuvem.admin ? '<button type="button" class="dob-btn secundario" id="dob-cfg-usuarios">Usuários e permissões</button>' : ''}
+        ${nuvem.dono ? '<button type="button" class="dob-btn secundario" id="dob-cfg-visibilidade">Quem vê cada seção</button>' : ''}
+        ${nuvem.dono ? '<button type="button" class="dob-btn secundario" id="dob-cfg-historico">Histórico de atividades</button>' : ''}
         ${(nuvem.editor && driveFotos && accessToken) ? '<button type="button" class="dob-btn secundario" id="dob-cfg-migrar">☁️ Mover ' + driveFotos + ' foto(s) do Drive para o banco</button>' : ''}
         <button type="button" class="dob-btn secundario" id="dob-cfg-fechar">Fechar</button>
       </div></div>`;
