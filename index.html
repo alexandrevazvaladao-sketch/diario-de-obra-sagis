@@ -1090,7 +1090,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.04.46';
+  const APP_VERSION = 'v2026.11.04.47';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -1659,6 +1659,25 @@
       html += `<p style="color:var(--muted); margin-top:16px;">Nenhum dado importado ainda.</p>`;
     } else {
       html += `<div style="margin-top:8px; text-align:right;"><button type="button" class="dob-btn secundario pequeno" id="dob-uaubee-limpar">Limpar tudo</button></div>`;
+      // Alertas de inconsistência (só leitura): ajudam a achar erro antes de lançar no BEE
+      const alertas = [];
+      obras.forEach(obra => Object.values(porObra[obra]).forEach(l => {
+        const num = /^m:/.test(l.numero) ? '' : l.numero;
+        const nome = `${obraCurta(obra)} · contrato ${num || '(sem nº)'} · ${l.fornecedorNome || l.objeto || '—'}`;
+        const contr = numeroBR(l.contratado), acum = numeroBR(l.acumulado);
+        if(contr !== null && acum !== null && acum > contr + 0.005) alertas.push({ n: 3, nome, txt: `medido acumulado (${fmtBR(acum)}) acima do contratado (${fmtBR(contr)})` });
+        const semQtd = (l.itens || []).filter(it => !it.quantidade && (it.total || 0) > 0);
+        if(semQtd.length) alertas.push({ n: 2, nome, txt: `${semQtd.length} ${semQtd.length === 1 ? 'item sem' : 'itens sem'} quantidade contratada (${semQtd.slice(0, 2).map(it => it.descricao || it.numero).join('; ')}${semQtd.length > 2 ? '…' : ''})` });
+        if(l.keyContrato && !(l.valorTotalContrato > 0)) alertas.push({ n: 2, nome, txt: 'contrato sem valor total (sem itens com valor)' });
+        if(l.keyContrato && (acum || 0) > 0 && !l.macroCod && !macroServicoParaFornecedor(l.fornecedorNome)) alertas.push({ n: 1, nome, txt: 'tem medição mas não está vinculado a nenhum macro do BEE' });
+      }));
+      alertas.sort((a, b) => b.n - a.n);
+      html += alertas.length
+        ? `<details style="margin-top:12px; border:1px solid #e0b25f; background:#fff8e8; border-radius:var(--radius-sm); padding:10px 14px;" open>
+            <summary style="cursor:pointer; font-weight:600;">${alertas.length} ${alertas.length === 1 ? 'alerta' : 'alertas'} para conferir</summary>
+            <ul style="margin:8px 0 2px; padding-left:20px; font-size:13px; line-height:1.5;">${alertas.map(a => `<li><b>${rotEsc(a.nome)}</b>: ${rotEsc(a.txt)}</li>`).join('')}</ul>
+          </details>`
+        : `<div style="margin-top:12px; font-size:13px; color:#15803d;">Nenhum alerta nos dados importados.</div>`;
       obras.forEach(obra => {
         const linhas = Object.values(porObra[obra]).sort((a,b) => (parseInt(a.numero)||99999) - (parseInt(b.numero)||99999));
         const semMedicaoQtd = linhas.filter(l => l.contratado === null).length;
