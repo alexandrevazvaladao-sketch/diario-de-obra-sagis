@@ -922,6 +922,8 @@
   .dob-mapa-macro{ font-size:12px; color:var(--muted,#6b6455); margin:2px 0 8px; }
   .dob-eqemp-lista{ display:flex; flex-direction:column; gap:6px; }
   .dob-eqemp-linha{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:#fff; border:1px solid var(--line,#e4dfd3); border-radius:12px; padding:8px 10px; }
+  .dob-eqemp-obra{ margin:14px 0 6px; padding:6px 10px; border-radius:8px; font-size:13px; font-weight:700; color:#fff; background:#5b6b86; }
+  .dob-eqemp-obra-p{ background:#2f5f45; } .dob-eqemp-obra-b{ background:#a97f2a; }
   .dob-eqemp-nome{ display:flex; flex-direction:column; min-width:0; }
   .dob-eqemp-nome b{ font-size:13.5px; color:var(--ink,#16233d); }
   .dob-eqemp-nome span{ font-size:12px; color:var(--muted,#6b6455); white-space:normal; overflow-wrap:anywhere; line-height:1.3; }
@@ -1090,7 +1092,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.10.50';
+  const APP_VERSION = 'v2026.11.10.51';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -7096,13 +7098,22 @@
         rest.querySelectorAll('[data-eqvolta]').forEach(b => b.addEventListener('click', () => { const o = ocs[Number(b.dataset.eqvolta)]; equipeEmpOcultar(o.empresa, o.servico, o.obra, o.desde, false); renderEquipeEmp(); }));
       }
       if(!frentes.length){ el.innerHTML = '<p class="dob-dica" style="margin:2px 0;">Nenhuma frente em execução no mapa nesse dia. Use "Frente fora do mapa" se quiser lançar mesmo assim.</p>'; return; }
-      let totalDia = 0;
+      // separa por obra: Pequis, Buritis, depois o que vale para as duas
+      const ordemObra = o => /^Pequis$/i.test(o) ? 0 : /^Buritis$/i.test(o) ? 1 : 2;
+      frentes.sort((a, b) => ordemObra(a.obra) - ordemObra(b.obra) || String(a.obra).localeCompare(String(b.obra)) || a.empresa.localeCompare(b.empresa) || a.servico.localeCompare(b.servico));
+      let totalDia = 0, obraAtual = null;
       const linhas = frentes.map((f, i) => {
         const r = equipeEmpGet(data, f.empresa, f.servico, f.obra);
         if(r) totalDia += r.qtd;
         const val = r ? r.qtd : '';
-        const det = f.manual ? 'fora do mapa' : `${f.obra} · ${f.n} ${f.n === 1 ? 'frente' : 'frentes'}`;
-        return `<div class="dob-eqemp-linha" data-i="${i}">
+        const det = f.manual ? 'fora do mapa' : `${f.n} ${f.n === 1 ? 'frente' : 'frentes'}`;
+        let cab = '';
+        if(f.obra !== obraAtual){
+          obraAtual = f.obra;
+          const nome = /^Pequis$/i.test(f.obra) ? 'Solar dos Pequis' : /^Buritis$/i.test(f.obra) ? 'Solar dos Buritis' : f.obra;
+          cab = `<div class="dob-eqemp-obra dob-eqemp-obra-${/^Pequis$/i.test(f.obra) ? 'p' : /^Buritis$/i.test(f.obra) ? 'b' : 'x'}">${esc(nome)}</div>`;
+        }
+        return cab + `<div class="dob-eqemp-linha" data-i="${i}">
           <button type="button" class="dob-eqemp-x" data-eqx title="Tirar esta frente da lista (a partir de hoje)" aria-label="Tirar da lista">×</button>
           <div class="dob-eqemp-nome"><b>${esc(f.empresa)}</b><span>${esc(f.servico)} · ${esc(det)}</span></div>
           <div class="dob-eqemp-passo"><button type="button" data-eqmenos aria-label="menos">−</button><input type="number" inputmode="numeric" min="0" max="999" value="${val}" placeholder="—" data-eqval aria-label="pessoas" /><button type="button" data-eqmais aria-label="mais">+</button></div>
