@@ -1090,7 +1090,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.04.47';
+  const APP_VERSION = 'v2026.11.10.48';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -4533,15 +4533,16 @@
     }
     return p;
   }
-  function rotuloTraco(d){
+  function rotuloTraco(d, curto){
     const ini = d.dataInicio || d.data || '';
     let t;
     if(d.cor === 'verde') t = d.dataConclusao ? `${fmtCurto(ini)} → ${fmtCurto(d.dataConclusao)}` : fmtCurto(ini);
-    else t = 'desde ' + fmtCurto(ini);
-    if(d.empresa) t += ' · ' + (d.empresa.length > 22 ? d.empresa.slice(0, 21) + '…' : d.empresa);
+    else t = (curto ? '' : 'desde ') + fmtCurto(ini);
+    const max = curto ? 12 : 22;
+    if(d.empresa) t += ' · ' + (d.empresa.length > max ? d.empresa.slice(0, max - 1) + '…' : d.empresa);
     return t;
   }
-  function desenharTraco(ctx, d, w, h, comRotulo){
+  function desenharTraco(ctx, d, w, h, comRotulo, naTela){
     const pts = pontosDoTraco(d);
     if(!pts || pts.length < 2) return;
     ctx.save();
@@ -4552,11 +4553,12 @@
     pts.forEach((p, i) => { const px = (p.x/100)*w, py = (p.y/100)*h; if(i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
     ctx.stroke();
     if(comRotulo){
-      const txt = rotuloTraco(d);
+      const txt = rotuloTraco(d, naTela);
       if(txt){
         let topo = pts[0];
         pts.forEach(p => { if(p.y < topo.y) topo = p; });
-        const fs = Math.max(10, Math.round(w * 0.011));
+        // Na tela (celular, mapa girado) o canvas é grande e o texto ficava gigante perto da planta: usa corpo pequeno e fixo
+        const fs = naTela ? Math.max(8, Math.min(10, Math.round(Math.min(w, h) * 0.025))) : Math.max(10, Math.round(w * 0.011));
         ctx.font = `600 ${fs}px sans-serif`;
         ctx.textBaseline = 'bottom';
         const tw = ctx.measureText(txt).width;
@@ -5452,7 +5454,7 @@
             const redesenhar = (preview) => {
               const ctx = canvas.getContext('2d');
               ctx.clearRect(0, 0, canvas.width, canvas.height);
-              desenhosPara(servico, obra, chaveAtualRede).forEach(d => desenharTraco(ctx, d, canvas.width, canvas.height, mapaMostrarRotulos));
+              desenhosPara(servico, obra, chaveAtualRede).forEach(d => desenharTraco(ctx, d, canvas.width, canvas.height, mapaMostrarRotulos, true));
               if(preview) desenharTraco(ctx, preview, canvas.width, canvas.height, false);
             };
             const inicializarCanvas = () => {
