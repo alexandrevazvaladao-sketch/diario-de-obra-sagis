@@ -1092,7 +1092,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.12.53';
+  const APP_VERSION = 'v2026.11.12.54';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2725,11 +2725,11 @@
       }
     }catch(e){ /* usa estado padrão */ }
     let mudouEscopo = false;
-    // Serviço PAREDE DE CONCRETO (Tavares Construtora, contratos 65 Buritis e 66 Pequis): criado por padrão, com macro próprio do BEE (02.03 Estrutura).
-    if(!mapaState.servicos.includes('PAREDE DE CONCRETO') && !mapaState.servicosExcluidos.includes('PAREDE DE CONCRETO')){
-      mapaState.servicos.push('PAREDE DE CONCRETO');
-      mapaState.tipoPorServico['PAREDE DE CONCRETO'] = 'bloco';
-      if(!mapaState.macroPorServico['PAREDE DE CONCRETO']) mapaState.macroPorServico['PAREDE DE CONCRETO'] = '02.03';
+    // Limpeza: o serviço genérico "PAREDE DE CONCRETO" (criado na v53) foi trocado pelas atividades FORMA / INSTALAÇÕES / CONCRETAGEM PAREDE DE CONCRETO.
+    if(mapaState.servicos.includes('PAREDE DE CONCRETO') && mapaState.servicos.some(x => /^(FORMA|INSTALA..ES|CONCRETAGEM) PAREDE DE CONCRETO/i.test(x)) && !mapaState.estados.some(e => e.servico === 'PAREDE DE CONCRETO')){
+      mapaState.servicos = mapaState.servicos.filter(x => x !== 'PAREDE DE CONCRETO');
+      delete mapaState.tipoPorServico['PAREDE DE CONCRETO'];
+      if(!mapaState.servicosExcluidos.includes('PAREDE DE CONCRETO')) mapaState.servicosExcluidos.push('PAREDE DE CONCRETO');
       mudouEscopo = true;
     }
     // Migra o formato antigo (array plano de ids, que travava a obra inteira) pro novo formato por obra.
@@ -4936,6 +4936,31 @@
     });
   }
 
+  // Serviços acompanhados por bloco e por apartamento (parede de concreto): o seletor de planta lista Bloco × Pavimento
+  // e os apartamentos (101, 102…) ficam sobre a planta do prédio.
+  function ehServicoPorApto(servico){ return /PAREDE DE CONCRETO/i.test(servico || ''); }
+  const PAVIMENTOS_APTO = [1, 2, 3, 4];
+  // Retângulos (% da planta do prédio) de cada apartamento. Bloco par = lado esquerdo da planta; ímpar = lado direito (espelhado).
+  const APTO_RETS = {
+    esq: { '02': [5.71, 12.34, 22.15, 30.94], '03': [27.86, 12.34, 22.14, 30.94], '01': [5.71, 56.62, 22.15, 31.14], '04': [27.86, 56.62, 22.14, 31.14] },
+    dir: { '04': [50, 12.34, 22.14, 30.94], '01': [72.14, 12.34, 22.15, 30.94], '03': [50, 56.62, 22.14, 31.14], '02': [72.14, 56.62, 22.15, 31.14] }
+  };
+  function opcoesAptoDaObra(obra){
+    const blocos = BLOCOS_MAPA.filter(b => b.obra === obra && b.cat === 'bloco' && b.num !== '1')
+      .sort((a, b) => parseInt(a.num) - parseInt(b.num));
+    const out = [];
+    blocos.forEach(b => {
+      const lado = parseInt(b.num) % 2 === 0 ? 'esq' : 'dir';
+      PAVIMENTOS_APTO.forEach(pav => {
+        const itens = Object.entries(APTO_RETS[lado]).sort((a, b) => a[0].localeCompare(b[0])).map(([fin, r]) => {
+          const num = pav * 100 + parseInt(fin);
+          return { forma: 'rect', x: r[0], y: r[1], w: r[2], h: r[3], num: String(num), rotulo: String(num), id: `apto_${obra}_${b.num}_${num}` };
+        });
+        out.push([`apto_${obra}_${b.num}_${pav}`, { obra, grupo: `Bloco ${b.num}`, label: `Bloco ${b.num} · ${pav}º pavimento (${pav}01–${pav}04)`, img: `planta_predio_${obra.toLowerCase()}`, itens }]);
+      });
+    });
+    return out;
+  }
   function renderMapa(){
     const container = document.getElementById('dob-mapa-container');
     esconderTooltipBloco();
@@ -5328,19 +5353,25 @@
 
       if(tipoMapa === 'rede'){
         seletorRedeWrap.style.display = 'block';
-        const opcoesRede = SERVICOS_COMPARTILHADOS.includes(servico)
+        const modoApto = ehServicoPorApto(servico);
+        const opcoesRede = modoApto ? opcoesAptoDaObra(obra)
+          : SERVICOS_COMPARTILHADOS.includes(servico)
           ? [['implantacao_geral', REDES_PLANTAS.implantacao_geral]]
           : Object.entries(REDES_PLANTAS).filter(([k,p]) => p.obra === obra);
         if(opcoesRede.length <= 1) seletorRedeWrap.style.display = 'none';
         const seletorRede = document.getElementById('dob-rede-seletor');
-        const chaveAtualRede = seletorRede.dataset.obraCarregada === obra && seletorRede.value ? seletorRede.value : (opcoesRede[0] ? opcoesRede[0][0] : '');
-        seletorRede.innerHTML = opcoesRede.map(([k,p]) => `<option value="${k}" ${k===chaveAtualRede?'selected':''}>${p.label}</option>`).join('');
+        const chaveAtualRede = seletorRede.dataset.obraCarregada === obra && seletorRede.value && opcoesRede.some(([k]) => k === seletorRede.value) ? seletorRede.value : (opcoesRede[0] ? opcoesRede[0][0] : '');
+        if(modoApto){
+          const grupos = {};
+          opcoesRede.forEach(([k,p]) => { (grupos[p.grupo] = grupos[p.grupo] || []).push(`<option value="${k}" ${k===chaveAtualRede?'selected':''}>${p.label}</option>`); });
+          seletorRede.innerHTML = Object.entries(grupos).map(([g, ops]) => `<optgroup label="${g}">${ops.join('')}</optgroup>`).join('');
+        } else seletorRede.innerHTML = opcoesRede.map(([k,p]) => `<option value="${k}" ${k===chaveAtualRede?'selected':''}>${p.label}</option>`).join('');
         seletorRede.dataset.obraCarregada = obra;
         seletorRede.onchange = renderGrid;
 
         if(opcoesRede.length === 0){ gridEl.innerHTML = '<p class="dob-dica">Nenhuma rede cadastrada para essa obra ainda.</p>'; return; }
 
-        const planta = REDES_PLANTAS[chaveAtualRede];
+        const planta = (modoApto ? opcoesRede.find(([k]) => k === chaveAtualRede)[1] : REDES_PLANTAS[chaveAtualRede]);
         const isDesenhavel = planta.itens.length > 0 && planta.itens[0].forma === 'line';
         if(!isDesenhavel) modoDesenho = false;
         const overlaysRede = planta.itens.map(it => {
@@ -5356,7 +5387,7 @@
             return polys;
           }
           return `<div class="dob-mapa-svg-bloco" data-bloco="${it.id}"${dica ? ` title="${dica}"` : ''}
-            style="position:absolute; left:${it.x}%; top:${it.y}%; width:${it.w}%; height:${it.h}%; background:${cor}; border:1px solid rgba(39,75,116,0.8); cursor:pointer;"></div>`;
+            style="position:absolute; left:${it.x}%; top:${it.y}%; width:${it.w}%; height:${it.h}%; background:${cor}; border:1px solid rgba(39,75,116,0.8); cursor:pointer;${it.rotulo ? ' display:flex; align-items:center; justify-content:center; font-weight:700; font-size:clamp(14px,2.6vw,34px); color:#1d3557; text-shadow:0 0 4px #fff,0 0 4px #fff;' : ''}">${it.rotulo || ''}</div>`;
         }).join('');
 
         const tracosAtuais = desenhosPara(servico, obra, chaveAtualRede);
@@ -5414,7 +5445,7 @@
           </div>`;
 
         const conteudoRede = `<div style="position:relative; width:100%;" id="dob-mapa-rede-box">
-          <img loading="lazy" decoding="async" src="mapa-imgs/redes/${chaveAtualRede}.jpg" style="width:100%; display:block; border-radius:8px; border:1px solid var(--line);" id="dob-mapa-rede-img" />
+          <img loading="lazy" decoding="async" src="mapa-imgs/redes/${planta.img || chaveAtualRede}.jpg" style="width:100%; display:block; border-radius:8px; border:1px solid var(--line);" id="dob-mapa-rede-img" />
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;">${overlaysRede}</svg>
           ${isDesenhavel ? `<canvas id="dob-mapa-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; ${modoDesenho ? 'cursor:crosshair; pointer-events:auto;' : 'pointer-events:none;'}"></canvas>` : ''}
         </div>`;
@@ -7663,6 +7694,8 @@
   const FOTO_SEM_THUMB = "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' fill='#e2d9c6'/><text x='40' y='48' font-size='30' text-anchor='middle'>📷</text></svg>`);
 
   function humanizarNomeBloco(id, tipo){
+    const mApto = /^apto_[^_]+_(\d+)_(\d+)$/.exec(String(id));
+    if(mApto) return `Apto ${mApto[2]} (Bloco ${mApto[1]})`;
     if(tipo === 'bloco' || tipo === 'vaga'){
       const rotulo = tipo === 'bloco' ? 'Bloco' : 'Vaga';
       const tokens = String(id).split('_').filter(Boolean);
