@@ -1092,7 +1092,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.10.52';
+  const APP_VERSION = 'v2026.11.12.53';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2667,7 +2667,7 @@
     // Estrutura (lajão), alvenaria da 1ª fiada e impermeabilização foram contratadas junto com a Fundação (02.02)
     'PREPARAÇÃO/CONCRETAGEM LAJÃO': '02.02', 'ALVENARIA DE 1º FIADA': '02.02', 'IMPERMEABILIZAÇÃO DA 1º FIADA': '02.02',
     'INTALAÇÕES HIDRAULICAS/ESGOTO INTERNO BLOCOS LAJÃO': '02.15', 'INSTALAÇÕES ELÉTRICAS BLOCOS LAJÃO': '02.12', 'INFRA INTERNA E EXTERNA': '04.07',
-    'FUNDAÇÃO - AREA COMUM': '06', 'ALVENARIA - AREA COMUM': '06', 'LAJE SUPERIOR - ÁREA COMUM': '06', 'TALISCAMENTO/REBOCO': '06'
+    'FUNDAÇÃO - AREA COMUM': '06', 'ALVENARIA - AREA COMUM': '06', 'LAJE SUPERIOR - ÁREA COMUM': '06', 'TALISCAMENTO/REBOCO': '06', 'PAREDE DE CONCRETO': '02.03'
   };
   function macroDoServico(nome){
     if(mapaState.macroPorServico && Object.prototype.hasOwnProperty.call(mapaState.macroPorServico, nome)) return mapaState.macroPorServico[nome];
@@ -2725,6 +2725,13 @@
       }
     }catch(e){ /* usa estado padrão */ }
     let mudouEscopo = false;
+    // Serviço PAREDE DE CONCRETO (Tavares Construtora, contratos 65 Buritis e 66 Pequis): criado por padrão, com macro próprio do BEE (02.03 Estrutura).
+    if(!mapaState.servicos.includes('PAREDE DE CONCRETO') && !mapaState.servicosExcluidos.includes('PAREDE DE CONCRETO')){
+      mapaState.servicos.push('PAREDE DE CONCRETO');
+      mapaState.tipoPorServico['PAREDE DE CONCRETO'] = 'bloco';
+      if(!mapaState.macroPorServico['PAREDE DE CONCRETO']) mapaState.macroPorServico['PAREDE DE CONCRETO'] = '02.03';
+      mudouEscopo = true;
+    }
     // Migra o formato antigo (array plano de ids, que travava a obra inteira) pro novo formato por obra.
     Object.entries(mapaState.escopoPorServico).forEach(([servico, valor]) => {
       if(Array.isArray(valor)){
