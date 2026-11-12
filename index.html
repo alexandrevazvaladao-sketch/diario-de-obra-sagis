@@ -1092,7 +1092,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.12.61';
+  const APP_VERSION = 'v2026.11.12.62';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -4979,6 +4979,26 @@
 
   // Serviços acompanhados por bloco e por apartamento (parede de concreto): o seletor de planta lista Bloco × Pavimento
   // e os apartamentos (101, 102…) ficam sobre a planta do prédio.
+  // Situação de um serviço na obra, pra colorir a lista de atividades: 'amarelo' = tem algo em execução; 'verde' = nada mais em execução e
+  // tudo concluído (quando o total é conhecido: blocos, áreas comuns, apartamentos) ou, nas redes desenhadas, ao menos um trecho concluído.
+  function statusServicoNaObra(servico, obra){
+    const est = mapaState.estados.filter(e => e.servico === servico && e.obra === obra);
+    const des = (mapaState.desenhos || []).filter(d => d.servico === servico && d.obra === obra);
+    if(est.some(e => e.cor === 'amarelo') || des.some(d => d.cor !== 'verde')) return 'amarelo';
+    const nVerde = est.filter(e => e.cor === 'verde').length + des.filter(d => d.cor === 'verde').length;
+    if(!nVerde) return '';
+    const tipo = mapaState.tipoPorServico[servico];
+    if(ehServicoPorApto(servico)){
+      const opts = ehServicoPne(servico) ? opcoesPneDaObra(obra) : opcoesAptoDaObra(obra);
+      const ids = new Set(); opts.forEach(([k, pl]) => pl.itens.forEach(it => ids.add(it.id)));
+      return est.filter(e => e.cor === 'verde' && ids.has(e.bloco)).length >= ids.size ? 'verde' : '';
+    }
+    if(tipo === 'bloco' || tipo === 'area_comum'){
+      const a = custoEtapaAvancoDoServico(servico, obra);
+      if(a && a.total > 0) return a.concluidos >= a.total ? 'verde' : '';
+    }
+    return 'verde';
+  }
   function ehServicoPne(servico){ return /ALVENARIA PNE/i.test(servico || ''); }
   function ehServicoPorApto(servico){ return /PAREDE DE CONCRETO/i.test(servico || '') || ehServicoPne(servico); }
   const PAVIMENTOS_PNE = [1, 2, 3, 4, 5];
@@ -5236,8 +5256,11 @@
         const np = prereqsDoServico(n).length;
         if(np) extra.push(`🔗 ${np} pré-requisito${np > 1 ? 's' : ''}`);
         const ativo = n === atual;
-        return `<button type="button" class="dob-mapa-atv-chip" data-atv="${n.replace(/"/g, '&quot;')}" aria-pressed="${ativo}"
-          style="text-align:left; padding:10px 12px; border-radius:7px; cursor:pointer; font:inherit; ${ativo ? 'background:#274b74; color:#fff; border:1px solid #274b74;' : 'background:#fff; color:inherit; border:1px solid var(--line);'}">
+        const stN = statusServicoNaObra(n, (document.getElementById('dob-mapa-obra') || {}).value);
+        const corChip = stN === 'verde' ? 'background:#e2f1e8; border:1px solid #3f7d5c; box-shadow:inset 5px 0 0 #3f7d5c;' : stN === 'amarelo' ? 'background:#fbf0d3; border:1px solid #c99a3d; box-shadow:inset 5px 0 0 #c99a3d;' : 'background:#fff; border:1px solid var(--line);';
+        if(stN) extra.unshift(stN === 'verde' ? '✔ concluído' : '● em execução');
+        return `<button type="button" class="dob-mapa-atv-chip" data-atv="${n.replace(/"/g, '&quot;')}" data-st="${stN}" aria-pressed="${ativo}"
+          style="text-align:left; padding:10px 12px; border-radius:7px; cursor:pointer; font:inherit; color:inherit; ${ativo ? 'background:#274b74; color:#fff; border:1px solid #274b74; box-shadow:inset 5px 0 0 ' + (stN === 'verde' ? '#5fbf8a' : stN === 'amarelo' ? '#f0c24d' : '#274b74') + ';' : corChip}">
           <div style="font-size:13.5px; font-weight:600;">${n}</div>
           ${extra.length ? `<div style="font-size:11px; opacity:.8; margin-top:2px;">${extra.join(' · ')}</div>` : ''}
         </button>`;
@@ -5385,6 +5408,7 @@
     }
 
     function renderGrid(){
+      try{ montarMacrosEAtividades(); }catch(e){ /* lista de atividades colorida: não pode quebrar o mapa */ }
       esconderTooltipBloco();
       const scrollYAntes = window.scrollY;
       const scrollXAntes = window.scrollX;
