@@ -1092,7 +1092,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.12.54';
+  const APP_VERSION = 'v2026.11.12.55';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -4946,17 +4946,20 @@
     dir: { '04': [50, 12.34, 22.14, 30.94], '01': [72.14, 12.34, 22.15, 30.94], '03': [50, 56.62, 22.14, 31.14], '02': [72.14, 56.62, 22.15, 31.14] }
   };
   function opcoesAptoDaObra(obra){
-    const blocos = BLOCOS_MAPA.filter(b => b.obra === obra && b.cat === 'bloco' && b.num !== '1')
-      .sort((a, b) => parseInt(a.num) - parseInt(b.num));
+    const nums = BLOCOS_MAPA.filter(b => b.obra === obra && b.cat === 'bloco' && b.num !== '1').map(b => parseInt(b.num)).sort((a, b) => a - b);
     const out = [];
-    blocos.forEach(b => {
-      const lado = parseInt(b.num) % 2 === 0 ? 'esq' : 'dir';
+    nums.filter(n => n % 2 === 0).forEach(par => {
+      const impar = nums.includes(par + 1) ? par + 1 : null; // geminado: par = lado esquerdo, ímpar = lado direito
+      const nomePar = impar ? `${par}/${impar}` : `${par}`;
       PAVIMENTOS_APTO.forEach(pav => {
-        const itens = Object.entries(APTO_RETS[lado]).sort((a, b) => a[0].localeCompare(b[0])).map(([fin, r]) => {
+        const itens = [];
+        const lado = (bl, rets) => Object.entries(rets).sort((a, b) => a[0].localeCompare(b[0])).forEach(([fin, r]) => {
           const num = pav * 100 + parseInt(fin);
-          return { forma: 'rect', x: r[0], y: r[1], w: r[2], h: r[3], num: String(num), rotulo: String(num), id: `apto_${obra}_${b.num}_${num}` };
+          itens.push({ forma: 'rect', x: r[0], y: r[1], w: r[2], h: r[3], num: String(num), rotulo: `${num}<small style="font-size:.4em; font-weight:600; margin-left:4px;">B${bl}</small>`, id: `apto_${obra}_${bl}_${num}` });
         });
-        out.push([`apto_${obra}_${b.num}_${pav}`, { obra, grupo: `Bloco ${b.num}`, label: `Bloco ${b.num} · ${pav}º pavimento (${pav}01–${pav}04)`, img: `planta_predio_${obra.toLowerCase()}`, itens }]);
+        lado(par, APTO_RETS.esq);
+        if(impar) lado(impar, APTO_RETS.dir);
+        out.push([`apto_${obra}_${par}_${pav}`, { obra, grupo: `Bloco ${nomePar}`, label: `Bloco ${nomePar} · ${pav}º pavimento (${pav}01–${pav}04)`, img: `planta_predio_${obra.toLowerCase()}`, itens }]);
       });
     });
     return out;
