@@ -1092,7 +1092,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.12.59';
+  const APP_VERSION = 'v2026.11.12.60';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2708,6 +2708,12 @@
     }
     // AREIA E CONCRETO MAGRO SOBRE INSTALAÇÕES (lajão): só pode começar com as instalações hidráulica/esgoto E elétrica do lajão prontas.
     // Ajuste feito uma vez por aparelho (depois disso, o que você mudar nos pré-requisitos vale).
+    if(!mapaState.servicos.some(x => /^AREIA E CONCRETO MAGRO/i.test(x)) && !mapaState.servicosExcluidos.includes('AREIA E CONCRETO MAGRO SOBRE INSTALAÇÕES')){
+      mapaState.servicos.push('AREIA E CONCRETO MAGRO SOBRE INSTALAÇÕES');
+      mapaState.tipoPorServico['AREIA E CONCRETO MAGRO SOBRE INSTALAÇÕES'] = 'bloco';
+      mapaState.macroPorServico['AREIA E CONCRETO MAGRO SOBRE INSTALAÇÕES'] = '02.02';
+      mudou = true;
+    }
     let flagAreia = '';
     try{ flagAreia = localStorage.getItem('dob:fix_prereq_areia_v1') || ''; }catch(e){}
     if(!flagAreia){
