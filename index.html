@@ -1092,7 +1092,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.12.56';
+  const APP_VERSION = 'v2026.11.12.57';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2667,7 +2667,7 @@
     // Estrutura (lajão), alvenaria da 1ª fiada e impermeabilização foram contratadas junto com a Fundação (02.02)
     'PREPARAÇÃO/CONCRETAGEM LAJÃO': '02.02', 'ALVENARIA DE 1º FIADA': '02.02', 'IMPERMEABILIZAÇÃO DA 1º FIADA': '02.02',
     'INTALAÇÕES HIDRAULICAS/ESGOTO INTERNO BLOCOS LAJÃO': '02.15', 'INSTALAÇÕES ELÉTRICAS BLOCOS LAJÃO': '02.12', 'INFRA INTERNA E EXTERNA': '04.07',
-    'FUNDAÇÃO - AREA COMUM': '06', 'ALVENARIA - AREA COMUM': '06', 'LAJE SUPERIOR - ÁREA COMUM': '06', 'TALISCAMENTO/REBOCO': '06', 'PAREDE DE CONCRETO': '02.03'
+    'FUNDAÇÃO - AREA COMUM': '06', 'ALVENARIA - AREA COMUM': '06', 'LAJE SUPERIOR - ÁREA COMUM': '06', 'TALISCAMENTO/REBOCO': '06', 'PAREDE DE CONCRETO': '02.03', 'ALVENARIA PNE': '02.04'
   };
   function macroDoServico(nome){
     if(mapaState.macroPorServico && Object.prototype.hasOwnProperty.call(mapaState.macroPorServico, nome)) return mapaState.macroPorServico[nome];
@@ -2730,6 +2730,13 @@
       mapaState.servicos = mapaState.servicos.filter(x => x !== 'PAREDE DE CONCRETO');
       delete mapaState.tipoPorServico['PAREDE DE CONCRETO'];
       if(!mapaState.servicosExcluidos.includes('PAREDE DE CONCRETO')) mapaState.servicosExcluidos.push('PAREDE DE CONCRETO');
+      mudouEscopo = true;
+    }
+    // Serviço ALVENARIA PNE (bloco 1 de cada obra, por apartamento): criado por padrão, macro 02.04 Alvenaria e divisões.
+    if(!mapaState.servicos.includes('ALVENARIA PNE') && !mapaState.servicosExcluidos.includes('ALVENARIA PNE')){
+      mapaState.servicos.push('ALVENARIA PNE');
+      mapaState.tipoPorServico['ALVENARIA PNE'] = 'rede';
+      if(!mapaState.macroPorServico['ALVENARIA PNE']) mapaState.macroPorServico['ALVENARIA PNE'] = '02.04';
       mudouEscopo = true;
     }
     // Migra o formato antigo (array plano de ids, que travava a obra inteira) pro novo formato por obra.
@@ -4938,7 +4945,25 @@
 
   // Serviços acompanhados por bloco e por apartamento (parede de concreto): o seletor de planta lista Bloco × Pavimento
   // e os apartamentos (101, 102…) ficam sobre a planta do prédio.
-  function ehServicoPorApto(servico){ return /PAREDE DE CONCRETO/i.test(servico || ''); }
+  function ehServicoPne(servico){ return /ALVENARIA PNE/i.test(servico || ''); }
+  function ehServicoPorApto(servico){ return /PAREDE DE CONCRETO/i.test(servico || '') || ehServicoPne(servico); }
+  const PAVIMENTOS_PNE = [1, 2, 3, 4, 5];
+  // Bloco PNE (bloco 1): 4 apartamentos por pavimento (quadrantes da planta) + corredor/escada no centro. Alvenaria estrutural.
+  const PNE_RETS = { '01': [3.1, 0.8, 39.4, 49.2], '02': [57.8, 0.8, 39.1, 49.2], '04': [3.1, 50, 39.4, 49.2], '03': [57.8, 50, 39.1, 49.2] };
+  const PNE_CORREDOR = [42.5, 26.6, 15.3, 46.8];
+  function opcoesPneDaObra(obra){
+    const out = [];
+    PAVIMENTOS_PNE.forEach(pav => {
+      const itens = Object.entries(PNE_RETS).sort((a, b) => a[0].localeCompare(b[0])).map(([fin, r]) => {
+        const num = pav * 100 + parseInt(fin);
+        return { forma: 'rect', x: r[0], y: r[1], w: r[2], h: r[3], num: String(num), rotulo: String(num), id: `apto_${obra}_1_${num}` };
+      });
+      const c = PNE_CORREDOR;
+      itens.push({ forma: 'rect', x: c[0], y: c[1], w: c[2], h: c[3], num: 'C' + pav, rotulo: 'Corredor', id: `apto_${obra}_1_C${pav}` });
+      out.push([`apto_${obra}_1_${pav}`, { obra, grupo: 'Bloco 1 (PNE)', label: `Bloco 1 PNE · ${pav}º pavimento (${pav}01–${pav}04)`, img: 'planta_pne', itens }]);
+    });
+    return out;
+  }
   const PAVIMENTOS_APTO = [1, 2, 3, 4];
   // Retângulos (% da planta do prédio) de cada apartamento. Bloco par = lado esquerdo da planta; ímpar = lado direito (espelhado).
   const APTO_RETS = {
@@ -5358,7 +5383,7 @@
       if(tipoMapa === 'rede'){
         seletorRedeWrap.style.display = 'block';
         const modoApto = ehServicoPorApto(servico);
-        const opcoesRede = modoApto ? opcoesAptoDaObra(obra)
+        const opcoesRede = modoApto ? (ehServicoPne(servico) ? opcoesPneDaObra(obra) : opcoesAptoDaObra(obra))
           : SERVICOS_COMPARTILHADOS.includes(servico)
           ? [['implantacao_geral', REDES_PLANTAS.implantacao_geral]]
           : Object.entries(REDES_PLANTAS).filter(([k,p]) => p.obra === obra);
