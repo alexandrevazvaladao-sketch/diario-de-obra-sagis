@@ -1092,7 +1092,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.12.60';
+  const APP_VERSION = 'v2026.11.12.61';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -4465,13 +4465,18 @@
   // obra, mas nenhuma marcação nem escopo na obra atual — sinal de que ele nunca foi pensado
   // pra essa obra e não deveria travar nada nela (mesmo sem estar oficialmente "escopado").
   function servicoRestritoAOutrasObras(servico, obraAtual){
-    const temNaAtual = mapaState.estados.some(e => e.servico === servico && e.obra === obraAtual)
-      || !!escopoDoServico(servico, obraAtual);
-    if(temNaAtual) return false;
+    // Só é "restrito a outra obra" quando isso está declarado: escopo definido só pra outra obra (ou "não se aplica" nessa),
+    // ou o nome do serviço cita a outra obra. Ter marcação só numa obra NÃO basta: na outra obra o serviço pode simplesmente
+    // não ter começado, e o pré-requisito precisa continuar travando (ex.: impermeabilização do Pequis espera a alvenaria da 1ª fiada).
     const escoposPorObra = (mapaState.escopoPorServico && mapaState.escopoPorServico[servico]) || {};
-    const temEmOutra = mapaState.estados.some(e => e.servico === servico && e.obra !== obraAtual)
-      || Object.keys(escoposPorObra).some(o => o !== obraAtual && escoposPorObra[o] && escoposPorObra[o].length);
-    return temEmOutra;
+    const naAtual = escoposPorObra[obraAtual];
+    if(naAtual && naAtual[0] === '__nenhum__') return true;
+    if(naAtual && naAtual.length) return false;
+    const temEmOutra = Object.keys(escoposPorObra).some(o => o !== obraAtual && escoposPorObra[o] && escoposPorObra[o].length && escoposPorObra[o][0] !== '__nenhum__');
+    if(temEmOutra) return true;
+    const nomeOutra = obraAtual === 'Pequis' ? /BURITIS/i : /PEQUIS/i;
+    const nomeAtual = obraAtual === 'Pequis' ? /PEQUIS/i : /BURITIS/i;
+    return nomeOutra.test(servico) && !nomeAtual.test(servico);
   }
   // ---------- Escopo: alguns serviços só valem pra um subconjunto de blocos DENTRO DE UMA OBRA (ex: só blocos 2 a 7 do
   // Pequis). Nunca trava a obra em si, porque o mesmo serviço pode ser usado em Pequis e Buritis ao mesmo tempo. ----------
