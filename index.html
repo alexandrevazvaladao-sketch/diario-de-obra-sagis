@@ -1092,7 +1092,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.12.55';
+  const APP_VERSION = 'v2026.11.12.56';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -4957,8 +4957,9 @@
           const num = pav * 100 + parseInt(fin);
           itens.push({ forma: 'rect', x: r[0], y: r[1], w: r[2], h: r[3], num: String(num), rotulo: `${num}<small style="font-size:.4em; font-weight:600; margin-left:4px;">B${bl}</small>`, id: `apto_${obra}_${bl}_${num}` });
         });
-        lado(par, APTO_RETS.esq);
-        if(impar) lado(impar, APTO_RETS.dir);
+        const corredor = (bl, r) => itens.push({ forma: 'rect', x: r[0], y: r[1], w: r[2], h: r[3], num: 'C' + pav, rotulo: `Corredor<small style="font-size:.4em; font-weight:600; margin-left:4px;">B${bl}</small>`, id: `apto_${obra}_${bl}_C${pav}` });
+        lado(par, APTO_RETS.esq); corredor(par, [16.4, 43.6, 22.9, 12.8]);
+        if(impar){ lado(impar, APTO_RETS.dir); corredor(impar, [60.7, 43.6, 22.9, 12.8]); }
         out.push([`apto_${obra}_${par}_${pav}`, { obra, grupo: `Bloco ${nomePar}`, label: `Bloco ${nomePar} · ${pav}º pavimento (${pav}01–${pav}04)`, img: `planta_predio_${obra.toLowerCase()}`, itens }]);
       });
     });
@@ -5390,7 +5391,7 @@
             return polys;
           }
           return `<div class="dob-mapa-svg-bloco" data-bloco="${it.id}"${dica ? ` title="${dica}"` : ''}
-            style="position:absolute; left:${it.x}%; top:${it.y}%; width:${it.w}%; height:${it.h}%; background:${cor}; border:1px solid rgba(39,75,116,0.8); cursor:pointer;${it.rotulo ? ' display:flex; align-items:center; justify-content:center; font-weight:700; font-size:clamp(14px,2.6vw,34px); color:#1d3557; text-shadow:0 0 4px #fff,0 0 4px #fff;' : ''}">${it.rotulo || ''}</div>`;
+            style="position:absolute; left:${it.x}%; top:${it.y}%; width:${it.w}%; height:${it.h}%; background:${cor}; border:1px solid rgba(39,75,116,0.8); cursor:pointer;${it.rotulo ? ' display:flex; align-items:center; justify-content:center; font-weight:700; font-size:clamp(12px,2.2vw,30px); color:#1d3557; text-shadow:0 0 4px #fff,0 0 4px #fff;' : ''}">${it.rotulo || ''}</div>`;
         }).join('');
 
         const tracosAtuais = desenhosPara(servico, obra, chaveAtualRede);
@@ -7697,6 +7698,8 @@
   const FOTO_SEM_THUMB = "data:image/svg+xml;utf8," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><rect width='80' height='80' fill='#e2d9c6'/><text x='40' y='48' font-size='30' text-anchor='middle'>📷</text></svg>`);
 
   function humanizarNomeBloco(id, tipo){
+    const mCorr = /^apto_[^_]+_(\d+)_C(\d+)$/.exec(String(id));
+    if(mCorr) return `Corredor ${mCorr[2]}º pav. (Bloco ${mCorr[1]})`;
     const mApto = /^apto_[^_]+_(\d+)_(\d+)$/.exec(String(id));
     if(mApto) return `Apto ${mApto[2]} (Bloco ${mApto[1]})`;
     if(tipo === 'bloco' || tipo === 'vaga'){
