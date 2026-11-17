@@ -989,6 +989,7 @@
     <div class="dob-side-item" data-side="catalogo"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.3 8.7 8.7 21.3a1 1 0 0 1-1.4 0L2.7 16.7a1 1 0 0 1 0-1.4L15.3 2.7a1 1 0 0 1 1.4 0l4.6 4.6a1 1 0 0 1 0 1.4z"/><path d="m7.5 10.5 2 2M10.5 7.5l2 2M13.5 4.5l2 2M4.5 13.5l2 2"/></svg></span><span class="label">Catálogo de custos</span></div>
     <div class="dob-side-item" data-side="painel"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg></span><span class="label">Meu painel</span></div>
     <div class="dob-side-item" data-side="custo-etapa"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.5.8-2.5 2s1 1.6 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1.1 0-2-.4-2.5-1.2M12 6v2M12 16v2"/></svg></span><span class="label">Custo por etapa</span></div>
+    <div class="dob-side-item" data-side="parede"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.5.8-2.5 2s1 1.6 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1.1 0-2-.4-2.5-1.2M12 6v2M12 16v2"/></svg></span><span class="label">Parede de concreto</span></div>
     <div class="dob-side-sep"></div>
     <div class="dob-side-item" data-side="relatorio"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h20"/><path d="M4 3v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3"/><path d="M12 16v5M8 21h8"/></svg></span><span class="label">Apresentação</span></div>
     <div class="dob-side-item" data-side="gamma"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/></svg></span><span class="label">Comando Gamma</span></div>
@@ -1045,6 +1046,7 @@
     <button class="dob-btn secundario" id="dob-btn-resumo-semana" style="display:none;">Resumo da semana</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-painel">Meu painel</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-custo-etapa">Custo por etapa</button>
+    <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-parede">Parede de concreto</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-uaubee">UAU → BEE</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-catalogo">Catálogo de custos</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-metodo">Método construtivo</button>
@@ -1075,6 +1077,7 @@
   <div id="dob-resumo-semana-container"></div>
   <div id="dob-painel-container"></div>
   <div id="dob-custo-etapa-container"></div>
+  <div id="dob-parede-container"></div>
   <div id="dob-uaubee-container"></div>
   <div id="dob-fotos-container"></div>
   <div id="dob-rotina-container"></div>
@@ -1094,7 +1097,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.17.66';
+  const APP_VERSION = 'v2026.11.17.67';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2917,6 +2920,7 @@
     try{ if(catalogoAberto) renderCatalogo(); }catch(e){ /* ignora */ }
     try{ if(metodoAberto) renderMetodo(); }catch(e){ /* ignora */ }
     try{ if(custoEtapaAberto) renderCustoEtapa(); }catch(e){ /* ignora */ }
+    try{ if(paredeAberto) renderParede(); }catch(e){ /* ignora */ }
     try{ if(painelAberto) renderPainel(); }catch(e){ /* ignora */ }
     try{ if(cronogramaAberto) renderCronograma(); }catch(e){ /* ignora */ }
   }
@@ -2971,10 +2975,10 @@
     nuvemStatus();
   }
   // ---------- Visibilidade das seções (o dono decide quem vê cada parte do app) ----------
-  var VIS_PADRAO = { 'rotina': 'dono', 'painel': 'dono', 'custo-etapa': 'dono', 'uaubee': 'dono', 'gamma': 'dono' }; // em desenvolvimento: só o dono, até liberar
+  var VIS_PADRAO = { 'rotina': 'dono', 'painel': 'dono', 'custo-etapa': 'dono', 'parede': 'dono', 'uaubee': 'dono', 'gamma': 'dono' }; // em desenvolvimento: só o dono, até liberar
   var VIS_SECOES = [['novo', 'Novo apontamento', 'dob-novo'], ['metodo', 'Método construtivo', 'dob-btn-metodo'], ['mapa', 'Mapa', 'dob-btn-mapa'], ['cronograma', 'Cronograma', 'dob-btn-cronograma'],
     ['campo', 'Modo Campo', 'dob-btn-campo'], ['fotos', 'Fotos da obra', 'dob-btn-fotos'], ['rotina', 'Rotina', 'dob-btn-rotina'], ['resumo-macro', 'Resumo macro', 'dob-btn-resumo-macro'], ['resumo-semana', 'Resumo semana', 'dob-btn-resumo-semana'], ['catalogo', 'Catálogo de custos', 'dob-btn-catalogo'],
-    ['painel', 'Meu painel', 'dob-btn-painel'], ['custo-etapa', 'Custo por etapa', 'dob-btn-custo-etapa'], ['relatorio', 'Apresentação', 'dob-btn-relatorio'], ['gamma', 'Comando Gamma', 'dob-btn-gamma'], ['uaubee', 'UAU → BEE', 'dob-btn-uaubee']];
+    ['painel', 'Meu painel', 'dob-btn-painel'], ['custo-etapa', 'Custo por etapa', 'dob-btn-custo-etapa'], ['parede', 'Parede de concreto', 'dob-btn-parede'], ['relatorio', 'Apresentação', 'dob-btn-relatorio'], ['gamma', 'Comando Gamma', 'dob-btn-gamma'], ['uaubee', 'UAU → BEE', 'dob-btn-uaubee']];
   function nivelSecao(k){ return (nuvem.vis && nuvem.vis[k]) || VIS_PADRAO[k] || 'todos'; }
   function secaoVisivel(k){ const n = nivelSecao(k); if(nuvem.dono) return true; if(n === 'todos') return true; if(n === 'editores') return !!nuvem.editor; return false; }
   function aplicarVisibilidade(){
@@ -3925,6 +3929,189 @@
     if(custoEtapaAberto) document.getElementById('dob-custo-etapa-container').scrollIntoView({behavior:'smooth', block:'start'});
   });
 
+
+  // ===== Parede de concreto: ciclos por pavimento e previsão dos próximos =====
+  // Um ciclo = um pavimento de um bloco geminado (par/ímpar, ex.: 18/19 · 1º pav.). Etapas: Forma → Instalações → Concretagem.
+  // As datas vêm do Mapa (serviços FORMA / INSTALAÇÕES / CONCRETAGEM PAREDE DE CONCRETO, por apartamento). A previsão usa
+  // o ciclo médio realizado (ou o padrão informado enquanto não há ciclo concluído), ciclos em paralelo e a cura do lajão.
+  let paredeAberto = false;
+  const PAREDE_ETAPAS = [['FORMA PAREDE DE CONCRETO', 'Forma', 'F'], ['INSTALAÇÕES PAREDE DE CONCRETO', 'Instalações', 'I'], ['CONCRETAGEM PAREDE DE CONCRETO', 'Concretagem', 'C']];
+  function paredeCfg(){
+    if(!mapaState.paredeConfig) mapaState.paredeConfig = {};
+    const c = mapaState.paredeConfig;
+    const num = (v, pad, min) => (v !== undefined && v !== null && v !== '' && isFinite(Number(v)) && Number(v) >= min) ? Number(v) : pad;
+    return { dias: num(c.dias, 4, 1), paralelo: Math.round(num(c.paralelo, 1, 1)), cura: Math.round(num(c.cura, 3, 0)), sabado: c.sabado !== false, usarReal: c.usarReal !== false };
+  }
+  function pDt(s){ const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); }
+  function pStr(d){ return d.toISOString().slice(0, 10); }
+  function pUtil(d, sab){ const w = d.getUTCDay(); return w !== 0 && (sab || w !== 6); }
+  function pProxUtil(d, sab){ const x = new Date(d); while(!pUtil(x, sab)) x.setUTCDate(x.getUTCDate() + 1); return x; }
+  function pSomaUteis(d, n, sab){ const x = new Date(d); let k = 0; while(k < n){ x.setUTCDate(x.getUTCDate() + 1); if(pUtil(x, sab)) k++; } return x; }
+  function pDiasUteis(a, b, sab){ let n = 0; const x = new Date(a); while(x <= b){ if(pUtil(x, sab)) n++; x.setUTCDate(x.getUTCDate() + 1); } return n; }
+  function pCurta(s){ return s ? s.slice(8, 10) + '/' + s.slice(5, 7) : '—'; }
+  function paredeCiclos(){
+    const ciclos = [];
+    ['Buritis', 'Pequis'].forEach(obra => {
+      opcoesAptoDaObra(obra).forEach(([key, pl]) => {
+        const partes = key.split('_');
+        const par = parseInt(partes[2]), pav = parseInt(partes[3]);
+        const ids = new Set(pl.itens.filter(i => !/^C/.test(i.num)).map(i => i.id));
+        const blocos = Array.from(new Set(pl.itens.map(i => parseInt(i.id.split('_')[2])))).sort((a, b) => a - b);
+        const etapas = {};
+        PAREDE_ETAPAS.forEach(([sv]) => {
+          const est = mapaState.estados.filter(e => e.servico === sv && e.obra === obra && ids.has(e.bloco));
+          const verdes = est.filter(e => e.cor === 'verde');
+          const ini = est.map(e => e.dataInicio).filter(Boolean).sort()[0] || null;
+          const feita = verdes.length >= ids.size;
+          const concl = feita ? (verdes.map(e => e.dataConclusao).filter(Boolean).sort().slice(-1)[0] || null) : null;
+          etapas[sv] = { n: est.length, verdes: verdes.length, total: ids.size, ini, concl, feita };
+        });
+        const conc = etapas['CONCRETAGEM PAREDE DE CONCRETO'];
+        const iniciais = PAREDE_ETAPAS.map(([sv]) => etapas[sv].ini).filter(Boolean).sort();
+        const ini = iniciais[0] || null;
+        const status = conc.feita ? 'concluido' : (PAREDE_ETAPAS.some(([sv]) => etapas[sv].n > 0) ? 'andamento' : 'pendente');
+        ciclos.push({ obra, par, pav, blocos, nome: `${blocos.join('/')}`, etapas, ini, fim: conc.feita ? (conc.concl || ini) : null, status });
+      });
+    });
+    return ciclos;
+  }
+  function paredeLiberacao(obra, blocos, cura, sab){
+    // Lajão concluído em todos os blocos do par → libera o 1º pavimento depois da cura.
+    let maior = null;
+    for(const n of blocos){
+      const e = mapaState.estados.find(x => x.servico === 'PREPARAÇÃO/CONCRETAGEM LAJÃO' && x.obra === obra && new RegExp('^' + obra + '_' + n + '_').test(x.bloco) && x.cor === 'verde' && x.dataConclusao);
+      if(!e) return null;
+      if(!maior || e.dataConclusao > maior) maior = e.dataConclusao;
+    }
+    return maior ? pStr(pSomaUteis(pDt(maior), cura, sab)) : null;
+  }
+  function paredePrevisao(ciclos, cfg){
+    const sab = cfg.sabado, hoje = pDt(todayStr());
+    const concl = ciclos.filter(c => c.status === 'concluido' && c.ini && c.fim);
+    const duracoes = concl.sort((a, b) => a.fim.localeCompare(b.fim)).slice(-5).map(c => pDiasUteis(pDt(c.ini), pDt(c.fim), sab));
+    const medio = duracoes.length ? duracoes.reduce((a, b) => a + b, 0) / duracoes.length : null;
+    const D = Math.max(1, Math.round((cfg.usarReal && medio) ? medio : cfg.dias));
+    const slots = Array.from({ length: cfg.paralelo }, () => pProxUtil(hoje, sab));
+    const fimPrevPorBloco = {};
+    ciclos.forEach(c => { if(c.status === 'concluido') fimPrevPorBloco[c.obra + '|' + c.par + '|' + c.pav] = pDt(c.fim); });
+    // em andamento: ocupa um jogo de forma até o fim previsto
+    const emAnd = ciclos.filter(c => c.status === 'andamento').sort((a, b) => (a.ini || '').localeCompare(b.ini || ''));
+    emAnd.forEach((c, i) => {
+      const ini = c.ini ? pDt(c.ini) : hoje;
+      let fim = pSomaUteis(ini, D - 1, sab);
+      if(fim < hoje) fim = pProxUtil(hoje, sab);
+      c.prevIni = pStr(ini); c.prevFim = pStr(fim);
+      fimPrevPorBloco[c.obra + '|' + c.par + '|' + c.pav] = fim;
+      const idx = i % slots.length;
+      const livre = pSomaUteis(fim, 1, sab);
+      if(livre > slots[idx]) slots[idx] = livre;
+    });
+    // pendentes: por prontidão do lajão, depois obra/bloco; pavimentos em sequência
+    const pares = {};
+    ciclos.filter(c => c.status === 'pendente').forEach(c => { const k = c.obra + '|' + c.par; (pares[k] = pares[k] || []).push(c); });
+    const listaPares = Object.keys(pares).map(k => {
+      const cs = pares[k].sort((a, b) => a.pav - b.pav);
+      const lib = paredeLiberacao(cs[0].obra, cs[0].blocos, cfg.cura, sab);
+      return { k, cs, lib };
+    }).sort((a, b) => ((a.lib || '9999') + a.cs[0].obra + String(a.cs[0].par).padStart(3, '0')).localeCompare((b.lib || '9999') + b.cs[0].obra + String(b.cs[0].par).padStart(3, '0')));
+    listaPares.forEach(({ cs, lib }) => {
+      cs.forEach(c => {
+        let i = 0; slots.forEach((s, j) => { if(s < slots[i]) i = j; });
+        let ini = slots[i];
+        const ant = fimPrevPorBloco[c.obra + '|' + c.par + '|' + (c.pav - 1)];
+        if(ant){ const apos = pSomaUteis(ant, 1, sab); if(apos > ini) ini = apos; }
+        if(c.pav === 1 && lib){ const l = pProxUtil(pDt(lib), sab); if(l > ini) ini = l; }
+        c.aguardaLajao = (c.pav === 1 && !lib);
+        const fim = pSomaUteis(ini, D - 1, sab);
+        c.prevIni = pStr(ini); c.prevFim = pStr(fim);
+        fimPrevPorBloco[c.obra + '|' + c.par + '|' + c.pav] = fim;
+        slots[i] = pSomaUteis(fim, 1, sab);
+      });
+    });
+    return { D, medio, nDur: duracoes.length };
+  }
+  function paredeEsc(s){ return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+  function renderParede(){
+    const container = document.getElementById('dob-parede-container');
+    if(!paredeAberto){ container.innerHTML = ''; return; }
+    const cfg = paredeCfg();
+    const ciclos = paredeCiclos();
+    const prev = paredePrevisao(ciclos, cfg);
+    const sab = cfg.sabado;
+    const conc = ciclos.filter(c => c.status === 'concluido'), and = ciclos.filter(c => c.status === 'andamento'), pend = ciclos.filter(c => c.status === 'pendente');
+    const fimObra = (obra) => { const f = ciclos.filter(c => c.obra === obra).map(c => c.fim || c.prevFim).filter(Boolean).sort().slice(-1)[0]; return f ? fmtDate(f) : '—'; };
+    const proximos = ciclos.filter(c => c.status !== 'concluido' && c.prevIni).sort((a, b) => a.prevIni.localeCompare(b.prevIni) || a.obra.localeCompare(b.obra) || a.par - b.par || a.pav - b.pav).slice(0, 8);
+    const chipEtapa = (c) => PAREDE_ETAPAS.map(([sv, nome, s]) => {
+      const e = c.etapas[sv];
+      const cor = e.feita ? '#1b6e3c' : (e.n > 0 ? '#b7791f' : '#b9bfca');
+      const bg = e.feita ? '#e6f4ea' : (e.n > 0 ? '#fff4d6' : '#f1f3f6');
+      const tit = `${nome}: ${e.feita ? 'concluída' + (e.concl ? ' em ' + fmtDate(e.concl) : '') : (e.n > 0 ? 'em execução (' + e.verdes + '/' + e.total + ' aptos)' : 'não iniciada')}`;
+      return `<span title="${paredeEsc(tit)}" style="display:inline-block;min-width:16px;text-align:center;padding:1px 4px;border-radius:5px;font-size:10px;font-weight:700;color:${cor};background:${bg};margin-right:2px;">${s}</span>`;
+    }).join('');
+    const celula = (c) => {
+      if(!c) return '<td></td>';
+      let corpo;
+      if(c.status === 'concluido'){
+        const d = (c.ini && c.fim) ? pDiasUteis(pDt(c.ini), pDt(c.fim), sab) : null;
+        corpo = `<div style="color:#1b6e3c;font-weight:700;">✔ ${pCurta(c.ini)} → ${pCurta(c.fim)}</div><div style="font-size:11px;color:#767e8c;">${d ? d + ' dia' + (d > 1 ? 's' : '') + ' úteis' : ''}</div>`;
+      } else if(c.status === 'andamento'){
+        corpo = `<div style="color:#b7791f;font-weight:700;">▶ desde ${pCurta(c.ini)}</div><div style="font-size:11px;color:#767e8c;font-style:italic;">prev. conc. ${pCurta(c.prevFim)}</div>`;
+      } else {
+        corpo = `<div style="color:#767e8c;font-style:italic;">prev. ${pCurta(c.prevIni)} → ${pCurta(c.prevFim)}</div>${c.aguardaLajao ? '<div style="font-size:11px;color:#b3261e;">aguarda lajão</div>' : ''}`;
+      }
+      return `<td style="padding:6px 8px;border-top:1px solid #e4e7ec;vertical-align:top;font-size:12.5px;min-width:128px;">${corpo}<div style="margin-top:3px;">${chipEtapa(c)}</div></td>`;
+    };
+    const tabela = (obra) => {
+      const doObra = ciclos.filter(c => c.obra === obra);
+      const pares = Array.from(new Set(doObra.map(c => c.par))).sort((a, b) => a - b);
+      const linhas = pares.map(par => {
+        const cs = [1, 2, 3, 4].map(p => doObra.find(c => c.par === par && c.pav === p));
+        const nome = (cs[0] || {}).nome || par;
+        const fim = cs[3] ? (cs[3].fim || cs[3].prevFim) : null;
+        const feitos = cs.filter(c => c && c.status === 'concluido').length;
+        return `<tr><td style="padding:6px 8px;border-top:1px solid #e4e7ec;font-weight:700;white-space:nowrap;">Bloco ${nome}<div style="font-size:11px;font-weight:400;color:#767e8c;">${feitos}/4 pav.</div></td>${cs.map(celula).join('')}<td style="padding:6px 8px;border-top:1px solid #e4e7ec;font-size:12.5px;white-space:nowrap;${feitos === 4 ? 'color:#1b6e3c;font-weight:700;' : 'color:#767e8c;font-style:italic;'}">${fim ? fmtDate(fim) : '—'}</td></tr>`;
+      }).join('');
+      return `<h4 style="margin:18px 0 6px;font-family:Georgia,serif;">Solar dos ${obra} <span style="font-size:13px;font-weight:400;color:#767e8c;">· término previsto ${fimObra(obra)}</span></h4>
+        <div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;"><thead><tr style="text-align:left;font-size:12px;color:#767e8c;"><th style="padding:4px 8px;">Bloco</th><th style="padding:4px 8px;">1º pav.</th><th style="padding:4px 8px;">2º pav.</th><th style="padding:4px 8px;">3º pav.</th><th style="padding:4px 8px;">4º pav.</th><th style="padding:4px 8px;">Fim do bloco</th></tr></thead><tbody>${linhas}</tbody></table></div>`;
+    };
+    const card = (titulo, valor, sub) => `<div style="flex:1;min-width:140px;background:var(--card-2,#f6f7f9);border-radius:10px;padding:10px 12px;"><div style="font-size:12px;color:#767e8c;">${titulo}</div><div style="font-size:22px;font-weight:700;">${valor}</div><div style="font-size:11.5px;color:#767e8c;">${sub || ''}</div></div>`;
+    const campo = (id, rot, val, extra) => `<label style="display:flex;flex-direction:column;font-size:12px;color:#767e8c;gap:3px;">${rot}<input class="dob-input" type="number" min="${extra.min}" step="${extra.step || 1}" id="${id}" value="${val}" style="width:96px;"/></label>`;
+    container.innerHTML = `
+      <div class="dob-card-form">
+        <h3>Parede de concreto — ciclos</h3>
+        <p class="dob-dica" style="margin-top:0;">Cada ciclo é um pavimento de um bloco geminado. Os dados vêm do Mapa (Forma, Instalações e Concretagem por apartamento); o que ainda não aconteceu aparece como <i>previsão</i> em itálico.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin:12px 0;">
+          ${card('Ciclos concluídos', conc.length + ' / ' + ciclos.length, and.length ? and.length + ' em andamento' : 'nenhum em andamento')}
+          ${card('Ciclo médio realizado', prev.medio ? prev.medio.toFixed(1).replace('.', ',') + ' dias' : '—', prev.medio ? 'últimos ' + prev.nDur + ' ciclo(s), dias úteis' : 'ainda sem ciclo concluído')}
+          ${card('Ciclo usado na previsão', prev.D + ' dias', (cfg.usarReal && prev.medio) ? 'média realizada' : 'padrão informado')}
+          ${card('Término previsto', 'Buritis ' + fimObra('Buritis'), 'Pequis ' + fimObra('Pequis'))}
+        </div>
+        <details style="margin-bottom:10px;"><summary style="cursor:pointer;font-weight:600;">Premissas da previsão</summary>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:10px;">
+            ${campo('dob-pc-dias', 'Dias por ciclo (padrão)', cfg.dias, { min: 1 })}
+            ${campo('dob-pc-par', 'Ciclos em paralelo', cfg.paralelo, { min: 1 })}
+            ${campo('dob-pc-cura', 'Cura do lajão (dias)', cfg.cura, { min: 0 })}
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" id="dob-pc-sab" ${cfg.sabado ? 'checked' : ''}/> Trabalha aos sábados</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" id="dob-pc-real" ${cfg.usarReal ? 'checked' : ''}/> Usar o ciclo médio realizado</label>
+          </div>
+          <p class="dob-dica">Ciclo = dias úteis do início da forma até a concretagem do pavimento. "Em paralelo" = quantos pavimentos podem estar em ciclo ao mesmo tempo (jogos de forma/equipes). O 1º pavimento de cada bloco só entra depois do lajão concluído mais a cura.</p>
+        </details>
+        <h4 style="margin:14px 0 6px;font-family:Georgia,serif;">Próximos ciclos</h4>
+        ${proximos.length ? `<div style="display:flex;flex-direction:column;gap:6px;">${proximos.map(c => `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:7px 10px;border-radius:8px;background:${c.status === 'andamento' ? '#fff4d6' : '#f1f3f6'};font-size:13.5px;"><b>${c.obra} · Bloco ${c.nome} · ${c.pav}º pav.</b><span style="color:#767e8c;">${c.status === 'andamento' ? 'em andamento desde ' + pCurta(c.ini) + ' · concretagem prevista ' + pCurta(c.prevFim) : 'início previsto ' + pCurta(c.prevIni) + ' · concretagem ' + pCurta(c.prevFim)}</span>${c.aguardaLajao ? '<span style="color:#b3261e;font-size:12px;">aguarda lajão</span>' : ''}</div>`).join('')}</div>` : '<p class="dob-dica">Todos os ciclos estão concluídos.</p>'}
+        ${tabela('Buritis')}
+        ${tabela('Pequis')}
+        <p class="dob-dica" style="margin-top:12px;">Letras: <b>F</b> forma · <b>I</b> instalações · <b>C</b> concretagem (verde = concluída, amarelo = em execução, cinza = não iniciada). Para registrar uma etapa, marque o apartamento no Mapa de Acompanhamento.</p>
+      </div>`;
+    const salvar = (campo, v) => { if(!mapaState.paredeConfig) mapaState.paredeConfig = {}; mapaState.paredeConfig[campo] = v; saveMapaState(); renderParede(); };
+    const lig = (id, campo, tipo) => { const el = document.getElementById(id); if(el) el.addEventListener('change', () => salvar(campo, tipo === 'bool' ? el.checked : (el.value === '' ? null : Number(el.value)))); };
+    lig('dob-pc-dias', 'dias'); lig('dob-pc-par', 'paralelo'); lig('dob-pc-cura', 'cura'); lig('dob-pc-sab', 'sabado', 'bool'); lig('dob-pc-real', 'usarReal', 'bool');
+  }
+  document.getElementById('dob-btn-parede').addEventListener('click', () => {
+    paredeAberto = !paredeAberto;
+    document.getElementById('dob-btn-parede').textContent = paredeAberto ? 'Fechar Parede de concreto' : 'Parede de concreto';
+    renderParede();
+    if(paredeAberto) document.getElementById('dob-parede-container').scrollIntoView({behavior:'smooth', block:'start'});
+  });
 
   // ===== Meu painel (só o dono): acompanhamento pessoal — PPC por semana, atrasos, causas e avanço do Mapa =====
   let painelAberto = false;
@@ -9187,6 +9374,7 @@
       'resumo-semana': 'dob-btn-resumo-semana',
       painel: 'dob-btn-painel',
       'custo-etapa': 'dob-btn-custo-etapa',
+      parede: 'dob-btn-parede',
       relatorio: 'dob-btn-relatorio',
       gamma: 'dob-btn-gamma',
       uaubee: 'dob-btn-uaubee',
@@ -9196,7 +9384,7 @@
       config: 'dob-btn-config',
       novo: 'dob-novo'
     };
-    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-cronograma', 'dob-btn-campo', 'dob-btn-fotos', 'dob-btn-rotina', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-painel', 'dob-btn-custo-etapa', 'dob-btn-relatorio', 'dob-btn-gamma', 'dob-btn-uaubee', 'dob-btn-catalogo', 'dob-btn-metodo'];
+    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-cronograma', 'dob-btn-campo', 'dob-btn-fotos', 'dob-btn-rotina', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-painel', 'dob-btn-custo-etapa', 'dob-btn-parede', 'dob-btn-relatorio', 'dob-btn-gamma', 'dob-btn-uaubee', 'dob-btn-catalogo', 'dob-btn-metodo'];
     function sincronizarSidebar(){
       let algumAberto = false;
       Object.entries(mapaBotoes).forEach(([side, btnId]) => {
