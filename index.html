@@ -1097,7 +1097,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.17.67';
+  const APP_VERSION = 'v2026.11.17.68';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -3931,11 +3931,11 @@
 
 
   // ===== Parede de concreto: ciclos por pavimento e previsão dos próximos =====
-  // Um ciclo = um pavimento de um bloco geminado (par/ímpar, ex.: 18/19 · 1º pav.). Etapas: Forma → Instalações → Concretagem.
+  // Um ciclo = um pavimento de um bloco geminado (par/ímpar, ex.: 18/19 · 1º pav.). Etapas: Instalações → Forma → Concretagem.
   // As datas vêm do Mapa (serviços FORMA / INSTALAÇÕES / CONCRETAGEM PAREDE DE CONCRETO, por apartamento). A previsão usa
   // o ciclo médio realizado (ou o padrão informado enquanto não há ciclo concluído), ciclos em paralelo e a cura do lajão.
   let paredeAberto = false;
-  const PAREDE_ETAPAS = [['FORMA PAREDE DE CONCRETO', 'Forma', 'F'], ['INSTALAÇÕES PAREDE DE CONCRETO', 'Instalações', 'I'], ['CONCRETAGEM PAREDE DE CONCRETO', 'Concretagem', 'C']];
+  const PAREDE_ETAPAS = [['INSTALAÇÕES PAREDE DE CONCRETO', 'Instalações', 'I'], ['FORMA PAREDE DE CONCRETO', 'Forma', 'F'], ['CONCRETAGEM PAREDE DE CONCRETO', 'Concretagem', 'C']];
   function paredeCfg(){
     if(!mapaState.paredeConfig) mapaState.paredeConfig = {};
     const c = mapaState.paredeConfig;
@@ -4079,7 +4079,7 @@
     container.innerHTML = `
       <div class="dob-card-form">
         <h3>Parede de concreto — ciclos</h3>
-        <p class="dob-dica" style="margin-top:0;">Cada ciclo é um pavimento de um bloco geminado. Os dados vêm do Mapa (Forma, Instalações e Concretagem por apartamento); o que ainda não aconteceu aparece como <i>previsão</i> em itálico.</p>
+        <p class="dob-dica" style="margin-top:0;">Cada ciclo é um pavimento de um bloco geminado. Os dados vêm do Mapa (Instalações, Forma e Concretagem por apartamento); o que ainda não aconteceu aparece como <i>previsão</i> em itálico.</p>
         <div style="display:flex;flex-wrap:wrap;gap:10px;margin:12px 0;">
           ${card('Ciclos concluídos', conc.length + ' / ' + ciclos.length, and.length ? and.length + ' em andamento' : 'nenhum em andamento')}
           ${card('Ciclo médio realizado', prev.medio ? prev.medio.toFixed(1).replace('.', ',') + ' dias' : '—', prev.medio ? 'últimos ' + prev.nDur + ' ciclo(s), dias úteis' : 'ainda sem ciclo concluído')}
@@ -4094,13 +4094,13 @@
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" id="dob-pc-sab" ${cfg.sabado ? 'checked' : ''}/> Trabalha aos sábados</label>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;"><input type="checkbox" id="dob-pc-real" ${cfg.usarReal ? 'checked' : ''}/> Usar o ciclo médio realizado</label>
           </div>
-          <p class="dob-dica">Ciclo = dias úteis do início da forma até a concretagem do pavimento. "Em paralelo" = quantos pavimentos podem estar em ciclo ao mesmo tempo (jogos de forma/equipes). O 1º pavimento de cada bloco só entra depois do lajão concluído mais a cura.</p>
+          <p class="dob-dica">Ciclo = dias úteis do início das instalações até a concretagem do pavimento. "Em paralelo" = quantos pavimentos podem estar em ciclo ao mesmo tempo (jogos de forma/equipes). O 1º pavimento de cada bloco só entra depois do lajão concluído mais a cura.</p>
         </details>
         <h4 style="margin:14px 0 6px;font-family:Georgia,serif;">Próximos ciclos</h4>
         ${proximos.length ? `<div style="display:flex;flex-direction:column;gap:6px;">${proximos.map(c => `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:7px 10px;border-radius:8px;background:${c.status === 'andamento' ? '#fff4d6' : '#f1f3f6'};font-size:13.5px;"><b>${c.obra} · Bloco ${c.nome} · ${c.pav}º pav.</b><span style="color:#767e8c;">${c.status === 'andamento' ? 'em andamento desde ' + pCurta(c.ini) + ' · concretagem prevista ' + pCurta(c.prevFim) : 'início previsto ' + pCurta(c.prevIni) + ' · concretagem ' + pCurta(c.prevFim)}</span>${c.aguardaLajao ? '<span style="color:#b3261e;font-size:12px;">aguarda lajão</span>' : ''}</div>`).join('')}</div>` : '<p class="dob-dica">Todos os ciclos estão concluídos.</p>'}
         ${tabela('Buritis')}
         ${tabela('Pequis')}
-        <p class="dob-dica" style="margin-top:12px;">Letras: <b>F</b> forma · <b>I</b> instalações · <b>C</b> concretagem (verde = concluída, amarelo = em execução, cinza = não iniciada). Para registrar uma etapa, marque o apartamento no Mapa de Acompanhamento.</p>
+        <p class="dob-dica" style="margin-top:12px;">Letras: <b>I</b> instalações · <b>F</b> forma · <b>C</b> concretagem (verde = concluída, amarelo = em execução, cinza = não iniciada). Para registrar uma etapa, marque o apartamento no Mapa de Acompanhamento.</p>
       </div>`;
     const salvar = (campo, v) => { if(!mapaState.paredeConfig) mapaState.paredeConfig = {}; mapaState.paredeConfig[campo] = v; saveMapaState(); renderParede(); };
     const lig = (id, campo, tipo) => { const el = document.getElementById(id); if(el) el.addEventListener('change', () => salvar(campo, tipo === 'bool' ? el.checked : (el.value === '' ? null : Number(el.value)))); };
