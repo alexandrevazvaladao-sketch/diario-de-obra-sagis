@@ -1094,7 +1094,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.17.63';
+  const APP_VERSION = 'v2026.11.17.64';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -9314,6 +9314,79 @@
         btnFiltros.textContent = abertos ? '🔍 Filtros ✓' : '🔍 Filtros';
       });
     }
+  })();
+
+  // ===== Atualização automática do app =====
+  // Ao abrir, ao voltar pro app (celular/aba em segundo plano), ao reconectar e a cada 60 s com o app aberto,
+  // compara a versão publicada com a que está rodando. Se houver versão nova, recarrega sozinho
+  // (esperando o usuário parar de digitar) e, depois de recarregar, mostra um aviso que só some quando fechado.
+  (function autoAtualizar(){
+    const INTERVALO_MS = 60000;
+    let verificando = false, recarregando = false;
+    // Aviso persistente depois de atualizar
+    try{
+      const raw = localStorage.getItem('dob:aviso-atualizacao');
+      if(raw){
+        const a = JSON.parse(raw);
+        const mostrar = () => {
+          if(document.getElementById('dob-aviso-atualizacao')) return;
+          const box = document.createElement('div');
+          box.id = 'dob-aviso-atualizacao';
+          box.setAttribute('role','alertdialog');
+          box.style.cssText = 'position:fixed; left:50%; top:max(12px, env(safe-area-inset-top,0px)); transform:translateX(-50%); z-index:2147483000; width:min(92vw,420px); background:#1f6f43; color:#fff; border-radius:12px; padding:14px 16px; box-shadow:0 8px 28px rgba(0,0,0,.35); font:14px/1.4 system-ui,sans-serif; display:flex; gap:12px; align-items:flex-start;';
+          box.innerHTML = '<div style="flex:1;"><strong style="display:block; font-size:15px; margin-bottom:2px;">App atualizado</strong>O Diário de Obra foi atualizado automaticamente para a versão ' + (a.para || APP_VERSION) + (a.de ? ' (antes: ' + a.de + ')' : '') + '.</div>';
+          const x = document.createElement('button');
+          x.type = 'button'; x.textContent = 'Fechar';
+          x.style.cssText = 'background:#fff; color:#1f6f43; border:0; border-radius:8px; padding:8px 12px; font-weight:700; font-size:14px; cursor:pointer; min-height:36px;';
+          x.addEventListener('click', () => { try{ localStorage.removeItem('dob:aviso-atualizacao'); }catch(e){} box.remove(); });
+          box.appendChild(x);
+          document.body.appendChild(box);
+        };
+        if(document.body) mostrar(); else document.addEventListener('DOMContentLoaded', mostrar);
+      }
+    }catch(e){ /* ignora */ }
+    // Tira o ?v= da barra de endereço depois de recarregar
+    try{ if(/[?&]v=/.test(location.search)) history.replaceState(null,'',location.pathname + location.hash); }catch(e){}
+
+    function digitando(){
+      const el = document.activeElement;
+      if(!el) return false;
+      const tag = (el.tagName || '').toLowerCase();
+      return tag === 'textarea' || tag === 'select' || (tag === 'input' && !['button','checkbox','radio','submit','range'].includes((el.type || '').toLowerCase()));
+    }
+    function recarregar(novaVersao){
+      if(recarregando) return;
+      recarregando = true;
+      try{ localStorage.setItem('dob:aviso-atualizacao', JSON.stringify({ de: APP_VERSION, para: novaVersao, quando: Date.now() })); }catch(e){}
+      const ir = () => {
+        if(digitando()){ setTimeout(ir, 3000); return; } // não perde o que está sendo digitado
+        window.location.replace(location.pathname + '?v=' + encodeURIComponent(novaVersao));
+      };
+      ir();
+    }
+    async function verificar(){
+      if(verificando || recarregando || !navigator.onLine) return;
+      verificando = true;
+      try{
+        const r = await fetch(location.pathname + '?_=' + Date.now(), { cache:'no-store' });
+        if(!r.ok) return;
+        const txt = await r.text();
+        const m = txt.match(/const APP_VERSION = '([^']+)'/);
+        if(!m || m[1] === APP_VERSION) { try{ sessionStorage.removeItem('dob:tentou-atualizar'); }catch(e){} return; }
+        // Evita laço: se já tentou recarregar para essa versão nesta sessão e continua igual, não insiste a cada ciclo
+        let tentou = null; try{ tentou = sessionStorage.getItem('dob:tentou-atualizar'); }catch(e){}
+        if(tentou === m[1]) return;
+        try{ sessionStorage.setItem('dob:tentou-atualizar', m[1]); }catch(e){}
+        recarregar(m[1]);
+      }catch(e){ /* sem rede: tenta no próximo ciclo */ }
+      finally{ verificando = false; }
+    }
+    verificar();
+    setInterval(verificar, INTERVALO_MS);
+    document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') verificar(); });
+    window.addEventListener('focus', verificar);
+    window.addEventListener('online', verificar);
+    window.addEventListener('pageshow', verificar);
   })();
 
   renderSetup();
