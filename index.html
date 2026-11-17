@@ -1094,7 +1094,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.17.65';
+  const APP_VERSION = 'v2026.11.17.66';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -3604,7 +3604,7 @@
   }
   function urlFotoPublica(fileId, largura){ return 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(fileId) + '&sz=w' + (largura || 2000); }
 
-  window.__dob = { nuvem, get mapa(){ return mapaState; }, set mapa(v){ mapaState = v; }, salvar: (x) => saveMapaState(x) }; // gancho de diagnóstico/testes
+  window.__dob = { nuvem, get mapa(){ return mapaState; }, set mapa(v){ mapaState = v; }, salvar: (x) => saveMapaState(x), get contratos(){ return contratosState; }, salvarContratos: () => saveContratosState() }; // gancho de diagnóstico/testes
   function nuvemIniciar(tentativa){
     if(!window.firebase || !firebase.firestore || !firebase.auth){
       if((tentativa || 0) < 20) setTimeout(() => nuvemIniciar((tentativa || 0) + 1), 500);
