@@ -1100,7 +1100,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.18.74';
+  const APP_VERSION = 'v2026.11.18.75';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -4142,6 +4142,30 @@
     'ARRASAMENTO DE ESTACAS/ BLOCOS DE COROAMENTO': { rotulo: 'Kit bloco de coroamento (por bloco)', macro: '02.02', itens: [['ACO CA-50-60 - BARRA ESTIRADA', 'KG', 35305.2], ['ARAME RECOZIDO TORCIDO 1,24 MM', 'KG', 1008.72], ['DISTANCIADOR PLASTICO CG15', 'UN', 10087.2], ['CONCRETO USINADO FCK 30 MPA', 'M3', 532.84], ['CONCRETO FCK 10 (LASTRO)', 'M3', 40.42], ['AREIA LAVADA MEDIA', 'M3', 39.17]] },
     'PREPARAÇÃO/CONCRETAGEM LAJÃO': { rotulo: 'Kit lajão (por bloco)', macro: '02.02', producao: true, itens: [['ACO CA-50-60 - BARRA ESTIRADA', 'KG', 23662.8], ['ARAME RECOZIDO TORCIDO 1,24 MM', 'KG', 676.08], ['DISTANCIADOR PLASTICO CG15', 'UN', 6760.8], ['TELA SOLDADA Q 283', 'KG', 110844], ['CONCRETO USINADO FCK 30 MPA', 'M3', 1506.93], ['PO DE BRITA (BGS)', 'M3', 292.58], ['FORMA METALICA PARA LAJE TERREO OU RADIER', 'UN', 547.56], ['LONA PLASTICA PRETA 200 MICRAS', 'M2', 8777.38], ['DESMOLDANTE PARA FORMA', 'L', 43.8]] }
   };
+  // Parede de concreto: o gatilho de lançamento no BEE é a CONCRETAGEM (1 apto concretado = 1 APTO de Produção em HAB - PAREDE - LAJE - CONCRETO).
+  // Nesse dia lança-se o kit completo do apto (instalações + forma + concretagem). Fonte: memorial da parede (orçamento executivo v4).
+  // Instalações UP CONSTRUTORA 14/15 (esgoto/elétrica do radier) são do lajão e não entram aqui. Linha VB: lançar a fração = valor ÷ preço da linha.
+  BEE_KITS['CONCRETAGEM PAREDE DE CONCRETO'] = { rotulo: 'Kit parede de concreto (por apto)', macro: '02.03.03', producaoApto: 'HAB - PAREDE - LAJE - CONCRETO', grupos: [
+    ['HAB - PAREDE - LAJE - CONCRETO', [
+      ['Material','Forma de alumínio (parede, laje e escada)','APTO',1],['Empreiteiro','Conferência de formas e segurança - 1ª montagem (VB: R$ 53,13 ÷ preço da linha)','VB',1],
+      ['Material','Desmoldante para formas','L',29.6],['Material','Materiais de consumo (faqueta/camisinha/espaçador/pino/cunha)','UND',1],
+      ['Empreiteiro','MO - serviços de execução de parede de concreto','APTO',1],['Material','Aço CA-50/60 (barra estirada)','KG',221.445],
+      ['Material','Distanciador plástico CG15','UND',63.27],['Material','Arame recozido BWG-18','KG',6.327],['Empreiteiro','Execução de armação - aço estirado','KG',210.9],
+      ['Material','Tela soldada nervurada','KG',480.102],['Empreiteiro','Execução de armação - tela de aço','KG',457.24],
+      ['Material','Concreto de parede (fck ≥ 25 MPa, autoadensável)','M3',13.905],['Empreiteiro','Taxa de bomba mínima (diária)','M3',13.905]]],
+    ['HAB - QUADRO E ACABAMENTO ELETRICO', [
+      ['Material','Tubulações elétricas e caixas de parede','APTO',1],['Empreiteiro','Tubulações elétricas e caixas de parede','APTO',1],
+      ['Material','Tubulações elétricas e caixas das lajes','APTO',1],['Empreiteiro','Tubulações elétricas e caixas das lajes','APTO',1],
+      ['Material','Quadro geral de circuitos (embutido)','APTO',1],['Empreiteiro','Quadro geral de circuitos (embutido)','APTO',1],
+      ['Material','Rede interna telefonia/interfonia/antena - caixinhas de parede','APTO',1],['Empreiteiro','Rede interna telefonia/interfonia/antena - caixinhas de parede','APTO',1]]],
+    ['HAB - INSTALACOES HIDROSSANITARIAS E FRIGORIGENAS', [
+      ['Material','Prumadas de água fria (AF)','APTO',1],['Empreiteiro','Prumadas de água fria (AF)','APTO',1],
+      ['Material','Rede de distribuição de água (kits)','APTO',1],['Empreiteiro','Rede de distribuição de água (kits)','APTO',1],
+      ['Material','Distribuição de esgoto - paredes','APTO',1],['Empreiteiro','Distribuição de esgoto - paredes','APTO',1],
+      ['Material','Distribuição de esgoto - lajes','APTO',1],['Empreiteiro','Distribuição de esgoto - lajes','APTO',1],
+      ['Material','Luvas e passagem esgoto/água na central','APTO',1],['Empreiteiro','Luvas e passagem esgoto/água na central','APTO',1],
+      ['Empreiteiro','Previsão de ar-condicionado','APTO',1]]]
+  ] };
   function beediaFmt(n){ return Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function beediaHoje(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function beediaConcluidos(data){
@@ -4170,7 +4194,10 @@
       const kit = BEE_KITS[sv];
       const linhasObra = Object.entries(r.obras).map(([ob, emp]) => `<div style="font-size:12.5px;">${paredeEsc(ob)}: ${Object.entries(emp).map(([e, n]) => paredeEsc(e) + ' (' + n + ')').join(' · ')}</div>`).join('');
       let kitHtml = '';
-      if(kit){
+      if(kit && kit.grupos){
+        kitHtml = `<div style="margin-top:8px;font-size:12.5px;"><b>${paredeEsc(kit.rotulo)} × ${r.total}</b> · Produção ${paredeEsc(kit.producaoApto)}: <b>${r.total} APTO</b>
+          ${kit.grupos.map(g => `<div style="margin-top:6px;font-weight:600;">${paredeEsc(g[0])}</div><table class="dob-custo-tab" style="margin-top:2px;"><tbody>${g[1].map(it => `<tr><td>${paredeEsc(it[0])} · ${paredeEsc(it[1])}</td><td class="num">${beediaFmt(it[3] * r.total)} ${paredeEsc(it[2])}</td></tr>`).join('')}</tbody></table>`).join('')}</div>`;
+      } else if(kit){
         kitHtml = `<div style="margin-top:8px;font-size:12.5px;"><b>${paredeEsc(kit.rotulo)} × ${r.total}</b>${kit.producao ? ` · Produção HAB - FUNDACAO: <b>${r.total} BL</b>` : ''}
           <table class="dob-custo-tab" style="margin-top:4px;"><tbody>${kit.itens.map(it => `<tr><td>${paredeEsc(it[0])}</td><td class="num">${beediaFmt(it[2] / 36 * r.total)} ${paredeEsc(it[1])}</td></tr>`).join('')}</tbody></table></div>`;
       }
