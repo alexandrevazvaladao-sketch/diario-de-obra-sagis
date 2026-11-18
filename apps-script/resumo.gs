@@ -97,6 +97,21 @@ function montarResumo_(hoje, dow, d) {
     const nomeCor = { verde: 'concluído', amarelo: 'executando' };
     h.push(bloco('Mapa — o que mudou hoje', '<ul style="margin:4px 0;padding-left:18px;font-size:13px">' + Object.values(grupos).map(g => '<li>' + esc_(g.servico) + ' · ' + esc_(g.obra) + ': ' + (nomeCor[g.cor] || esc_(g.cor)) + ' — blocos ' + g.blocos.map(esc_).join(', ') + '</li>').join('') + '</ul>'));
   } else { h.push(bloco('Mapa — o que mudou hoje', vazio('Sem alterações no Mapa hoje.'))); }
+  // 2b. BEE: concluídos do dia (para lançar) e concluídos sem data
+  const mp = d.mapa || {};
+  const conc = {}; // servico -> { total, lancado }
+  const somaConc = (x) => { if (x.cor !== 'verde' || x.dataConclusao !== hoje) return; const c = conc[x.servico] || (conc[x.servico] = { total: 0 }); c.total++; };
+  (mp.estados || []).forEach(somaConc); (mp.desenhos || []).forEach(somaConc);
+  const nomesConc = Object.keys(conc).sort();
+  if (nomesConc.length) {
+    h.push(bloco('BEE — concluídos hoje no app (' + nomesConc.length + ' serviço(s))', '<ul style="margin:4px 0;padding-left:18px;font-size:13px">' + nomesConc.map(sv => { const l = (mp.beeLancado || {})[hoje + '|' + sv]; return '<li>' + esc_(sv) + ' · ' + conc[sv].total + (l ? ' <span style="color:#2f7d4f">✔ lançado no BEE</span>' : ' <span style="color:#c4662f">pendente de lançar</span>') + '</li>'; }).join('') + '</ul>'));
+  }
+  const semData = {};
+  const somaSem = (x) => { if (x.cor === 'verde' && !x.dataConclusao && (mp.servicos || []).indexOf(x.servico) >= 0) semData[x.servico + ' · ' + x.obra] = (semData[x.servico + ' · ' + x.obra] || 0) + 1; };
+  (mp.estados || []).forEach(somaSem); (mp.desenhos || []).forEach(somaSem);
+  if (Object.keys(semData).length) {
+    h.push(bloco('⚠ Concluídos sem data (não entram no BEE)', '<ul style="margin:4px 0;padding-left:18px;font-size:13px">' + Object.keys(semData).sort().map(k => '<li>' + esc_(k) + ' (' + semData[k] + ')</li>').join('') + '</ul>'));
+  }
   // 3. cronograma da semana
   obras.forEach(obra => {
     const dados = d.cron[obra]; if (!dados) return;
