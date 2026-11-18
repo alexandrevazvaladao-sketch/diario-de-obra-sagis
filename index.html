@@ -1100,7 +1100,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.18.75';
+  const APP_VERSION = 'v2026.11.18.76';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2925,7 +2925,7 @@
     return Object.assign(extra, {
       servicos, tipoPorServico, escopoPorServico, prereqPorServico, servicosExcluidos,
       blocosPorObra: mescla('blocosPorObra'), estados: Object.values(estadoPorChave), desenhos: Object.values(desenhoPorId),
-      rotacoes: mescla('rotacoes'), macroPorServico: mescla('macroPorServico'), catalogoCustom: mescla('catalogoCustom'),
+      rotacoes: mescla('rotacoes'), beeLancado: mescla('beeLancado'), macroPorServico: mescla('macroPorServico'), catalogoCustom: mescla('catalogoCustom'),
       metodoOrdem: mescla('metodoOrdem'), metodoPassos: (local.metodoPassos && local.metodoPassos.length) ? local.metodoPassos : (remote.metodoPassos || []),
       custoEtapa: mescla('custoEtapa'), producaoDia: mescla('producaoDia'), apagados
     });
@@ -4181,12 +4181,22 @@
     (mapaState.desenhos || []).forEach(d => { if(d.cor === 'verde' && d.dataConclusao === data) soma(d.servico, d.obra, d.empresa); });
     return por;
   }
+  // Concluídos (verde) sem data de conclusão: não entram no BEE do dia e podem ficar sem lançar. Agrupa por serviço/obra.
+  function beediaSemData(){
+    const g = {};
+    const add = (sv, ob, id) => { const k = sv + '|' + ob; (g[k] = g[k] || { servico: sv, obra: ob, itens: [] }).itens.push(id); };
+    (mapaState.estados || []).forEach(e => { if(e.cor === 'verde' && !e.dataConclusao && (mapaState.servicos || []).includes(e.servico)) add(e.servico, e.obra, humanizarNomeBloco(e.bloco, (mapaState.tipoPorServico || {})[e.servico] || '')); });
+    (mapaState.desenhos || []).forEach(d => { if(d.cor === 'verde' && !d.dataConclusao && (mapaState.servicos || []).includes(d.servico)) add(d.servico, d.obra, 'desenho'); });
+    return Object.values(g).sort((a, b) => a.servico.localeCompare(b.servico));
+  }
   function renderBeeDia(){
     const c = document.getElementById('dob-beedia-container');
     if(!c) return;
     if(!beediaAberto){ c.innerHTML = ''; return; }
     if(!beediaData) beediaData = beediaHoje();
     const por = beediaConcluidos(beediaData);
+    const semData = beediaSemData();
+    const alertaData = semData.length ? `<div style="border:1px solid #c4662f;background:rgba(196,102,47,.08);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12.5px;"><b>⚠ Concluídos sem data (${semData.reduce((n, x) => n + x.itens.length, 0)})</b> — não aparecem no BEE do dia. Informe a data para eu lançar.<ul style="margin:4px 0 0;padding-left:18px;">${semData.map(x => `<li>${paredeEsc(x.servico)} · ${paredeEsc(x.obra)}: ${x.itens.map(paredeEsc).join(', ')}</li>`).join('')}</ul></div>` : '';
     const nomes = Object.keys(por).sort((a, b) => (macroDoServico(a) || 'zz').localeCompare(macroDoServico(b) || 'zz') || a.localeCompare(b));
     const blocos = nomes.map(sv => {
       const r = por[sv];
@@ -4203,7 +4213,7 @@
       }
       return `<div style="border:1px solid var(--line, #ddd);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
         <div style="font-weight:700;">${paredeEsc(sv)} <span style="font-weight:400;opacity:.7;">· ${r.total} concluído(s)${macro ? ' · macro ' + paredeEsc(rotuloMacro(macro)) : ''}</span></div>
-        ${linhasObra}${kitHtml}</div>`;
+        ${linhasObra}${(() => { const l = (mapaState.beeLancado || {})[beediaData + '|' + sv]; return l ? `<div style="margin-top:6px;font-size:12px;color:#2f7d4f;">✔ Lançado no BEE em ${paredeEsc(String(l.em || '').slice(0, 10).split('-').reverse().join('/'))}${l.qtd != null ? ' · qtd ' + paredeEsc(l.qtd) : ''}</div>` : `<div style="margin-top:6px;font-size:12px;color:#c4662f;">Pendente de lançar no BEE</div>`; })()}${kitHtml}</div>`;
     }).join('');
     c.innerHTML = `<div class="dob-card" style="margin-top:14px;">
       <h3>BEE do dia</h3>
@@ -4214,6 +4224,7 @@
         <button type="button" class="dob-btn secundario pequeno" id="dob-beedia-prox">▶</button>
         <button type="button" class="dob-btn secundario pequeno" id="dob-beedia-hoje">Hoje</button>
       </div>
+      ${alertaData}
       ${blocos || '<p class="dob-dica">Nenhum serviço concluído nessa data no app.</p>'}
     </div>`;
     const ir = (d) => { beediaData = d; renderBeeDia(); };
