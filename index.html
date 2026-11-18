@@ -1097,7 +1097,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.18.72';
+  const APP_VERSION = 'v2026.11.18.73';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2882,8 +2882,15 @@
   var nuvem = { db: null, auth: null, user: null, editor: false, dono: false, rev: null, revEnviado: null, existe: false, sujo: false, seq: 0, timer: null, gravando: false, ok: false, erro: '', authPronto: false, primeiro: null, primeiroOk: null };
 
   function normalizarMapa(o){
-    const base = { servicos: [], tipoPorServico: {}, blocosPorObra: {}, estados: [], desenhos: [], rotacoes: {}, servicosExcluidos: [], escopoPorServico: {}, prereqPorServico: {}, macroPorServico: {}, catalogoCustom: {}, metodoOrdem: {}, metodoPassos: [], custoEtapa: {}, producaoDia: {} };
+    const base = { servicos: [], tipoPorServico: {}, blocosPorObra: {}, estados: [], desenhos: [], rotacoes: {}, servicosExcluidos: [], escopoPorServico: {}, prereqPorServico: {}, macroPorServico: {}, catalogoCustom: {}, metodoOrdem: {}, metodoPassos: [], custoEtapa: {}, producaoDia: {}, apagados: {} };
     return Object.assign(base, o || {});
+  }
+  // Apagar uma chave de um mapa (escopo, custos, catálogo...) precisa deixar um "túmulo": sem ele, na mesclagem com a
+  // nuvem a chave que ainda existe do outro lado ressuscita. Túmulos expiram em 30 dias.
+  function apagarChaveMapa(campo, chave){
+    if(mapaState[campo]) delete mapaState[campo][chave];
+    if(!mapaState.apagados) mapaState.apagados = {};
+    mapaState.apagados[campo + '|' + chave] = Date.now();
   }
   // Une duas versões; em conflito, vale a "local" (quem está gravando agora).
   function mesclarMapa(remote, local){
@@ -2891,7 +2898,14 @@
     const uniao = (a, b) => Array.from(new Set([...(a || []), ...(b || [])]));
     const servicosExcluidos = uniao(remote.servicosExcluidos, local.servicosExcluidos);
     const servicos = uniao(local.servicos, remote.servicos).filter(s => !servicosExcluidos.includes(s));
-    const mescla = (campo) => Object.assign({}, remote[campo], local[campo]);
+    const limite = Date.now() - 30 * 86400000;
+    const apagados = {};
+    Object.entries(Object.assign({}, remote.apagados, local.apagados)).forEach(([k, t]) => { if(t > limite) apagados[k] = t; });
+    const mescla = (campo) => {
+      const r = Object.assign({}, remote[campo]);
+      Object.keys(r).forEach(k => { if(apagados[campo + '|' + k] && !(local[campo] && k in local[campo])) delete r[k]; });
+      return Object.assign(r, local[campo]);
+    };
     const tipoPorServico = mescla('tipoPorServico');
     const escopoPorServico = mescla('escopoPorServico');
     const prereqPorServico = mescla('prereqPorServico');
@@ -2910,7 +2924,7 @@
       blocosPorObra: mescla('blocosPorObra'), estados: Object.values(estadoPorChave), desenhos: Object.values(desenhoPorId),
       rotacoes: mescla('rotacoes'), macroPorServico: mescla('macroPorServico'), catalogoCustom: mescla('catalogoCustom'),
       metodoOrdem: mescla('metodoOrdem'), metodoPassos: (local.metodoPassos && local.metodoPassos.length) ? local.metodoPassos : (remote.metodoPassos || []),
-      custoEtapa: mescla('custoEtapa'), producaoDia: mescla('producaoDia')
+      custoEtapa: mescla('custoEtapa'), producaoDia: mescla('producaoDia'), apagados
     });
   }
   function nuvemSalvarLocal(){ try{ localStorage.setItem('dob:mapa_state', JSON.stringify(mapaState)); }catch(e){ /* ignora */ } }
@@ -3911,7 +3925,7 @@
       const cod = sel.dataset.cod;
       const ehComposicao = cod.split('.').length > 3;
       if(sel.value) mapaState.custoEtapa[cod] = { servico: sel.value };
-      else if(ehComposicao) delete mapaState.custoEtapa[cod];
+      else if(ehComposicao) apagarChaveMapa('custoEtapa', cod);
       else mapaState.custoEtapa[cod] = { pct: (mapaState.custoEtapa[cod] || {}).pct || 0 };
       saveMapaState();
       renderCustoEtapa();
@@ -4475,7 +4489,7 @@
     const be = document.getElementById('dob-cat-excluir');
     if(be) be.addEventListener('click', () => {
       if(!confirm('Excluir "' + s.nome + '" do catálogo?')) return;
-      delete mapaState.catalogoCustom[s.id]; catalogoSel = 'radier'; saveMapaState(true); renderCatalogo();
+      apagarChaveMapa('catalogoCustom', s.id); catalogoSel = 'radier'; saveMapaState(true); renderCatalogo();
     });
   }
 
@@ -6065,17 +6079,17 @@
       const idx = mapaState.servicos.indexOf(nomeAtual);
       if(idx >= 0) mapaState.servicos[idx] = novoNomeLimpo;
       mapaState.tipoPorServico[novoNomeLimpo] = mapaState.tipoPorServico[nomeAtual] || 'bloco';
-      delete mapaState.tipoPorServico[nomeAtual];
-      { const m = macroDoServico(nomeAtual); if(m){ if(!mapaState.macroPorServico) mapaState.macroPorServico = {}; mapaState.macroPorServico[novoNomeLimpo] = m; delete mapaState.macroPorServico[nomeAtual]; } }
+      apagarChaveMapa('tipoPorServico', nomeAtual);
+      { const m = macroDoServico(nomeAtual); if(m){ if(!mapaState.macroPorServico) mapaState.macroPorServico = {}; mapaState.macroPorServico[novoNomeLimpo] = m; apagarChaveMapa('macroPorServico', nomeAtual); } }
       mapaState.estados.forEach(e => { if(e.servico === nomeAtual) e.servico = novoNomeLimpo; });
       if(mapaState.escopoPorServico && mapaState.escopoPorServico[nomeAtual]){
         mapaState.escopoPorServico[novoNomeLimpo] = mapaState.escopoPorServico[nomeAtual];
-        delete mapaState.escopoPorServico[nomeAtual];
+        apagarChaveMapa('escopoPorServico', nomeAtual);
       }
       if(mapaState.prereqPorServico){
         if(mapaState.prereqPorServico[nomeAtual]){
           mapaState.prereqPorServico[novoNomeLimpo] = mapaState.prereqPorServico[nomeAtual];
-          delete mapaState.prereqPorServico[nomeAtual];
+          apagarChaveMapa('prereqPorServico', nomeAtual);
         }
         Object.values(mapaState.prereqPorServico).forEach(lista => {
           const i = lista.indexOf(nomeAtual);
@@ -6169,7 +6183,7 @@
         mapaState.tipoPorServico[servico] = 'rede';
         if(mapaState.escopoPorServico && mapaState.escopoPorServico[servico]){
           delete mapaState.escopoPorServico[servico][obraAtual];
-          if(Object.keys(mapaState.escopoPorServico[servico]).length === 0) delete mapaState.escopoPorServico[servico];
+          if(Object.keys(mapaState.escopoPorServico[servico]).length === 0) apagarChaveMapa('escopoPorServico', servico);
         }
         saveMapaState();
         fechar();
@@ -6184,7 +6198,7 @@
         if(!mapaState.escopoPorServico[servico]) mapaState.escopoPorServico[servico] = {};
         if(ids.length === blocosDaObraAtual.length){
           delete mapaState.escopoPorServico[servico][obraAtual];
-          if(Object.keys(mapaState.escopoPorServico[servico]).length === 0) delete mapaState.escopoPorServico[servico];
+          if(Object.keys(mapaState.escopoPorServico[servico]).length === 0) apagarChaveMapa('escopoPorServico', servico);
         } else {
           mapaState.escopoPorServico[servico][obraAtual] = ids;
         }
