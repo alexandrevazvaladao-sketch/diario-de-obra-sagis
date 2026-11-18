@@ -990,6 +990,7 @@
     <div class="dob-side-item" data-side="painel"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></svg></span><span class="label">Meu painel</span></div>
     <div class="dob-side-item" data-side="custo-etapa"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.5.8-2.5 2s1 1.6 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1.1 0-2-.4-2.5-1.2M12 6v2M12 16v2"/></svg></span><span class="label">Custo por etapa</span></div>
     <div class="dob-side-item" data-side="parede"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.5.8-2.5 2s1 1.6 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1.1 0-2-.4-2.5-1.2M12 6v2M12 16v2"/></svg></span><span class="label">Parede de concreto</span></div>
+    <div class="dob-side-item" data-side="beedia"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.5.8-2.5 2s1 1.6 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1.1 0-2-.4-2.5-1.2M12 6v2M12 16v2"/></svg></span><span class="label">BEE do dia</span></div>
     <div class="dob-side-sep"></div>
     <div class="dob-side-item" data-side="relatorio"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h20"/><path d="M4 3v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3"/><path d="M12 16v5M8 21h8"/></svg></span><span class="label">Apresentação</span></div>
     <div class="dob-side-item" data-side="gamma"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/></svg></span><span class="label">Comando Gamma</span></div>
@@ -1047,6 +1048,7 @@
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-painel">Meu painel</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-custo-etapa">Custo por etapa</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-parede">Parede de concreto</button>
+    <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-beedia">BEE do dia</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-uaubee">UAU → BEE</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-catalogo">Catálogo de custos</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-metodo">Método construtivo</button>
@@ -1078,6 +1080,7 @@
   <div id="dob-painel-container"></div>
   <div id="dob-custo-etapa-container"></div>
   <div id="dob-parede-container"></div>
+  <div id="dob-beedia-container"></div>
   <div id="dob-uaubee-container"></div>
   <div id="dob-fotos-container"></div>
   <div id="dob-rotina-container"></div>
@@ -1097,7 +1100,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.18.73';
+  const APP_VERSION = 'v2026.11.18.74';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2936,6 +2939,7 @@
     try{ if(metodoAberto) renderMetodo(); }catch(e){ /* ignora */ }
     try{ if(custoEtapaAberto) renderCustoEtapa(); }catch(e){ /* ignora */ }
     try{ if(paredeAberto) renderParede(); }catch(e){ /* ignora */ }
+    try{ if(beediaAberto) renderBeeDia(); }catch(e){ /* ignora */ }
     try{ if(painelAberto) renderPainel(); }catch(e){ /* ignora */ }
     try{ if(cronogramaAberto) renderCronograma(); }catch(e){ /* ignora */ }
   }
@@ -2990,10 +2994,10 @@
     nuvemStatus();
   }
   // ---------- Visibilidade das seções (o dono decide quem vê cada parte do app) ----------
-  var VIS_PADRAO = { 'rotina': 'dono', 'painel': 'dono', 'custo-etapa': 'dono', 'parede': 'dono', 'uaubee': 'dono', 'gamma': 'dono' }; // em desenvolvimento: só o dono, até liberar
+  var VIS_PADRAO = { 'rotina': 'dono', 'painel': 'dono', 'custo-etapa': 'dono', 'parede': 'dono', 'beedia': 'dono', 'uaubee': 'dono', 'gamma': 'dono' }; // em desenvolvimento: só o dono, até liberar
   var VIS_SECOES = [['novo', 'Novo apontamento', 'dob-novo'], ['metodo', 'Método construtivo', 'dob-btn-metodo'], ['mapa', 'Mapa', 'dob-btn-mapa'], ['cronograma', 'Cronograma', 'dob-btn-cronograma'],
     ['campo', 'Modo Campo', 'dob-btn-campo'], ['fotos', 'Fotos da obra', 'dob-btn-fotos'], ['rotina', 'Rotina', 'dob-btn-rotina'], ['resumo-macro', 'Resumo macro', 'dob-btn-resumo-macro'], ['resumo-semana', 'Resumo semana', 'dob-btn-resumo-semana'], ['catalogo', 'Catálogo de custos', 'dob-btn-catalogo'],
-    ['painel', 'Meu painel', 'dob-btn-painel'], ['custo-etapa', 'Custo por etapa', 'dob-btn-custo-etapa'], ['parede', 'Parede de concreto', 'dob-btn-parede'], ['relatorio', 'Apresentação', 'dob-btn-relatorio'], ['gamma', 'Comando Gamma', 'dob-btn-gamma'], ['uaubee', 'UAU → BEE', 'dob-btn-uaubee']];
+    ['painel', 'Meu painel', 'dob-btn-painel'], ['custo-etapa', 'Custo por etapa', 'dob-btn-custo-etapa'], ['parede', 'Parede de concreto', 'dob-btn-parede'], ['beedia', 'BEE do dia', 'dob-btn-beedia'], ['relatorio', 'Apresentação', 'dob-btn-relatorio'], ['gamma', 'Comando Gamma', 'dob-btn-gamma'], ['uaubee', 'UAU → BEE', 'dob-btn-uaubee']];
   function nivelSecao(k){ return (nuvem.vis && nuvem.vis[k]) || VIS_PADRAO[k] || 'todos'; }
   function secaoVisivel(k){ const n = nivelSecao(k); if(nuvem.dono) return true; if(n === 'todos') return true; if(n === 'editores') return !!nuvem.editor; return false; }
   function aplicarVisibilidade(){
@@ -4126,6 +4130,77 @@
     document.getElementById('dob-btn-parede').textContent = paredeAberto ? 'Fechar Parede de concreto' : 'Parede de concreto';
     renderParede();
     if(paredeAberto) document.getElementById('dob-parede-container').scrollIntoView({behavior:'smooth', block:'start'});
+  });
+
+  // ===== BEE do dia: o que lançar no BEE a partir do que o app registrou como concluído numa data =====
+  // Mostra, por macro, os serviços concluídos no dia (por obra e empresa) e o kit de material que acompanha cada um.
+  // Kits da fundação = totais do orçamento executivo ÷ 36 BL (um bloco). O lajão tem a Produção (BL) do macro HAB - FUNDACAO.
+  let beediaAberto = false;
+  let beediaData = '';
+  const BEE_KITS = {
+    'FUNDAÇÃO PROFUNDA': { rotulo: 'Kit estaca (por bloco)', macro: '02.02', itens: [['ACO CA-50-60 - BARRA ESTIRADA', 'KG', 63466.2], ['ARAME RECOZIDO TORCIDO 1,24 MM', 'KG', 1813.32], ['DISTANCIADOR PLASTICO CG15', 'UN', 18133.2], ['CONCRETO USINADO FCK 40 MPA', 'M3', 2883.96], ['AREIA LAVADA MEDIA', 'M3', 73.44]] },
+    'ARRASAMENTO DE ESTACAS/ BLOCOS DE COROAMENTO': { rotulo: 'Kit bloco de coroamento (por bloco)', macro: '02.02', itens: [['ACO CA-50-60 - BARRA ESTIRADA', 'KG', 35305.2], ['ARAME RECOZIDO TORCIDO 1,24 MM', 'KG', 1008.72], ['DISTANCIADOR PLASTICO CG15', 'UN', 10087.2], ['CONCRETO USINADO FCK 30 MPA', 'M3', 532.84], ['CONCRETO FCK 10 (LASTRO)', 'M3', 40.42], ['AREIA LAVADA MEDIA', 'M3', 39.17]] },
+    'PREPARAÇÃO/CONCRETAGEM LAJÃO': { rotulo: 'Kit lajão (por bloco)', macro: '02.02', producao: true, itens: [['ACO CA-50-60 - BARRA ESTIRADA', 'KG', 23662.8], ['ARAME RECOZIDO TORCIDO 1,24 MM', 'KG', 676.08], ['DISTANCIADOR PLASTICO CG15', 'UN', 6760.8], ['TELA SOLDADA Q 283', 'KG', 110844], ['CONCRETO USINADO FCK 30 MPA', 'M3', 1506.93], ['PO DE BRITA (BGS)', 'M3', 292.58], ['FORMA METALICA PARA LAJE TERREO OU RADIER', 'UN', 547.56], ['LONA PLASTICA PRETA 200 MICRAS', 'M2', 8777.38], ['DESMOLDANTE PARA FORMA', 'L', 43.8]] }
+  };
+  function beediaFmt(n){ return Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function beediaHoje(){ const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function beediaConcluidos(data){
+    const por = {}; // servico -> { total, obras: {obra: {empresa: n}} }
+    const soma = (servico, obra, empresa) => {
+      const r = por[servico] || (por[servico] = { total: 0, obras: {} });
+      r.total++;
+      const o = r.obras[obra] || (r.obras[obra] = {});
+      const e = empresa || 'Sem empresa';
+      o[e] = (o[e] || 0) + 1;
+    };
+    (mapaState.estados || []).forEach(e => { if(e.cor === 'verde' && e.dataConclusao === data) soma(e.servico, e.obra, e.empresa); });
+    (mapaState.desenhos || []).forEach(d => { if(d.cor === 'verde' && d.dataConclusao === data) soma(d.servico, d.obra, d.empresa); });
+    return por;
+  }
+  function renderBeeDia(){
+    const c = document.getElementById('dob-beedia-container');
+    if(!c) return;
+    if(!beediaAberto){ c.innerHTML = ''; return; }
+    if(!beediaData) beediaData = beediaHoje();
+    const por = beediaConcluidos(beediaData);
+    const nomes = Object.keys(por).sort((a, b) => (macroDoServico(a) || 'zz').localeCompare(macroDoServico(b) || 'zz') || a.localeCompare(b));
+    const blocos = nomes.map(sv => {
+      const r = por[sv];
+      const macro = macroDoServico(sv);
+      const kit = BEE_KITS[sv];
+      const linhasObra = Object.entries(r.obras).map(([ob, emp]) => `<div style="font-size:12.5px;">${paredeEsc(ob)}: ${Object.entries(emp).map(([e, n]) => paredeEsc(e) + ' (' + n + ')').join(' · ')}</div>`).join('');
+      let kitHtml = '';
+      if(kit){
+        kitHtml = `<div style="margin-top:8px;font-size:12.5px;"><b>${paredeEsc(kit.rotulo)} × ${r.total}</b>${kit.producao ? ` · Produção HAB - FUNDACAO: <b>${r.total} BL</b>` : ''}
+          <table class="dob-custo-tab" style="margin-top:4px;"><tbody>${kit.itens.map(it => `<tr><td>${paredeEsc(it[0])}</td><td class="num">${beediaFmt(it[2] / 36 * r.total)} ${paredeEsc(it[1])}</td></tr>`).join('')}</tbody></table></div>`;
+      }
+      return `<div style="border:1px solid var(--line, #ddd);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-weight:700;">${paredeEsc(sv)} <span style="font-weight:400;opacity:.7;">· ${r.total} concluído(s)${macro ? ' · macro ' + paredeEsc(rotuloMacro(macro)) : ''}</span></div>
+        ${linhasObra}${kitHtml}</div>`;
+    }).join('');
+    c.innerHTML = `<div class="dob-card" style="margin-top:14px;">
+      <h3>BEE do dia</h3>
+      <p class="dob-dica">Serviços que o app marca como concluídos na data escolhida e o que lançar no BEE (quantidade = total das duas obras no dia). Lance a empresa na linha EMPREITEIRO dela; kits de material seguem a regra do orçamento ÷ 36 BL.</p>
+      <div style="display:flex;gap:8px;align-items:center;margin:8px 0 12px;flex-wrap:wrap;">
+        <button type="button" class="dob-btn secundario pequeno" id="dob-beedia-ant">◀</button>
+        <input type="date" id="dob-beedia-data" class="dob-input" value="${beediaData}" style="width:auto;" />
+        <button type="button" class="dob-btn secundario pequeno" id="dob-beedia-prox">▶</button>
+        <button type="button" class="dob-btn secundario pequeno" id="dob-beedia-hoje">Hoje</button>
+      </div>
+      ${blocos || '<p class="dob-dica">Nenhum serviço concluído nessa data no app.</p>'}
+    </div>`;
+    const ir = (d) => { beediaData = d; renderBeeDia(); };
+    const deslocar = (n) => { const d = new Date(beediaData + 'T12:00:00'); d.setDate(d.getDate() + n); ir(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')); };
+    document.getElementById('dob-beedia-ant').addEventListener('click', () => deslocar(-1));
+    document.getElementById('dob-beedia-prox').addEventListener('click', () => deslocar(1));
+    document.getElementById('dob-beedia-hoje').addEventListener('click', () => ir(beediaHoje()));
+    document.getElementById('dob-beedia-data').addEventListener('change', (ev) => { if(ev.target.value) ir(ev.target.value); });
+  }
+  document.getElementById('dob-btn-beedia').addEventListener('click', () => {
+    beediaAberto = !beediaAberto;
+    document.getElementById('dob-btn-beedia').textContent = beediaAberto ? 'Fechar BEE do dia' : 'BEE do dia';
+    renderBeeDia();
+    if(beediaAberto) document.getElementById('dob-beedia-container').scrollIntoView({behavior:'smooth', block:'start'});
   });
 
   // ===== Meu painel (só o dono): acompanhamento pessoal — PPC por semana, atrasos, causas e avanço do Mapa =====
@@ -9395,6 +9470,7 @@
       painel: 'dob-btn-painel',
       'custo-etapa': 'dob-btn-custo-etapa',
       parede: 'dob-btn-parede',
+      beedia: 'dob-btn-beedia',
       relatorio: 'dob-btn-relatorio',
       gamma: 'dob-btn-gamma',
       uaubee: 'dob-btn-uaubee',
@@ -9404,7 +9480,7 @@
       config: 'dob-btn-config',
       novo: 'dob-novo'
     };
-    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-cronograma', 'dob-btn-campo', 'dob-btn-fotos', 'dob-btn-rotina', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-painel', 'dob-btn-custo-etapa', 'dob-btn-parede', 'dob-btn-relatorio', 'dob-btn-gamma', 'dob-btn-uaubee', 'dob-btn-catalogo', 'dob-btn-metodo'];
+    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-cronograma', 'dob-btn-campo', 'dob-btn-fotos', 'dob-btn-rotina', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-painel', 'dob-btn-custo-etapa', 'dob-btn-parede', 'dob-btn-beedia', 'dob-btn-relatorio', 'dob-btn-gamma', 'dob-btn-uaubee', 'dob-btn-catalogo', 'dob-btn-metodo'];
     function sincronizarSidebar(){
       let algumAberto = false;
       Object.entries(mapaBotoes).forEach(([side, btnId]) => {
