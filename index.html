@@ -946,6 +946,63 @@
   .dob-side-item[data-side="rotina"], .dob-side-item[data-side="catalogo"], .dob-side-item[data-side="custo-etapa"], .dob-side-item[data-side="uaubee"],
   #dob-btn-rotina, #dob-btn-catalogo, #dob-btn-custo-etapa, #dob-btn-uaubee { display: none !important; }
 </style>
+
+<style id="dob-skin">
+/* ===== Tema profissional (sobrepõe o padrão): neutros frios, azul institucional, cantos discretos ===== */
+:root{ --paper:#f3f4f6; --line:#dde1e7; --clay:#1f4e8c; --clay-dark:#173d70; --sand:#8a6d2f; --radius:8px; --radius-sm:6px;
+  --shadow:0 1px 2px rgba(16,24,40,.05); --shadow-sm:0 1px 1px rgba(16,24,40,.06); --ink:#111c33; --muted:#6b7380; }
+body{ letter-spacing:-.003em; }
+.dob-btn{ border-radius:6px; box-shadow:none; font-weight:600; letter-spacing:0; }
+.dob-btn:hover{ transform:none; box-shadow:none; }
+.dob-btn.secundario:hover{ background:#eceff3; }
+.dob-input:focus,.dob-select:focus,.dob-textarea:focus{ border-color:var(--clay); box-shadow:0 0 0 3px rgba(31,78,140,.14); }
+.dob-input,.dob-select,.dob-textarea{ border-radius:6px; }
+.dob-card-form h3,.dob-side-brand{ font-family:inherit !important; letter-spacing:-.01em; }
+.dob-card-form{ box-shadow:none; }
+.dob-side-item{ border-radius:6px !important; }
+.dob-side-item.active{ border-left-color:#fff; background:rgba(255,255,255,.12); }
+.dob-saudacao-titulo{ font-family:inherit !important; font-weight:650; letter-spacing:-.02em; }
+.dob-saudacao-titulo .nome{ color:var(--ink); }
+.dob-header{ border-radius:8px !important; box-shadow:none !important; }
+.dob-header::after{ display:none !important; }
+.dob-header h1,.dob-header h2{ font-family:inherit !important; letter-spacing:-.015em; }
+/* Visitas */
+.vis-wrap{ display:flex; flex-direction:column; gap:16px; margin-top:14px; color:var(--ink-text); }
+.vis-topo{ display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; }
+.vis-tit{ margin:0; font-size:18px; font-weight:650; color:var(--ink); }
+.vis-sub{ font-size:12.5px; color:var(--muted); margin-top:2px; }
+.vis-novo{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.vis-resumos{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
+.vis-resumo{ background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 16px; border-top:3px solid var(--clay); }
+.vis-r-obra{ font-size:15px; font-weight:650; color:var(--ink); }
+.vis-r-sit{ font-size:12.5px; margin:2px 0 10px; font-weight:600; }
+.vis-r-sit.vis-ok{ color:#23704a; } .vis-r-sit.vis-ag{ color:var(--clay); } .vis-r-sit.vis-pend{ color:#a4531c; }
+.vis-r-meta{ display:flex; gap:28px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+.vis-r-meta b{ display:block; font-size:14px; color:var(--ink-text); text-transform:none; letter-spacing:0; font-weight:600; margin-top:2px; }
+.vis-tabela{ background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+.vis-cab,.vis-linha{ display:grid; grid-template-columns:130px 1.1fr 110px 1.2fr 104px 24px; align-items:center; gap:12px; padding:0 16px; }
+.vis-cab{ background:#f7f8fa; border-bottom:1px solid var(--line); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); height:36px; }
+.vis-linha{ width:100%; min-height:52px; border:0; border-bottom:1px solid #eceff3; background:#fff; text-align:left; font:inherit; color:inherit; cursor:pointer; }
+.vis-linha:hover{ background:#f7f9fc; } .vis-linha.ativa{ background:#f2f6fc; }
+.vis-data b{ font-size:14px; font-weight:650; display:block; line-height:1.2; } .vis-data small{ font-size:11.5px; color:var(--muted); text-transform:capitalize; }
+.vis-obra{ font-size:14px; font-weight:600; } .vis-falta,.vis-reg{ font-size:12.5px; color:var(--muted); } .vis-seta{ color:var(--muted); font-size:11px; }
+.vis-badge{ font-size:11.5px; font-weight:600; padding:3px 9px; border-radius:4px; text-align:center; white-space:nowrap; }
+.vis-badge.vis-ag{ background:#e6eef8; color:#1f4e8c; } .vis-badge.vis-ok{ background:#e2f1e9; color:#23704a; } .vis-badge.vis-atras{ background:#f8e5e1; color:#a63a26; }
+.vis-detalhe{ padding:16px 18px 18px; background:#fafbfc; border-bottom:1px solid var(--line); }
+.vis-lbl{ display:block; font-size:12px; font-weight:600; color:var(--ink-soft); } .vis-dica{ display:block; font-weight:400; font-size:11.5px; color:var(--muted); margin:1px 0 6px; }
+.vis-fotos{ display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:8px; margin:8px 0; }
+.vis-foto{ position:relative; border-radius:6px; overflow:hidden; border:1px solid var(--line); }
+.vis-foto img{ width:100%; aspect-ratio:4/3; object-fit:cover; display:block; cursor:pointer; }
+.vis-foto button{ position:absolute; top:4px; right:4px; border:0; border-radius:4px; width:22px; height:22px; background:rgba(17,28,51,.7); color:#fff; cursor:pointer; line-height:1; }
+.vis-acoes{ display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+.vis-rodape{ display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+@media (max-width:720px){
+  .vis-cab{ display:none; }
+  .vis-linha{ grid-template-columns:1fr auto 20px; grid-template-areas:"d b s" "o f s" "r r r"; row-gap:2px; padding:10px 14px; }
+  .vis-data{ grid-area:d; } .vis-badge{ grid-area:b; } .vis-seta{ grid-area:s; } .vis-obra{ grid-area:o; } .vis-falta{ grid-area:f; text-align:right; } .vis-reg{ grid-area:r; font-size:11.5px; }
+  .vis-reg:empty{ display:none; }
+}
+</style>
 </head>
 <body>
 <div id="dob-gate"><div class="lg-carregando"><b>Diário de Obra</b><span>Carregando…</span></div></div>
@@ -1106,7 +1163,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.19.80';
+  const APP_VERSION = 'v2026.11.19.81';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -4302,47 +4359,54 @@
     Object.entries(mapaState.visitas || {}).forEach(([id, v]) => { if(v.coleta && !v.notas){ const t = Object.values(v.coleta).filter(Boolean).join('\n'); if(t) v.notas = t; } });
     const lista = visitasLista(), hoje = beediaHoje(), mes = hoje.slice(0, 7);
     const dias = Array.from(new Set(lista.map(v => v.data))).sort();
-    const status = VISITAS_OBRAS.map(([o]) => {
+    const resumo = VISITAS_OBRAS.map(([o]) => {
       const doMes = lista.filter(v => v.obra === o && (v.data || '').slice(0, 7) === mes);
       const ok = doMes.some(v => v.status === 'realizada'), ag = doMes.find(v => v.status !== 'realizada');
-      const txt = ok ? 'visitada' : (ag ? 'marcada ' + visitasDataBr(ag.data) : 'sem data');
-      const cor = ok ? '#2f7d4f' : (ag ? '#2a6db0' : '#c4662f');
-      return `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;"><span style="width:8px;height:8px;border-radius:50%;background:${cor};"></span><b>${o}</b> <span style="opacity:.75;">${txt}</span></span>`;
+      const prox = lista.filter(v => v.obra === o && v.status !== 'realizada' && v.data >= hoje).sort((x, y) => x.data.localeCompare(y.data))[0];
+      const feitas = lista.filter(v => v.obra === o && v.status === 'realizada').length;
+      const sit = ok ? ['Visitada neste mês', 'ok'] : (ag ? ['Marcada para ' + visitasDataBr(ag.data), 'ag'] : ['Sem visita marcada', 'pend']);
+      return `<div class="vis-resumo"><div class="vis-r-obra">${paredeEsc(o)}</div><div class="vis-r-sit vis-${sit[1]}">${sit[0]}</div>
+        <div class="vis-r-meta"><span>Próxima<b>${prox ? visitasDiaSemana(prox.data) + ' ' + visitasDataBr(prox.data) : '–'}</b></span><span>Realizadas<b>${feitas}</b></span></div></div>`;
     }).join('');
     const sel = visitasSel && (mapaState.visitas || {})[visitasSel] ? visitasSel : '';
-    const blocos = dias.map(d => {
-      const vs = lista.filter(v => v.data === d).sort((a, b) => a.obra.localeCompare(b.obra));
-      const passou = d < hoje, feitas = vs.every(v => v.status === 'realizada');
-      const chips = vs.map(v => {
-        const f = v.status === 'realizada', ativo = v.id === sel;
-        return `<button type="button" class="dob-btn pequeno ${ativo ? '' : 'secundario'} dob-vis-chip" data-id="${v.id}">${f ? '✔ ' : ''}${paredeEsc(v.obra)}</button>`;
-      }).join('');
-      const v = sel && vs.find(x => x.id === sel);
-      const fotosV = v ? (v.fotos || []) : [];
-      const form = v ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line);">
-        <div style="font-size:14px;margin-bottom:8px;"><b>${paredeEsc(v.obra)}</b> · ${visitasDiaSemana(v.data)} ${visitasDataBr(v.data)}</div>
-        <label style="display:block;font-size:12px;"><span style="opacity:.75;">Anotações: o que está rodando, métodos, o que achei bom ou diferente</span>
-          <textarea class="dob-input dob-vis-campo" data-id="${v.id}" data-campo="notas" rows="7" style="width:100%;margin-top:2px;">${paredeEsc(v.notas || '')}</textarea></label>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;">
-          <label class="dob-btn" for="dob-vis-foto-cam" style="cursor:pointer;">📸 Tirar foto</label>
-          <label class="dob-btn secundario" for="dob-vis-foto-gal" style="cursor:pointer;">Enviar da galeria</label>
+    const linhas = lista.slice().sort((x, y) => x.data.localeCompare(y.data) || x.obra.localeCompare(y.obra)).map(v => {
+      const f = v.status === 'realizada', atras = !f && v.data < hoje, ativo = v.id === sel;
+      const st = f ? ['Realizada', 'ok'] : (atras ? ['Atrasada', 'atras'] : ['Agendada', 'ag']);
+      const nF = (v.fotos || []).length, temN = !!(v.notas && v.notas.trim());
+      const linha = `<button type="button" class="vis-linha dob-vis-chip ${ativo ? 'ativa' : ''}" data-id="${v.id}" aria-expanded="${ativo}">
+        <span class="vis-data"><b>${visitasDataBr(v.data)}</b><small>${visitasDiaSemana(v.data)}</small></span>
+        <span class="vis-obra">${paredeEsc(v.obra)}</span>
+        <span class="vis-falta">${f ? '' : visitasFalta(v.data)}</span>
+        <span class="vis-reg">${temN ? 'Anotações' : ''}${temN && nF ? ' · ' : ''}${nF ? nF + (nF > 1 ? ' fotos' : ' foto') : ''}</span>
+        <span class="vis-badge vis-${st[1]}">${st[0]}</span>
+        <span class="vis-seta">${ativo ? '▴' : '▾'}</span></button>`;
+      if(!ativo) return linha;
+      const fotosV = v.fotos || [];
+      return linha + `<div class="vis-detalhe">
+        <label class="vis-lbl">Anotações
+          <span class="vis-dica">O que está rodando, métodos usados, o que achei bom ou diferente</span>
+          <textarea class="dob-input dob-vis-campo" data-id="${v.id}" data-campo="notas" rows="6" style="width:100%;">${paredeEsc(v.notas || '')}</textarea></label>
+        <div class="vis-lbl" style="margin-top:14px;">Fotos</div>
+        ${visitasEnviando ? '<div class="dob-dica">Enviando foto…</div>' : ''}
+        ${fotosV.length ? `<div class="vis-fotos">${fotosV.map((fo, i) => `<div class="vis-foto"><img data-vis-abrir="${i}" src="${fo.thumb || fo.data || ''}" alt="" /><button type="button" class="dob-vis-fdel" data-i="${i}" title="Remover foto">×</button></div>`).join('')}</div>` : '<div class="dob-dica" style="margin:4px 0 8px;">Nenhuma foto registrada.</div>'}
+        <div class="vis-acoes">
+          <label class="dob-btn pequeno" for="dob-vis-foto-cam" style="cursor:pointer;">Tirar foto</label>
+          <label class="dob-btn pequeno secundario" for="dob-vis-foto-gal" style="cursor:pointer;">Enviar da galeria</label>
           <input type="file" id="dob-vis-foto-cam" accept="image/*" capture="environment" style="position:absolute;width:1px;height:1px;opacity:0;" />
           <input type="file" id="dob-vis-foto-gal" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;" />
         </div>
-        ${visitasEnviando ? '<div class="dob-dica">Enviando foto…</div>' : ''}
-        ${fotosV.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-bottom:10px;">${fotosV.map((f, i) => `<div style="position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--line);"><img data-vis-abrir="${i}" src="${f.thumb || f.data || ''}" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block;cursor:pointer;" /><button type="button" class="dob-vis-fdel" data-i="${i}" title="Remover foto" style="position:absolute;top:3px;right:3px;border:0;border-radius:50%;width:22px;height:22px;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;">×</button></div>`).join('')}</div>` : '<div class="dob-dica" style="margin-bottom:10px;">Nenhuma foto ainda.</div>'}
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
-          <label style="font-size:12px;">Data<input type="date" class="dob-input dob-vis-campo" data-id="${v.id}" data-campo="data" value="${paredeEsc(v.data)}" style="display:block;" /></label>
-          <button type="button" class="dob-btn pequeno dob-vis-status" data-id="${v.id}">${v.status === 'realizada' ? 'Reabrir' : 'Marcar como realizada'}</button>
-          <button type="button" class="dob-btn secundario pequeno dob-vis-del" data-id="${v.id}">Remover visita</button>
-        </div></div>` : '';
-      return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;${passou && feitas ? 'opacity:.7;' : ''}">
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;"><div style="min-width:92px;"><b style="font-size:15px;">${visitasDiaSemana(d)} ${visitasDataBr(d)}</b><div style="font-size:11.5px;opacity:.7;">${visitasFalta(d)}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;">${chips}</div></div>${form}</div>`;
-    }).join('') || '<div style="opacity:.7;font-size:13px;">Nenhuma visita registrada. Adicione uma data abaixo.</div>';
-    c.innerHTML = `<div class="dob-cat">
-      <div style="font-size:13px;margin-bottom:10px;"><div style="opacity:.75;margin-bottom:4px;">Meta: 1 visita por mês em cada obra</div>${status}</div>
-      ${blocos}
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:10px;"><label style="font-size:12px;">Novo dia de visita<input type="date" id="dob-vis-data" class="dob-input" style="display:block;" /></label><button type="button" class="dob-btn pequeno" id="dob-vis-add">Adicionar (Vera Cruz e Miramar)</button></div></div>`;
+        <div class="vis-rodape">
+          <label class="vis-lbl" style="margin:0;">Data da visita<input type="date" class="dob-input dob-vis-campo" data-id="${v.id}" data-campo="data" value="${paredeEsc(v.data)}" style="display:block;margin-top:4px;" /></label>
+          <div class="vis-acoes" style="margin:0;margin-left:auto;">
+            <button type="button" class="dob-btn pequeno dob-vis-status" data-id="${v.id}">${f ? 'Reabrir visita' : 'Marcar como realizada'}</button>
+            <button type="button" class="dob-btn secundario perigo pequeno dob-vis-del" data-id="${v.id}">Remover</button>
+          </div></div></div>`;
+    }).join('') || '<div class="dob-dica" style="padding:16px;">Nenhuma visita registrada. Adicione uma data acima.</div>';
+    c.innerHTML = `<div class="vis-wrap">
+      <div class="vis-topo"><div><h3 class="vis-tit">Visitas às obras</h3><div class="vis-sub">Meta: 1 visita por mês em cada obra</div></div>
+        <div class="vis-novo"><input type="date" id="dob-vis-data" class="dob-input" aria-label="Data da nova visita" /><button type="button" class="dob-btn pequeno" id="dob-vis-add">Adicionar dia (Vera Cruz e Miramar)</button></div></div>
+      <div class="vis-resumos">${resumo}</div>
+      <div class="vis-tabela"><div class="vis-cab"><span>Data</span><span>Obra</span><span>Prazo</span><span>Registro</span><span>Situação</span><span></span></div>${linhas}</div></div>`;
     c.querySelectorAll('.dob-vis-chip').forEach(b => b.addEventListener('click', () => { visitasSel = visitasSel === b.dataset.id ? '' : b.dataset.id; renderVisitas(); }));
     const fotoIn = (id) => { const el = document.getElementById(id); if(el) el.addEventListener('change', async (ev) => { const fs = Array.from(ev.target.files || []); ev.target.value = ''; await visitasAddFotos(sel, fs); }); };
     fotoIn('dob-vis-foto-cam'); fotoIn('dob-vis-foto-gal');
