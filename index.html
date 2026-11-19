@@ -1103,7 +1103,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.19.78';
+  const APP_VERSION = 'v2026.11.19.79';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -4246,13 +4246,9 @@
   });
 
   // ===== Visitas às outras obras (Vera Cruz e Miramar): meta de pelo menos 1 visita por mês em cada; registro do que foi coletado =====
-  let visitasAberto = false, visitasSel = '';
+  let visitasAberto = false, visitasSel = '', visitasEnviando = false;
   const VISITAS_OBRAS = [['Vera Cruz', 'vc'], ['Miramar', 'mi']];
   const VISITAS_INICIAIS = ['2026-11-25', '2026-12-21'];
-  const VISITAS_CAMPOS = [
-    ['fase', 'Fase e serviços em andamento'], ['avanco', 'Avanço físico'], ['metodo', 'Método construtivo e produtividade'], ['custos', 'Custos e preços'],
-    ['medicoes', 'Medições e pagamentos (UAU/BEE)'], ['problemas', 'Problemas e soluções'], ['analistas', 'Analistas: quem e o que combinamos'], ['levar', 'Para aplicar em Anápolis']
-  ];
   const VISITAS_DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
   function visitasDataBr(d){ return d ? String(d).split('-').reverse().join('/').slice(0, 5) : '—'; }
   function visitasDiaSemana(d){ return VISITAS_DIAS[new Date(d + 'T12:00:00').getDay()]; }
@@ -4262,7 +4258,7 @@
     mapaState.visitas = mapaState.visitas || {};
     const id = 'v-' + data + '-' + sigla;
     if(mapaState.visitas[id]) return;
-    mapaState.visitas[id] = { obra, data, status: 'agendada', coleta: {}, atualizadoEm: new Date().toISOString() };
+    mapaState.visitas[id] = { obra, data, status: 'agendada', notas: '', fotos: [], atualizadoEm: new Date().toISOString() };
   }
   function visitasSalvar(id, campo, valor){
     mapaState.visitas = mapaState.visitas || {};
@@ -4270,6 +4266,27 @@
     if(campo.indexOf('c_') === 0){ v.coleta = Object.assign({}, v.coleta); v.coleta[campo.slice(2)] = valor; } else v[campo] = valor;
     v.atualizadoEm = new Date().toISOString();
     saveMapaState(true);
+  }
+  async function visitasAddFotos(id, files){
+    if(!id || !files.length) return;
+    visitasEnviando = true; renderVisitas();
+    let falhas = 0;
+    for(const file of files){
+      try{
+        const [fullRes, thumbRes] = await Promise.all([ compressImage(file, 1600, 0.82), compressImage(file, 180, 0.5) ]);
+        let foto;
+        try{
+          if(nuvem.editor){ foto = { type: 'nuvem', id: await uploadFotoNuvem(fullRes), thumb: thumbRes }; }
+          else if(accessToken){ foto = { type: 'drive', fileId: await uploadToDrive(fullRes, 'visita_' + id + '_' + fmtTimestamp() + '.jpg'), thumb: thumbRes }; }
+        }catch(e){ foto = null; }
+        if(!foto) foto = { type: 'local', data: await compressImage(file, 900, 0.5) };
+        const v = Object.assign({}, (mapaState.visitas || {})[id]); if(!v.obra) continue;
+        v.fotos = (v.fotos || []).concat([foto]); v.atualizadoEm = new Date().toISOString();
+        mapaState.visitas[id] = v; saveMapaState(true);
+      }catch(e){ falhas++; }
+    }
+    visitasEnviando = false; renderVisitas();
+    if(falhas) mostrarToastSalvo(falhas + ' foto(s) não foram salvas — tenta de novo', { erro: true });
   }
   function renderVisitas(){
     const c = document.getElementById('dob-visitas-container');
@@ -4279,6 +4296,7 @@
       VISITAS_INICIAIS.forEach(d => VISITAS_OBRAS.forEach(([o, s]) => visitasCriar(d, o, s)));
       mapaState.visitasInit = true; saveMapaState(true);
     }
+    Object.entries(mapaState.visitas || {}).forEach(([id, v]) => { if(v.coleta && !v.notas){ const t = Object.values(v.coleta).filter(Boolean).join('\n'); if(t) v.notas = t; } });
     const lista = visitasLista(), hoje = beediaHoje(), mes = hoje.slice(0, 7);
     const dias = Array.from(new Set(lista.map(v => v.data))).sort();
     const status = VISITAS_OBRAS.map(([o]) => {
@@ -4297,14 +4315,24 @@
         return `<button type="button" class="dob-btn pequeno ${ativo ? '' : 'secundario'} dob-vis-chip" data-id="${v.id}">${f ? '✔ ' : ''}${paredeEsc(v.obra)}</button>`;
       }).join('');
       const v = sel && vs.find(x => x.id === sel);
+      const fotosV = v ? (v.fotos || []) : [];
       const form = v ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line);">
-        <div style="font-size:14px;margin-bottom:8px;"><b>${paredeEsc(v.obra)}</b> · anotações da visita</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:8px;">
+        <div style="font-size:14px;margin-bottom:8px;"><b>${paredeEsc(v.obra)}</b> · ${visitasDiaSemana(v.data)} ${visitasDataBr(v.data)}</div>
+        <label style="display:block;font-size:12px;"><span style="opacity:.75;">Anotações: o que está rodando, métodos, o que achei bom ou diferente</span>
+          <textarea class="dob-input dob-vis-campo" data-id="${v.id}" data-campo="notas" rows="7" style="width:100%;margin-top:2px;">${paredeEsc(v.notas || '')}</textarea></label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;">
+          <label class="dob-btn" for="dob-vis-foto-cam" style="cursor:pointer;">📸 Tirar foto</label>
+          <label class="dob-btn secundario" for="dob-vis-foto-gal" style="cursor:pointer;">Enviar da galeria</label>
+          <input type="file" id="dob-vis-foto-cam" accept="image/*" capture="environment" style="position:absolute;width:1px;height:1px;opacity:0;" />
+          <input type="file" id="dob-vis-foto-gal" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;" />
+        </div>
+        ${visitasEnviando ? '<div class="dob-dica">Enviando foto…</div>' : ''}
+        ${fotosV.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-bottom:10px;">${fotosV.map((f, i) => `<div style="position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--line);"><img data-vis-abrir="${i}" src="${f.thumb || f.data || ''}" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block;cursor:pointer;" /><button type="button" class="dob-vis-fdel" data-i="${i}" title="Remover foto" style="position:absolute;top:3px;right:3px;border:0;border-radius:50%;width:22px;height:22px;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;">×</button></div>`).join('')}</div>` : '<div class="dob-dica" style="margin-bottom:10px;">Nenhuma foto ainda.</div>'}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
           <label style="font-size:12px;">Data<input type="date" class="dob-input dob-vis-campo" data-id="${v.id}" data-campo="data" value="${paredeEsc(v.data)}" style="display:block;" /></label>
           <button type="button" class="dob-btn pequeno dob-vis-status" data-id="${v.id}">${v.status === 'realizada' ? 'Reabrir' : 'Marcar como realizada'}</button>
-          <button type="button" class="dob-btn secundario pequeno dob-vis-del" data-id="${v.id}">Remover</button>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;">${VISITAS_CAMPOS.map(([k, r]) => `<label style="font-size:12px;"><span style="opacity:.75;">${r}</span><textarea class="dob-input dob-vis-campo" data-id="${v.id}" data-campo="c_${k}" rows="3" style="width:100%;margin-top:2px;">${paredeEsc((v.coleta || {})[k] || '')}</textarea></label>`).join('')}</div></div>` : '';
+          <button type="button" class="dob-btn secundario pequeno dob-vis-del" data-id="${v.id}">Remover visita</button>
+        </div></div>` : '';
       return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;${passou && feitas ? 'opacity:.7;' : ''}">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;"><div style="min-width:92px;"><b style="font-size:15px;">${visitasDiaSemana(d)} ${visitasDataBr(d)}</b><div style="font-size:11.5px;opacity:.7;">${visitasFalta(d)}</div></div><div style="display:flex;gap:6px;flex-wrap:wrap;">${chips}</div></div>${form}</div>`;
     }).join('') || '<div style="opacity:.7;font-size:13px;">Nenhuma visita registrada. Adicione uma data abaixo.</div>';
@@ -4313,6 +4341,14 @@
       ${blocos}
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:10px;"><label style="font-size:12px;">Novo dia de visita<input type="date" id="dob-vis-data" class="dob-input" style="display:block;" /></label><button type="button" class="dob-btn pequeno" id="dob-vis-add">Adicionar (Vera Cruz e Miramar)</button></div></div>`;
     c.querySelectorAll('.dob-vis-chip').forEach(b => b.addEventListener('click', () => { visitasSel = visitasSel === b.dataset.id ? '' : b.dataset.id; renderVisitas(); }));
+    const fotoIn = (id) => { const el = document.getElementById(id); if(el) el.addEventListener('change', async (ev) => { const fs = Array.from(ev.target.files || []); ev.target.value = ''; await visitasAddFotos(sel, fs); }); };
+    fotoIn('dob-vis-foto-cam'); fotoIn('dob-vis-foto-gal');
+    c.querySelectorAll('[data-vis-abrir]').forEach(el => el.addEventListener('click', () => openLightbox(((mapaState.visitas || {})[sel].fotos || []).map(normalizeFoto), Number(el.dataset.visAbrir))));
+    c.querySelectorAll('.dob-vis-fdel').forEach(b => b.addEventListener('click', () => {
+      if(b.dataset.confirma !== '1'){ b.dataset.confirma = '1'; b.textContent = '?'; b.style.width = 'auto'; b.style.padding = '0 6px'; b.title = 'Toque de novo para remover'; return; }
+      const v = Object.assign({}, mapaState.visitas[sel]); v.fotos = (v.fotos || []).filter((_, i) => i !== Number(b.dataset.i)); v.atualizadoEm = new Date().toISOString();
+      mapaState.visitas[sel] = v; saveMapaState(true); renderVisitas();
+    }));
     c.querySelectorAll('.dob-vis-campo').forEach(el => el.addEventListener('change', () => { visitasSalvar(el.dataset.id, el.dataset.campo, el.value); if(el.dataset.campo === 'data') renderVisitas(); }));
     c.querySelectorAll('.dob-vis-status').forEach(b => b.addEventListener('click', () => { const v = (mapaState.visitas || {})[b.dataset.id]; visitasSalvar(b.dataset.id, 'status', v && v.status === 'realizada' ? 'agendada' : 'realizada'); renderVisitas(); }));
     c.querySelectorAll('.dob-vis-del').forEach(b => b.addEventListener('click', () => {
