@@ -942,6 +942,9 @@
   .dob-eqemp-ocultas-t{ font-size:12px; font-weight:600; color:var(--ink,#16233d); margin-bottom:4px; }
   .dob-eqemp-oculta{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12.5px; padding:4px 0; }
   @media (prefers-reduced-motion:reduce){ .dob-side-item, .dob-daypill, .dob-btn{ transition:none; } }
+  /* Seções desligadas (não uso): Rotina, Catálogo de custos, Custo por etapa e UAU → BEE. O código e os dados continuam, só ficam fora do menu. */
+  .dob-side-item[data-side="rotina"], .dob-side-item[data-side="catalogo"], .dob-side-item[data-side="custo-etapa"], .dob-side-item[data-side="uaubee"],
+  #dob-btn-rotina, #dob-btn-catalogo, #dob-btn-custo-etapa, #dob-btn-uaubee { display: none !important; }
 </style>
 </head>
 <body>
@@ -1103,7 +1106,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.19.79';
+  const APP_VERSION = 'v2026.11.19.80';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -3000,8 +3003,8 @@
   // ---------- Visibilidade das seções (o dono decide quem vê cada parte do app) ----------
   var VIS_PADRAO = { 'rotina': 'dono', 'painel': 'dono', 'custo-etapa': 'dono', 'parede': 'dono', 'beedia': 'dono', 'visitas': 'dono', 'uaubee': 'dono', 'gamma': 'dono' }; // em desenvolvimento: só o dono, até liberar
   var VIS_SECOES = [['novo', 'Novo apontamento', 'dob-novo'], ['metodo', 'Método construtivo', 'dob-btn-metodo'], ['mapa', 'Mapa', 'dob-btn-mapa'], ['cronograma', 'Cronograma', 'dob-btn-cronograma'],
-    ['campo', 'Modo Campo', 'dob-btn-campo'], ['fotos', 'Fotos da obra', 'dob-btn-fotos'], ['rotina', 'Rotina', 'dob-btn-rotina'], ['resumo-macro', 'Resumo macro', 'dob-btn-resumo-macro'], ['resumo-semana', 'Resumo semana', 'dob-btn-resumo-semana'], ['catalogo', 'Catálogo de custos', 'dob-btn-catalogo'],
-    ['painel', 'Meu painel', 'dob-btn-painel'], ['custo-etapa', 'Custo por etapa', 'dob-btn-custo-etapa'], ['parede', 'Parede de concreto', 'dob-btn-parede'], ['beedia', 'BEE do dia', 'dob-btn-beedia'], ['visitas', 'Visitas', 'dob-btn-visitas'], ['relatorio', 'Apresentação', 'dob-btn-relatorio'], ['gamma', 'Comando Gamma', 'dob-btn-gamma'], ['uaubee', 'UAU → BEE', 'dob-btn-uaubee']];
+    ['campo', 'Modo Campo', 'dob-btn-campo'], ['fotos', 'Fotos da obra', 'dob-btn-fotos'], ['resumo-macro', 'Resumo macro', 'dob-btn-resumo-macro'], ['resumo-semana', 'Resumo semana', 'dob-btn-resumo-semana'], 
+    ['painel', 'Meu painel', 'dob-btn-painel'], ['parede', 'Parede de concreto', 'dob-btn-parede'], ['beedia', 'BEE do dia', 'dob-btn-beedia'], ['visitas', 'Visitas', 'dob-btn-visitas'], ['relatorio', 'Apresentação', 'dob-btn-relatorio'], ['gamma', 'Comando Gamma', 'dob-btn-gamma'], ];
   function nivelSecao(k){ return (nuvem.vis && nuvem.vis[k]) || VIS_PADRAO[k] || 'todos'; }
   function secaoVisivel(k){ const n = nivelSecao(k); if(nuvem.dono) return true; if(n === 'todos') return true; if(n === 'editores') return !!nuvem.editor; return false; }
   function aplicarVisibilidade(){
