@@ -991,6 +991,7 @@
     <div class="dob-side-item" data-side="custo-etapa"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.5.8-2.5 2s1 1.6 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1.1 0-2-.4-2.5-1.2M12 6v2M12 16v2"/></svg></span><span class="label">Custo por etapa</span></div>
     <div class="dob-side-item" data-side="parede"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.5.8-2.5 2s1 1.6 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1.1 0-2-.4-2.5-1.2M12 6v2M12 16v2"/></svg></span><span class="label">Parede de concreto</span></div>
     <div class="dob-side-item" data-side="beedia"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.5 0-2.5.8-2.5 2s1 1.6 2.5 2 2.5.8 2.5 2-1 2-2.5 2c-1.1 0-2-.4-2.5-1.2M12 6v2M12 16v2"/></svg></span><span class="label">BEE do dia</span></div>
+    <div class="dob-side-item" data-side="visitas"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z"/><circle cx="12" cy="11" r="2"/></svg></span><span class="label">Visitas</span></div>
     <div class="dob-side-sep"></div>
     <div class="dob-side-item" data-side="relatorio"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h20"/><path d="M4 3v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3"/><path d="M12 16v5M8 21h8"/></svg></span><span class="label">Apresentação</span></div>
     <div class="dob-side-item" data-side="gamma"><span class="ic"><svg class="ic-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/></svg></span><span class="label">Comando Gamma</span></div>
@@ -1049,6 +1050,7 @@
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-custo-etapa">Custo por etapa</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-parede">Parede de concreto</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-beedia">BEE do dia</button>
+    <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-visitas">Visitas</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-uaubee">UAU → BEE</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-catalogo">Catálogo de custos</button>
     <button class="dob-btn secundario dob-btn-oculto-lateral" id="dob-btn-metodo">Método construtivo</button>
@@ -1081,6 +1083,7 @@
   <div id="dob-custo-etapa-container"></div>
   <div id="dob-parede-container"></div>
   <div id="dob-beedia-container"></div>
+  <div id="dob-visitas-container"></div>
   <div id="dob-uaubee-container"></div>
   <div id="dob-fotos-container"></div>
   <div id="dob-rotina-container"></div>
@@ -1100,7 +1103,7 @@
   // Versão do app — muda este texto toda vez que o index.html é alterado/publicado.
   // Aparece no topo da tela pra confirmar que o aparelho está com a versão mais nova
   // (útil pra saber se um celular/PWA ainda está com algo em cache).
-  const APP_VERSION = 'v2026.11.18.76';
+  const APP_VERSION = 'v2026.11.19.77';
   const versaoEl = document.getElementById('dob-versao');
   if(versaoEl) versaoEl.textContent = APP_VERSION;
 
@@ -2869,7 +2872,7 @@
       const producaoDia = Object.assign({}, remote.producaoDia, mapaState.producaoDia);
       servicosExcluidos.forEach(s => { delete prereqPorServico[s]; });
 
-      mapaState = { servicos, tipoPorServico, blocosPorObra, estados: Object.values(estadoPorChave), desenhos: Object.values(desenhoPorId), rotacoes, servicosExcluidos, escopoPorServico, prereqPorServico, macroPorServico, catalogoCustom, metodoOrdem, metodoPassos, custoEtapa, producaoDia };
+      mapaState = { servicos, tipoPorServico, blocosPorObra, estados: Object.values(estadoPorChave), desenhos: Object.values(desenhoPorId), rotacoes, servicosExcluidos, escopoPorServico, prereqPorServico, macroPorServico, catalogoCustom, metodoOrdem, metodoPassos, custoEtapa, producaoDia, beeLancado: Object.assign({}, remote.beeLancado, mapaState.beeLancado), visitas: Object.assign({}, remote.visitas, mapaState.visitas), apagados: mapaState.apagados };
       saveMapaState(false);
       await driveWriteDataFile(id, JSON.stringify(mapaState));
       if(mapaAberto) renderMapa();
@@ -2925,7 +2928,7 @@
     return Object.assign(extra, {
       servicos, tipoPorServico, escopoPorServico, prereqPorServico, servicosExcluidos,
       blocosPorObra: mescla('blocosPorObra'), estados: Object.values(estadoPorChave), desenhos: Object.values(desenhoPorId),
-      rotacoes: mescla('rotacoes'), beeLancado: mescla('beeLancado'), macroPorServico: mescla('macroPorServico'), catalogoCustom: mescla('catalogoCustom'),
+      rotacoes: mescla('rotacoes'), beeLancado: mescla('beeLancado'), visitas: mescla('visitas'), macroPorServico: mescla('macroPorServico'), catalogoCustom: mescla('catalogoCustom'),
       metodoOrdem: mescla('metodoOrdem'), metodoPassos: (local.metodoPassos && local.metodoPassos.length) ? local.metodoPassos : (remote.metodoPassos || []),
       custoEtapa: mescla('custoEtapa'), producaoDia: mescla('producaoDia'), apagados
     });
@@ -2940,6 +2943,7 @@
     try{ if(custoEtapaAberto) renderCustoEtapa(); }catch(e){ /* ignora */ }
     try{ if(paredeAberto) renderParede(); }catch(e){ /* ignora */ }
     try{ if(beediaAberto) renderBeeDia(); }catch(e){ /* ignora */ }
+    try{ if(visitasAberto) renderVisitas(); }catch(e){ /* ignora */ }
     try{ if(painelAberto) renderPainel(); }catch(e){ /* ignora */ }
     try{ if(cronogramaAberto) renderCronograma(); }catch(e){ /* ignora */ }
   }
@@ -2994,10 +2998,10 @@
     nuvemStatus();
   }
   // ---------- Visibilidade das seções (o dono decide quem vê cada parte do app) ----------
-  var VIS_PADRAO = { 'rotina': 'dono', 'painel': 'dono', 'custo-etapa': 'dono', 'parede': 'dono', 'beedia': 'dono', 'uaubee': 'dono', 'gamma': 'dono' }; // em desenvolvimento: só o dono, até liberar
+  var VIS_PADRAO = { 'rotina': 'dono', 'painel': 'dono', 'custo-etapa': 'dono', 'parede': 'dono', 'beedia': 'dono', 'visitas': 'dono', 'uaubee': 'dono', 'gamma': 'dono' }; // em desenvolvimento: só o dono, até liberar
   var VIS_SECOES = [['novo', 'Novo apontamento', 'dob-novo'], ['metodo', 'Método construtivo', 'dob-btn-metodo'], ['mapa', 'Mapa', 'dob-btn-mapa'], ['cronograma', 'Cronograma', 'dob-btn-cronograma'],
     ['campo', 'Modo Campo', 'dob-btn-campo'], ['fotos', 'Fotos da obra', 'dob-btn-fotos'], ['rotina', 'Rotina', 'dob-btn-rotina'], ['resumo-macro', 'Resumo macro', 'dob-btn-resumo-macro'], ['resumo-semana', 'Resumo semana', 'dob-btn-resumo-semana'], ['catalogo', 'Catálogo de custos', 'dob-btn-catalogo'],
-    ['painel', 'Meu painel', 'dob-btn-painel'], ['custo-etapa', 'Custo por etapa', 'dob-btn-custo-etapa'], ['parede', 'Parede de concreto', 'dob-btn-parede'], ['beedia', 'BEE do dia', 'dob-btn-beedia'], ['relatorio', 'Apresentação', 'dob-btn-relatorio'], ['gamma', 'Comando Gamma', 'dob-btn-gamma'], ['uaubee', 'UAU → BEE', 'dob-btn-uaubee']];
+    ['painel', 'Meu painel', 'dob-btn-painel'], ['custo-etapa', 'Custo por etapa', 'dob-btn-custo-etapa'], ['parede', 'Parede de concreto', 'dob-btn-parede'], ['beedia', 'BEE do dia', 'dob-btn-beedia'], ['visitas', 'Visitas', 'dob-btn-visitas'], ['relatorio', 'Apresentação', 'dob-btn-relatorio'], ['gamma', 'Comando Gamma', 'dob-btn-gamma'], ['uaubee', 'UAU → BEE', 'dob-btn-uaubee']];
   function nivelSecao(k){ return (nuvem.vis && nuvem.vis[k]) || VIS_PADRAO[k] || 'todos'; }
   function secaoVisivel(k){ const n = nivelSecao(k); if(nuvem.dono) return true; if(n === 'todos') return true; if(n === 'editores') return !!nuvem.editor; return false; }
   function aplicarVisibilidade(){
@@ -4239,6 +4243,76 @@
     document.getElementById('dob-btn-beedia').textContent = beediaAberto ? 'Fechar BEE do dia' : 'BEE do dia';
     renderBeeDia();
     if(beediaAberto) document.getElementById('dob-beedia-container').scrollIntoView({behavior:'smooth', block:'start'});
+  });
+
+  // ===== Visitas às outras obras (Vera Cruz e Miramar): meta de pelo menos 1 visita por mês em cada; registro do que foi coletado =====
+  let visitasAberto = false;
+  const VISITAS_OBRAS = ['Vera Cruz', 'Miramar'];
+  const VISITAS_SUGERIDAS = [['Vera Cruz', '2026-11-25'], ['Miramar', '2026-11-30'], ['Vera Cruz', '2026-12-15'], ['Miramar', '2026-12-16'], ['Vera Cruz', '2027-01-12'], ['Miramar', '2027-01-13']];
+  const VISITAS_CAMPOS = [
+    ['fase', 'Fase da obra e serviços em andamento'], ['avanco', 'Avanço físico (blocos/aptos concluídos, % )'], ['metodo', 'Método construtivo e produtividade (o que fazem diferente)'],
+    ['custos', 'Custos e preços (insumos, empreiteiros, contratos)'], ['medicoes', 'Medições e pagamentos (UAU/BEE: o que lançam e como)'],
+    ['problemas', 'Problemas, riscos e soluções adotadas'], ['analistas', 'Analistas: com quem falei e o que combinamos'], ['levar', 'Para aplicar / levar para a obra de Anápolis']
+  ];
+  function visitasLista(){ return Object.entries(mapaState.visitas || {}).map(([id, v]) => Object.assign({ id }, v)).sort((a, b) => (a.data || '').localeCompare(b.data || '')); }
+  function visitasDataBr(d){ return d ? String(d).split('-').reverse().join('/') : '—'; }
+  function visitasSalvar(id, campo, valor){
+    mapaState.visitas = mapaState.visitas || {};
+    const v = mapaState.visitas[id] = Object.assign({}, mapaState.visitas[id]);
+    if(campo.indexOf('c_') === 0){ v.coleta = Object.assign({}, v.coleta); v.coleta[campo.slice(2)] = valor; } else v[campo] = valor;
+    v.atualizadoEm = new Date().toISOString();
+    saveMapaState(true);
+  }
+  function visitasNova(obra, data){
+    mapaState.visitas = mapaState.visitas || {};
+    const id = 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    mapaState.visitas[id] = { obra, data, status: 'agendada', coleta: {}, atualizadoEm: new Date().toISOString() };
+  }
+  function renderVisitas(){
+    const c = document.getElementById('dob-visitas-container');
+    if(!c) return;
+    if(!visitasAberto){ c.innerHTML = ''; return; }
+    const lista = visitasLista(), hoje = beediaHoje(), mes = hoje.slice(0, 7);
+    const cards = VISITAS_OBRAS.map(o => {
+      const doMes = lista.filter(v => v.obra === o && (v.data || '').slice(0, 7) === mes);
+      const feita = doMes.find(v => v.status === 'realizada'), ag = doMes.find(v => v.status !== 'realizada');
+      const ult = lista.filter(v => v.obra === o && v.status === 'realizada').pop();
+      const txt = feita ? '✔ Visita do mês feita em ' + visitasDataBr(feita.data) : (ag ? 'Agendada para ' + visitasDataBr(ag.data) : '⚠ Sem visita marcada neste mês');
+      const cor = feita ? '#2f7d4f' : (ag ? '#2a6db0' : '#c4662f');
+      return `<div style="flex:1;min-width:200px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;"><b>${paredeEsc(o)}</b><div style="font-size:12.5px;color:${cor};margin-top:4px;">${txt}</div><div style="font-size:12px;opacity:.7;margin-top:2px;">Última realizada: ${ult ? visitasDataBr(ult.data) : 'nenhuma'}</div></div>`;
+    }).join('');
+    const itens = lista.map(v => {
+      const campos = VISITAS_CAMPOS.map(([k, rot]) => `<label style="display:block;margin-top:8px;font-size:12px;"><span style="opacity:.75;">${rot}</span><textarea class="dob-input dob-vis-campo" data-id="${v.id}" data-campo="c_${k}" rows="2" style="width:100%;margin-top:2px;">${paredeEsc((v.coleta || {})[k] || '')}</textarea></label>`).join('');
+      const feita = v.status === 'realizada';
+      return `<details class="dob-vis-item" ${v.data >= hoje && !feita ? '' : (feita ? '' : 'open')} style="border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:8px;"><summary style="cursor:pointer;"><b>${paredeEsc(v.obra)}</b> · ${visitasDataBr(v.data)} · <span style="color:${feita ? '#2f7d4f' : '#2a6db0'};">${feita ? 'realizada' : 'agendada'}</span></summary>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:end;">
+          <label style="font-size:12px;">Obra<select class="dob-select dob-vis-campo" data-id="${v.id}" data-campo="obra" style="display:block;">${VISITAS_OBRAS.map(o => `<option ${o === v.obra ? 'selected' : ''}>${o}</option>`).join('')}</select></label>
+          <label style="font-size:12px;">Data<input type="date" class="dob-input dob-vis-campo" data-id="${v.id}" data-campo="data" value="${paredeEsc(v.data || '')}" style="display:block;" /></label>
+          <button type="button" class="dob-btn pequeno dob-vis-status" data-id="${v.id}">${feita ? 'Reabrir' : 'Marcar como realizada'}</button>
+          <button type="button" class="dob-btn secundario pequeno dob-vis-del" data-id="${v.id}">Remover</button>
+        </div>${campos}</details>`;
+    }).join('') || '<div style="opacity:.7;font-size:13px;">Nenhuma visita registrada ainda. Use "Agendar sugeridas" ou "Nova visita".</div>';
+    c.innerHTML = `<div class="dob-cat"><div class="aviso">Meta: pelo menos 1 visita por mês em Vera Cruz e em Miramar, para ficar afiado com os outros analistas. Dias sugeridos: terça ou quarta (quinta e sexta de manhã são de aula). Evitar 01 a 10/12 (prova e entrega N3).</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;">${cards}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;"><button type="button" class="dob-btn pequeno" id="dob-vis-nova">Nova visita</button><button type="button" class="dob-btn secundario pequeno" id="dob-vis-sug">Agendar sugeridas (nov/26 a jan/27)</button></div>${itens}</div>`;
+    c.querySelectorAll('.dob-vis-campo').forEach(el => el.addEventListener('change', () => { visitasSalvar(el.dataset.id, el.dataset.campo, el.value); if(el.dataset.campo === 'obra' || el.dataset.campo === 'data') renderVisitas(); }));
+    c.querySelectorAll('.dob-vis-status').forEach(b => b.addEventListener('click', () => { const v = (mapaState.visitas || {})[b.dataset.id]; visitasSalvar(b.dataset.id, 'status', v && v.status === 'realizada' ? 'agendada' : 'realizada'); renderVisitas(); }));
+    c.querySelectorAll('.dob-vis-del').forEach(b => b.addEventListener('click', () => {
+      if(b.dataset.confirma !== '1'){ b.dataset.confirma = '1'; b.textContent = 'Confirmar remoção'; return; }
+      delete mapaState.visitas[b.dataset.id]; mapaState.apagados = mapaState.apagados || {}; mapaState.apagados['visitas|' + b.dataset.id] = Date.now();
+      saveMapaState(true); renderVisitas();
+    }));
+    document.getElementById('dob-vis-nova').addEventListener('click', () => { visitasNova(VISITAS_OBRAS[0], hoje); saveMapaState(true); renderVisitas(); });
+    document.getElementById('dob-vis-sug').addEventListener('click', () => {
+      VISITAS_SUGERIDAS.forEach(([o, d]) => { if(!lista.some(v => v.obra === o && v.data === d) && d >= hoje) visitasNova(o, d); });
+      saveMapaState(true); renderVisitas();
+    });
+  }
+  document.getElementById('dob-btn-visitas').addEventListener('click', () => {
+    visitasAberto = !visitasAberto;
+    document.getElementById('dob-btn-visitas').textContent = visitasAberto ? 'Fechar Visitas' : 'Visitas';
+    renderVisitas();
+    if(visitasAberto) document.getElementById('dob-visitas-container').scrollIntoView({behavior:'smooth', block:'start'});
   });
 
   // ===== Meu painel (só o dono): acompanhamento pessoal — PPC por semana, atrasos, causas e avanço do Mapa =====
@@ -9509,6 +9583,7 @@
       'custo-etapa': 'dob-btn-custo-etapa',
       parede: 'dob-btn-parede',
       beedia: 'dob-btn-beedia',
+      visitas: 'dob-btn-visitas',
       relatorio: 'dob-btn-relatorio',
       gamma: 'dob-btn-gamma',
       uaubee: 'dob-btn-uaubee',
@@ -9518,7 +9593,7 @@
       config: 'dob-btn-config',
       novo: 'dob-novo'
     };
-    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-cronograma', 'dob-btn-campo', 'dob-btn-fotos', 'dob-btn-rotina', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-painel', 'dob-btn-custo-etapa', 'dob-btn-parede', 'dob-btn-beedia', 'dob-btn-relatorio', 'dob-btn-gamma', 'dob-btn-uaubee', 'dob-btn-catalogo', 'dob-btn-metodo'];
+    const PAINEIS_TOGGLE = ['dob-btn-mapa', 'dob-btn-cronograma', 'dob-btn-campo', 'dob-btn-fotos', 'dob-btn-rotina', 'dob-btn-resumo-macro', 'dob-btn-resumo-semana', 'dob-btn-painel', 'dob-btn-custo-etapa', 'dob-btn-parede', 'dob-btn-beedia', 'dob-btn-visitas', 'dob-btn-relatorio', 'dob-btn-gamma', 'dob-btn-uaubee', 'dob-btn-catalogo', 'dob-btn-metodo'];
     function sincronizarSidebar(){
       let algumAberto = false;
       Object.entries(mapaBotoes).forEach(([side, btnId]) => {
